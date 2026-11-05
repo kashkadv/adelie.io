@@ -31,8 +31,10 @@
 ## 4. Git
 
 - Після пушу перевіряти, що CI зелений (GitHub Actions). Червоний CI на `main` — лагодити першочергово.
-  Відтворити CI локально: чистий `git clone` у тимчасову папку → `CI=true pnpm install --frozen-lockfile`
-  → `pnpm format:check` → `pnpm exec turbo run lint typecheck test build --force`.
+  Відтворити CI локально: чистий `git clone` у тимчасову папку (без `.env`, `.next`, `dist`,
+  `generated`) → `CI=true pnpm install --frozen-lockfile` → `pnpm format:check`
+  → `pnpm exec turbo run lint typecheck test build --force`. Робоча копія не годиться: згенеровані
+  файли (`.next/types`, Prisma client) маскують помилки, які видно лише в чистому CI.
 - pnpm 12 вимагає явного рішення для кожного пакета з install-скриптом (`allowBuilds` у
   `pnpm-workspace.yaml`); інакше в CI install падає (`ERR_PNPM_IGNORED_BUILDS`).
 
