@@ -1,4 +1,4 @@
-"""Builds self-hosted brand fonts (Unbounded + Geologica) as subset variable WOFF2.
+"""Builds self-hosted brand fonts (Tektur + Geologica) as subset variable WOFF2.
 
 Source: github.com/google/fonts (SIL OFL 1.1). Subset: Latin, Latin-1, Cyrillic incl.
 Ukrainian, common punctuation and currency. Output goes to assets/fonts/ and is copied to
@@ -21,7 +21,7 @@ from fontTools.ttLib import TTFont
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BASE = "https://raw.githubusercontent.com/google/fonts/main/ofl"
 FONTS = {
-    "unbounded": ("Unbounded[wght].ttf", "Unbounded.woff2"),
+    "tektur": ("Tektur[wdth,wght].ttf", "Tektur.woff2"),
     "geologica": ("Geologica[CRSV,SHRP,slnt,wght].ttf", "Geologica.woff2"),
 }
 UNICODES = (

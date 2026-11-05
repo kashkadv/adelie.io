@@ -29,9 +29,9 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-line: var(--line);
-  /* Brand fonts from next/font/local (layout.tsx): Geologica — text, Unbounded — display. */
+  /* Brand fonts from next/font/local (layout.tsx): Geologica — text, Tektur — display. */
   --font-sans: var(--font-geologica), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-display: var(--font-unbounded), var(--font-sans);
+  --font-display: var(--font-tektur), var(--font-sans);
 }
 
 html {
@@ -74,8 +74,8 @@ h2,
   align-items: center;
   gap: 12px;
   font-weight: 600;
-  font-size: 22px;
-  letter-spacing: -0.01em;
+  font-size: 24px;
+  letter-spacing: 0;
   text-decoration: none;
   color: inherit;
 }

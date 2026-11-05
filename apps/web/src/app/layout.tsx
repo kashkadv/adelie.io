@@ -13,10 +13,10 @@ const geologica = localFont({
   display: 'swap',
 });
 
-const unbounded = localFont({
-  src: '../fonts/Unbounded.woff2',
-  weight: '200 900',
-  variable: '--font-unbounded',
+const tektur = localFont({
+  src: '../fonts/Tektur.woff2',
+  weight: '400 900',
+  variable: '--font-tektur',
   display: 'swap',
 });
 
@@ -32,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
     // before hydration (e.g. location="..."). Applies to these elements' attributes only.
     <html
       lang="en"
-      className={`${geologica.variable} ${unbounded.variable} h-full`}
+      className={`${geologica.variable} ${tektur.variable} h-full`}
       suppressHydrationWarning
     >
       <head>
