@@ -45,9 +45,9 @@ export function AppFrame({ children }: { children: ReactNode }) {
 
   return (
     <WorkspaceProvider>
-      <div className="flex h-dvh flex-col px-3 pb-3 md:px-5 md:pb-5">
+      <div className="flex h-dvh flex-col px-3 pb-3 md:px-8 md:pb-8">
         {/* Top bar (base layer) */}
-        <header className="flex h-16 shrink-0 items-center md:h-[72px]">
+        <header className="flex h-16 shrink-0 items-center md:h-[88px]">
           <button
             type="button"
             className="icon-btn md:hidden"
@@ -67,8 +67,8 @@ export function AppFrame({ children }: { children: ReactNode }) {
             </span>
             <span className="label wordmark text-xl">Adelie</span>
           </Link>
-          {/* Project switcher above the content panel: gap (16px) + corner radius (32px). */}
-          <div className="hidden min-w-0 md:ml-12 md:block">
+          {/* Project switcher above the content panel: gap (24px) + corner radius (32px). */}
+          <div className="hidden min-w-0 md:ml-14 md:block">
             <ProjectSwitcher />
           </div>
           <Link href="/" className="ml-2 flex items-center gap-2 md:hidden" aria-label="Adelie">
@@ -116,7 +116,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
           )}
 
           {/* Content viewport (raised layer) */}
-          <main className="content-panel min-w-0 flex-1 overflow-y-auto rounded-[32px] md:ml-4">
+          <main className="content-panel min-w-0 flex-1 overflow-y-auto rounded-[32px] md:ml-6">
             <div className="w-full p-5 md:p-8">{children}</div>
           </main>
         </div>

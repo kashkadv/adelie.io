@@ -46,7 +46,7 @@ export function Sidebar({
     <aside className="sidebar flex h-full flex-col gap-1 px-3 pb-1">
       {header}
 
-      <nav className="flex flex-1 flex-col gap-1" aria-label={t('main')}>
+      <nav className="flex flex-1 flex-col gap-2.5" aria-label={t('main')}>
         {NAV.map(({ key, href, icon: Icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
           return (
