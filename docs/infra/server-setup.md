@@ -85,6 +85,8 @@ Cloudflare Email Routing (лише прийом, переадресація): `h
 - Postgres 18 + Redis 8 (`infra/dev/`, секрети згенеровано на сервері), перша міграція.
 - Встановлено cloudflared, авторизовано на зону `adelie.space` (`cloudflared tunnel login`, власник).
 - Створено тунель `adelie`, CNAME `adelie.space` і `www.adelie.space` → тунель.
+- `~/adelie/app.env` (секрети застосунку, 0600): BETTER_AUTH_SECRET, TOKEN_ENCRYPTION_KEY,
+  PINTEREST_APP_ID/SECRET (секрет вставлено власником через `ssh -t … read -rs`). `pnpm env:pull` копіює їх у `.env`.
 - Розгорнуто `infra/edge` (cloudflared + caddy): лендінг і privacy policy на https://adelie.space.
 - Увімкнено Cloudflare Email Routing (власник): `hello@`, `privacy@` → Gmail. MX, SPF, DKIM на місці;
   DMARC поки немає — додати, коли почнемо надсилати пошту від домену.

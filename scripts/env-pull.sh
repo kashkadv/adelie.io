@@ -3,6 +3,12 @@
 # Requires SSH access to the dev server (see docs/infra/server-setup.md).
 # Usage: pnpm env:pull            (host defaults to "adelie" via Tailscale)
 #        ADELIE_HOST=192.168.3.158 pnpm env:pull
+#        FORCE=1 pnpm env:pull    (overwrite an existing .env)
+#
+# Server files (never committed):
+#   ~/adelie/infra/dev/.env  — Postgres/Redis credentials
+#   ~/adelie/app.env         — app secrets; every KEY=value line is copied into .env
+#                              (BETTER_AUTH_SECRET, TOKEN_ENCRYPTION_KEY, PINTEREST_APP_*, ...)
 set -euo pipefail
 
 HOST="${ADELIE_HOST:-adelie}"
@@ -14,24 +20,25 @@ if [ -f "$TARGET" ] && [ "${FORCE:-}" != "1" ]; then
   exit 1
 fi
 
-# Remote secrets: infra .env + a shared app secrets file (created once on the server).
+# Generated-once secrets are created on the server if missing, so all machines share them.
 REMOTE=$(ssh -o BatchMode=yes "adelie@$HOST" '
   set -e
   cd ~/adelie
-  if [ ! -f app.env ]; then
-    umask 077
-    echo "BETTER_AUTH_SECRET=$(openssl rand -hex 32)" > app.env
-  fi
-  cat infra/dev/.env app.env
+  umask 077
+  touch app.env
+  grep -q "^BETTER_AUTH_SECRET=" app.env || echo "BETTER_AUTH_SECRET=$(openssl rand -hex 32)" >> app.env
+  grep -q "^TOKEN_ENCRYPTION_KEY=" app.env || echo "TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> app.env
+  echo "### infra"; cat infra/dev/.env
+  echo "### app"; cat app.env
 ')
 
-get() { printf '%s\n' "$REMOTE" | sed -n "s/^$1=//p" | head -1; }
+infra() { printf '%s\n' "$REMOTE" | sed -n '/^### infra$/,/^### app$/p' | sed -n "s/^$1=//p" | head -1; }
+APP_SECRETS=$(printf '%s\n' "$REMOTE" | sed -n '/^### app$/,$p' | grep -E '^[A-Z][A-Z0-9_]*=' || true)
 
-PG_USER=$(get POSTGRES_USER)
-PG_PASS=$(get POSTGRES_PASSWORD)
-PG_DB=$(get POSTGRES_DB)
-REDIS_PASS=$(get REDIS_PASSWORD)
-AUTH_SECRET=$(get BETTER_AUTH_SECRET)
+PG_USER=$(infra POSTGRES_USER)
+PG_PASS=$(infra POSTGRES_PASSWORD)
+PG_DB=$(infra POSTGRES_DB)
+REDIS_PASS=$(infra REDIS_PASSWORD)
 DB_HOST="${ADELIE_DB_HOST:-adelie}"
 
 umask 077
@@ -40,12 +47,15 @@ cat > "$TARGET" <<EOF
 DATABASE_URL=postgresql://$PG_USER:$PG_PASS@$DB_HOST:5432/$PG_DB
 REDIS_URL=redis://:$REDIS_PASS@$DB_HOST:6379
 
-BETTER_AUTH_SECRET=$AUTH_SECRET
 BETTER_AUTH_URL=http://localhost:4000
-
 API_PORT=4000
+API_URL=http://localhost:4000
 WEB_URL=http://localhost:3000
 NEXT_PUBLIC_API_URL=http://localhost:4000
+
+# App secrets from the dev server (~/adelie/app.env)
+$APP_SECRETS
 EOF
 
 echo "Wrote $TARGET (DB host: $DB_HOST)"
+printf '%s\n' "$APP_SECRETS" | sed 's/=.*/=…/' | sed 's/^/  /'
