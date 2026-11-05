@@ -14,3 +14,5 @@
 ## Рішення (ADR)
 
 - [ADR-0001](decisions/0001-docs-as-source-of-truth.md) — Документація в репозиторії як єдине джерело правди
+- [ADR-0002](decisions/0002-stack-and-monorepo.md) — Стек і структура монорепо (прийнято)
+- [ADR-0003](decisions/0003-auth.md) — Автентифікація: Better Auth (запропоновано)
