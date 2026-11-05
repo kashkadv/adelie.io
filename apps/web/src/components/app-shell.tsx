@@ -16,7 +16,7 @@ export function AppShell({
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-6 py-5">
-        <Link href="/" className="text-lg">
+        <Link href="/" className="text-2xl">
           <Logo />
         </Link>
         {headerRight && <div className="flex items-center gap-4 text-sm">{headerRight}</div>}

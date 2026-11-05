@@ -71,17 +71,17 @@ header.top {
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-weight: 600;
-  font-size: 20px;
-  letter-spacing: -0.01em;
+  font-size: 24px;
+  letter-spacing: -0.02em;
   text-decoration: none;
 }
 
 /* The penguin uses currentColor: dark on light theme, white on dark theme. */
 .brand svg {
-  width: 26px;
-  height: 29px;
+  width: 29px;
+  height: 32px;
   color: var(--fg);
 }
 
