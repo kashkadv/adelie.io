@@ -63,17 +63,17 @@ export function AppFrame({ children }: { children: ReactNode }) {
             aria-label="Adelie"
           >
             <span className="slot">
-              <BrandMark className="h-7 w-6" />
+              <BrandMark className="h-8 w-[29px]" />
             </span>
-            <span className="label wordmark ml-2 text-[33px]">Adelie</span>
+            <span className="label wordmark ml-2 text-[38px]">Adelie</span>
           </Link>
           {/* Project switcher above the content panel: gap (24px) + corner radius (32px). */}
           <div className="hidden min-w-0 md:ml-14 md:block">
             <ProjectSwitcher />
           </div>
           <Link href="/" className="ml-2 flex items-center gap-3 md:hidden" aria-label="Adelie">
-            <BrandMark className="h-6 w-5" />
-            <span className="wordmark text-[29px]">Adelie</span>
+            <BrandMark className="h-7 w-[25px]" />
+            <span className="wordmark text-[33px]">Adelie</span>
           </Link>
 
           {/* Ends where the content panel's top-right corner radius (32px) begins. */}

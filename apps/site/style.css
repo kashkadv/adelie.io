@@ -101,7 +101,7 @@ header.top {
   align-items: center;
   gap: 16px;
   font-weight: 400;
-  font-size: 37px;
+  font-size: 43px;
   line-height: 1;
   font-family: 'Yuyu Short', var(--font-text);
   letter-spacing: 0;
@@ -110,8 +110,8 @@ header.top {
 
 /* The penguin uses currentColor: dark on light theme, white on dark theme. */
 .brand svg {
-  width: 29px;
-  height: 32px;
+  width: 33px;
+  height: 37px;
   color: var(--fg);
 }
 

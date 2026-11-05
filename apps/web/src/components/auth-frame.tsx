@@ -19,8 +19,8 @@ export function AuthFrame({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh flex-col px-4 py-4 md:px-8">
       <header className="flex items-center justify-between">
         <Link href="/" className="flex items-center gap-4">
-          <BrandMark className="h-8 w-7" />
-          <span className="wordmark text-[37px]">Adelie</span>
+          <BrandMark className="h-[37px] w-[33px]" />
+          <span className="wordmark text-[43px]">Adelie</span>
         </Link>
         <div className="flex items-center gap-1">
           <ThemeToggle />
