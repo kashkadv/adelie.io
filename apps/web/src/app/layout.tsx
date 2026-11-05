@@ -22,8 +22,14 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     // lang is updated on the client by <HtmlLang> once the locale is resolved.
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+    // suppressHydrationWarning: browser extensions inject attributes into <html>/<body>
+    // before hydration (e.g. location="..."). Applies to these elements' attributes only.
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <Suspense>
           <LocaleProvider>{children}</LocaleProvider>
         </Suspense>
