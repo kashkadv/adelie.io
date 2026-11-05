@@ -15,7 +15,8 @@
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "dev": "nest start --watch",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "auth:reset-password": "node scripts/reset-password.mjs"
   },
   "dependencies": {
     "@adelie/db": "workspace:*",
