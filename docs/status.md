@@ -14,13 +14,12 @@ _Оновлено: 2026-11-05_
 - Обговорення MVP завершено: [plans/mvp-discussion.md](plans/mvp-discussion.md).
 - Рішення: стек (ADR-0002), auth — Better Auth (ADR-0003), Pinterest першим (ADR-0004).
 - Перший користувач — Gushka (Instagram, Pinterest, Etsy).
-- Домен продукту: `adelie.space` (DNS переноситься на Cloudflare). Приватна мережа: Tailscale.
+- Домен продукту: `adelie.space` (DNS на Cloudflare, активовано 2026-11-05). Приватна мережа: Tailscale.
 - Dev-сервер: VM `adelie` на домашньому Proxmox (Docker, Tailscale, ufw) — [infra/server-setup.md](infra/server-setup.md).
 
 ## На чому зупинились
 
 Dev-сервер готовий (порожній, лише Docker). Потрібен developer app Pinterest — створює власник проєкту.
-Активація DNS `adelie.space` на Cloudflare — в процесі.
 
 ## Наступні кроки
 

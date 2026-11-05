@@ -61,7 +61,7 @@
 - `api.adelie.space` — API та OAuth callback'и платформ.
 - `staging.` / `dev.` — за потреби, для тестових середовищ.
 
-- **DNS:** `adelie.space` переноситься на Cloudflare (2026-11-05). Публічний доступ
+- **DNS:** `adelie.space` на Cloudflare — активовано 2026-11-05. Публічний доступ
   до сервера — через Cloudflare Tunnel (без відкриття портів на роутері).
 
 ### Інструкція: перенесення DNS на Cloudflare (виконує власник)
