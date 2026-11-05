@@ -15,7 +15,12 @@ export function AppShell({
 }) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-6 py-5">
+      {/* Logo centered; on pages with header actions (e.g. signed-in) it sits left with actions right. */}
+      <header
+        className={`mx-auto flex w-full max-w-5xl items-center gap-4 px-6 py-5 ${
+          headerRight ? 'justify-between' : 'justify-center'
+        }`}
+      >
         <Link href="/" className="text-2xl">
           <Logo />
         </Link>
