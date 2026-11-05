@@ -2,7 +2,8 @@
   "Common": {
     "loading": "Loading…",
     "language": "Language",
-    "genericError": "Something went wrong"
+    "genericError": "Something went wrong",
+    "toggleTheme": "Toggle theme"
   },
   "Auth": {
     "signInTitle": "Sign in to your workspace",

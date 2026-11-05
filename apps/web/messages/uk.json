@@ -2,7 +2,8 @@
   "Common": {
     "loading": "Завантаження…",
     "language": "Мова",
-    "genericError": "Щось пішло не так"
+    "genericError": "Щось пішло не так",
+    "toggleTheme": "Змінити тему"
   },
   "Auth": {
     "signInTitle": "Увійдіть у свій робочий простір",

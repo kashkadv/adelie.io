@@ -2,8 +2,9 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { LocaleSwitcher } from './locale-switcher';
 import { Logo } from './logo';
+import { ThemeToggle } from './theme-toggle';
 
-/** Page frame: logo in the header, language switcher in the footer. */
+/** Page frame: logo left and theme switch right in the header, language switcher in the footer. */
 export function AppShell({
   children,
   headerRight,
@@ -15,16 +16,14 @@ export function AppShell({
 }) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      {/* Logo centered; on pages with header actions (e.g. signed-in) it sits left with actions right. */}
-      <header
-        className={`mx-auto flex w-full max-w-5xl items-center gap-4 px-6 py-5 ${
-          headerRight ? 'justify-between' : 'justify-center'
-        }`}
-      >
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-6 py-5">
         <Link href="/" className="text-2xl">
           <Logo />
         </Link>
-        {headerRight && <div className="flex items-center gap-4 text-sm">{headerRight}</div>}
+        <div className="flex items-center gap-4 text-sm">
+          {headerRight}
+          <ThemeToggle />
+        </div>
       </header>
 
       <main

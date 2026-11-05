@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { Suspense } from 'react';
 import { LocaleProvider } from '@/components/locale-provider';
+import { themeInitScript } from '@/lib/theme';
 import './globals.css';
 
 const geistSans = Geist({
@@ -29,6 +30,10 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        {/* Sets data-theme before first paint (no flash of the wrong theme). */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <Suspense>
           <LocaleProvider>{children}</LocaleProvider>
