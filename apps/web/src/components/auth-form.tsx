@@ -47,8 +47,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
       <form onSubmit={onSubmit} className="@container w-full max-w-md space-y-4">
         <h1
           className="mb-6 font-semibold leading-tight whitespace-nowrap"
-          // Longest title (uk) is ~16.0em wide in Tektur 600 → 26px fits 448px; shrinks on narrow screens.
-          style={{ fontSize: 'min(26px, calc(100cqi / 16.4))' }}
+          // Longest title (uk) is ~15.5em wide in Onest 600 → 28px fits 448px; shrinks on narrow screens.
+          style={{ fontSize: 'min(28px, calc(100cqi / 15.9))' }}
         >
           {mode === 'register' ? t('registerTitle') : t('signInTitle')}
         </h1>

@@ -1,4 +1,4 @@
-"""Builds self-hosted brand fonts (Tektur + Geologica) as subset variable WOFF2.
+"""Builds self-hosted brand fonts (Onest + Tektur) as subset variable WOFF2.
 
 Source: github.com/google/fonts (SIL OFL 1.1). Subset: Latin, Latin-1, Cyrillic incl.
 Ukrainian, common punctuation and currency. Output goes to assets/fonts/ and is copied to
@@ -22,7 +22,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 BASE = "https://raw.githubusercontent.com/google/fonts/main/ofl"
 FONTS = {
     "tektur": ("Tektur[wdth,wght].ttf", "Tektur.woff2"),
-    "geologica": ("Geologica[CRSV,SHRP,slnt,wght].ttf", "Geologica.woff2"),
+    "onest": ("Onest[wght].ttf", "Onest.woff2"),
 }
 UNICODES = (
     "U+0020-007E,U+00A0-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,"

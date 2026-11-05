@@ -1,4 +1,4 @@
-/* Brand fonts (self-hosted, SIL OFL): Tektur — wordmark & headings, Geologica — text. */
+/* Brand fonts (self-hosted, SIL OFL): Onest — wordmark & headings, Tektur — text. */
 @font-face {
   font-family: 'Tektur';
   src: url('/fonts/Tektur.woff2') format('woff2');
@@ -8,8 +8,8 @@
 }
 
 @font-face {
-  font-family: 'Geologica';
-  src: url('/fonts/Geologica.woff2') format('woff2');
+  font-family: 'Onest';
+  src: url('/fonts/Onest.woff2') format('woff2');
   font-weight: 100 900;
   font-display: swap;
 }
@@ -21,8 +21,8 @@
   --muted: #6b6b6b;
   --line: #e6e6e6;
   --max: 1120px;
-  --font-text: 'Geologica', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Tektur', var(--font-text);
+  --font-text: 'Tektur', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Onest', var(--font-text);
   color-scheme: light;
 }
 

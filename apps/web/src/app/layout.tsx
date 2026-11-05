@@ -6,10 +6,10 @@ import { themeInitScript } from '@/lib/theme';
 import './globals.css';
 
 // Brand fonts (self-hosted, SIL OFL; built by scripts/brand-fonts.py) — same as the public site.
-const geologica = localFont({
-  src: '../fonts/Geologica.woff2',
+const onest = localFont({
+  src: '../fonts/Onest.woff2',
   weight: '100 900',
-  variable: '--font-geologica',
+  variable: '--font-onest',
   display: 'swap',
 });
 
@@ -32,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
     // before hydration (e.g. location="..."). Applies to these elements' attributes only.
     <html
       lang="en"
-      className={`${geologica.variable} ${tektur.variable} h-full`}
+      className={`${onest.variable} ${tektur.variable} h-full`}
       suppressHydrationWarning
     >
       <head>

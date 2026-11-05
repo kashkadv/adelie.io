@@ -29,9 +29,9 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-line: var(--line);
-  /* Brand fonts from next/font/local (layout.tsx): Geologica — text, Tektur — display. */
-  --font-sans: var(--font-geologica), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-display: var(--font-tektur), var(--font-sans);
+  /* Brand fonts from next/font/local (layout.tsx): Tektur — text, Onest — display (headings, wordmark). */
+  --font-sans: var(--font-tektur), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: var(--font-onest), var(--font-sans);
 }
 
 html {
