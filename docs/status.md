@@ -22,14 +22,17 @@ _Оновлено: 2026-11-05_
 
 ## На чому зупинились
 
-Скелет працює: `pnpm dev` успішно запущено на Mac (через Tailscale до dev-сервера).
+Скелет працює: `pnpm dev` успішно запущено на Mac, перший користувач зареєстрований через браузер.
+Досліджено Pinterest API: [integrations/pinterest.md](integrations/pinterest.md) — історія лише 90 днів,
+trial — 1000 запитів/добу, для заявки потрібна privacy policy на `adelie.space`.
 Лишилось перевірити запуск з нуля на стаціонарному ПК.
 
 ## Наступні кроки
 
 1. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
-2. Створити developer app на developers.pinterest.com → етап 0 (PoC Pinterest API).
-3. Етап 2: adapter-контракт, схема соцмереж/метрик, OAuth Pinterest.
+2. Опублікувати `adelie.space` + `/privacy` (потрібно для Pinterest app).
+3. Створити developer app на developers.pinterest.com (інструкція в integrations/pinterest.md) → PoC.
+4. Етап 2: adapter-контракт, схема соцмереж/метрик, OAuth Pinterest.
 
 ## Відкриті питання
 
