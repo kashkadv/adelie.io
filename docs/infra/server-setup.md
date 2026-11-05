@@ -86,6 +86,8 @@ Cloudflare Email Routing (лише прийом, переадресація): `h
 - Встановлено cloudflared, авторизовано на зону `adelie.space` (`cloudflared tunnel login`, власник).
 - Створено тунель `adelie`, CNAME `adelie.space` і `www.adelie.space` → тунель.
 - Розгорнуто `infra/edge` (cloudflared + caddy): лендінг і privacy policy на https://adelie.space.
+- Увімкнено Cloudflare Email Routing (власник): `hello@`, `privacy@` → Gmail. MX, SPF, DKIM на місці;
+  DMARC поки немає — додати, коли почнемо надсилати пошту від домену.
 
 ## Відтворення VM з нуля (на хості Proxmox)
 

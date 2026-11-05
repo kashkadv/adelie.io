@@ -13,7 +13,7 @@ _Оновлено: 2026-11-05_
 - Вимоги: [product-requirements.md](product-requirements.md). Обговорення MVP: [plans/mvp-discussion.md](plans/mvp-discussion.md).
 - Рішення: стек (ADR-0002), Better Auth (ADR-0003), Pinterest першим (ADR-0004), інструменти й версії (ADR-0005).
 - Перший користувач — Gushka (Instagram, Pinterest, Etsy).
-- Домен `adelie.space` на Cloudflare. Приватна мережа: Tailscale.
+- Домен `adelie.space` на Cloudflare; пошта `hello@`/`privacy@` → Gmail (Email Routing). Приватна мережа: Tailscale.
 - Dev-сервер: VM `adelie` на Proxmox — Docker, PostgreSQL 18, Redis 8 (лише через Tailscale): [infra/server-setup.md](infra/server-setup.md).
 - Скелет монорепо: api (NestJS + Better Auth), web (Next.js), worker (BullMQ), db (Prisma), shared; CI.
   Перевірено наживо проти dev-сервера: реєстрація → автоматичний workspace, чужий workspace → 404,
@@ -34,10 +34,9 @@ trial — 1000 запитів/добу, для заявки потрібна pri
 ## Наступні кроки
 
 1. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
-2. Cloudflare Email Routing: `hello@` і `privacy@adelie.space` → Gmail власника (адреси вказані на сайті).
-3. Business-акаунт Pinterest «Adelie» (пошта `hello@adelie.space`) → з нього developer app
+2. Business-акаунт Pinterest «Adelie» (пошта `hello@adelie.space`) → з нього developer app
    (інструкція в integrations/pinterest.md) → PoC.
-4. Етап 2: adapter-контракт, схема соцмереж/метрик, OAuth Pinterest.
+3. Етап 2: adapter-контракт, схема соцмереж/метрик, OAuth Pinterest.
 
 ## Відкриті питання
 
