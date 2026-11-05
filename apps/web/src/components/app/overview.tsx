@@ -23,7 +23,7 @@ export function Overview() {
         {METRICS.map((key, i) => (
           <article
             key={key}
-            className="glass animate-rise rounded-[24px] p-5"
+            className="card animate-rise rounded-[24px] p-5"
             style={{ animationDelay: `${40 + i * 40}ms` }}
           >
             <p className="text-sm text-muted">{t(`metrics.${key}`)}</p>

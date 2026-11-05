@@ -2,15 +2,21 @@
 
 import { Menu } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { BrandMark } from '../brand';
+import { LocaleSwitcher } from '../locale-switcher';
+import { ThemeToggle } from '../theme-toggle';
 import { Sidebar } from './sidebar';
+import { UserMenu } from './user-menu';
 import { WorkspaceProvider } from './workspace-context';
 
 /**
- * Full-screen app frame: glass sidebar on the left, scrollable content on the right.
+ * Full-screen app frame in two layers (ADR-0009):
+ * - base layer: top bar (brand left; theme, language, profile right) and the sidebar;
+ * - raised layer: the content viewport — a single panel with its own scroll.
  * On small screens the sidebar becomes a drawer opened from the top bar.
  * Redirects to /login without a session.
  */
@@ -38,47 +44,66 @@ export function AppFrame({ children }: { children: ReactNode }) {
 
   return (
     <WorkspaceProvider>
-      <div className="flex h-dvh gap-3 p-3">
-        {/* Desktop sidebar */}
-        <div className="hidden md:block">
-          <Sidebar user={user} />
-        </div>
-
-        {/* Mobile drawer */}
-        {drawerOpen && (
-          <div className="fixed inset-0 z-50 md:hidden">
-            <button
-              type="button"
-              aria-label={t('closeMenu')}
-              className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-              onClick={() => setDrawerOpen(false)}
-            />
-            <div className="sidebar-drawer animate-rise absolute inset-y-3 left-3">
-              <Sidebar user={user} collapsible={false} onNavigate={() => setDrawerOpen(false)} />
-            </div>
-          </div>
-        )}
-
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          {/* Mobile top bar */}
-          <header className="glass flex h-14 items-center justify-between rounded-[22px] px-3 md:hidden">
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label={t('openMenu')}
-              onClick={() => setDrawerOpen(true)}
-            >
-              <Menu size={20} strokeWidth={1.75} aria-hidden="true" />
-            </button>
-            <span className="flex items-center gap-2">
-              <BrandMark className="h-6 w-5" />
-              <span className="wordmark text-lg">Adelie</span>
+      <div className="flex h-dvh flex-col pb-3 md:pr-3">
+        {/* Top bar (base layer) */}
+        <header className="flex h-16 shrink-0 items-center pr-3 md:pr-0">
+          <button
+            type="button"
+            className="icon-btn ml-3 md:hidden"
+            aria-label={t('openMenu')}
+            onClick={() => setDrawerOpen(true)}
+          >
+            <Menu size={20} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+          {/* Same width as the sidebar, so the mark sits right above the nav icons. */}
+          <Link
+            href="/"
+            className="sidebar hidden h-full items-center px-3 md:flex"
+            aria-label="Adelie"
+          >
+            <span className="slot">
+              <BrandMark className="h-7 w-6" />
             </span>
-            <span className="w-9" aria-hidden="true" />
-          </header>
+            <span className="label wordmark text-xl">Adelie</span>
+          </Link>
+          <Link href="/" className="ml-2 flex items-center gap-2 md:hidden" aria-label="Adelie">
+            <BrandMark className="h-6 w-5" />
+            <span className="wordmark text-lg">Adelie</span>
+          </Link>
 
-          <main className="min-h-0 flex-1 overflow-y-auto rounded-[28px]">
-            <div className="w-full px-1 py-2 md:px-3 md:py-3">{children}</div>
+          <div className="ml-auto flex items-center gap-1">
+            <ThemeToggle />
+            <LocaleSwitcher />
+            <span className="ml-2">
+              <UserMenu user={user} />
+            </span>
+          </div>
+        </header>
+
+        <div className="flex min-h-0 flex-1">
+          {/* Sidebar (base layer) */}
+          <div className="hidden md:block">
+            <Sidebar />
+          </div>
+
+          {/* Mobile drawer */}
+          {drawerOpen && (
+            <div className="fixed inset-0 z-50 md:hidden">
+              <button
+                type="button"
+                aria-label={t('closeMenu')}
+                className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+                onClick={() => setDrawerOpen(false)}
+              />
+              <div className="sidebar-drawer content-panel animate-rise absolute inset-y-3 left-3 rounded-[28px] py-3">
+                <Sidebar collapsible={false} onNavigate={() => setDrawerOpen(false)} />
+              </div>
+            </div>
+          )}
+
+          {/* Content viewport (raised layer) */}
+          <main className="content-panel mx-3 min-w-0 flex-1 overflow-y-auto rounded-[32px] md:mx-0">
+            <div className="w-full p-5 md:p-8">{children}</div>
           </main>
         </div>
       </div>

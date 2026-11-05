@@ -23,6 +23,14 @@
   --shadow: rgb(20 28 40 / 0.08);
   --hover: rgb(11 14 18 / 0.05);
 
+  /* Content viewport (raised layer) and cards inside it */
+  --panel: rgb(255 255 255 / 0.62);
+  --panel-border: rgb(255 255 255 / 0.85);
+  --panel-shadow: 0 30px 80px -30px rgb(20 28 40 / 0.25), 0 2px 6px rgb(20 28 40 / 0.04);
+  --card: rgb(255 255 255 / 0.9);
+  --card-border: rgb(11 14 18 / 0.04);
+  --card-shadow: 0 8px 24px -14px rgb(20 28 40 / 0.18);
+
   /* Highlight: the black "pill" in light theme */
   --accent: #0b0e12;
   --accent-foreground: #ffffff;
@@ -54,6 +62,13 @@
   --glass-highlight: rgb(255 255 255 / 0.06);
   --shadow: rgb(0 0 0 / 0.45);
   --hover: rgb(255 255 255 / 0.05);
+
+  --panel: rgb(20 24 30 / 0.72);
+  --panel-border: rgb(255 255 255 / 0.07);
+  --panel-shadow: 0 30px 80px -30px rgb(0 0 0 / 0.8), inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --card: rgb(255 255 255 / 0.035);
+  --card-border: rgb(255 255 255 / 0.06);
+  --card-shadow: none;
 
   --accent: #f2f4f7;
   --accent-foreground: #07090c;
@@ -146,6 +161,22 @@ h3 {
       0 10px 40px -12px var(--shadow);
     -webkit-backdrop-filter: blur(28px) saturate(160%);
     backdrop-filter: blur(28px) saturate(160%);
+  }
+
+  /* The content viewport: the only raised layer; everything else lies on the base. */
+  .content-panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    box-shadow: var(--panel-shadow);
+    -webkit-backdrop-filter: blur(32px) saturate(160%);
+    backdrop-filter: blur(32px) saturate(160%);
+  }
+
+  /* Cards inside the viewport. */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--card-shadow);
   }
 
   .glass-strong {
