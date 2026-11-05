@@ -4,33 +4,35 @@ _Оновлено: 2026-11-05_
 
 ## Поточний етап
 
-**MVP-1, етап 0** — перевірка Pinterest API. План: [plans/mvp-1.md](plans/mvp-1.md).
-Коду ще немає.
+**MVP-1, етап 1 (Foundation)** — скелет готовий, лишилась перевірка на другому ПК.
+Паралельно чекає **етап 0** (Pinterest developer app). План: [plans/mvp-1.md](plans/mvp-1.md).
 
 ## Зроблено
 
-- Репозиторій `kashkadv/adelie.io` (монорепо), правила роботи: [rules.md](rules.md).
-- Вимоги до продукту: [product-requirements.md](product-requirements.md).
-- Обговорення MVP завершено: [plans/mvp-discussion.md](plans/mvp-discussion.md).
-- Рішення: стек (ADR-0002), auth — Better Auth (ADR-0003), Pinterest першим (ADR-0004).
+- Репозиторій `kashkadv/adelie.io`, правила роботи: [rules.md](rules.md).
+- Вимоги: [product-requirements.md](product-requirements.md). Обговорення MVP: [plans/mvp-discussion.md](plans/mvp-discussion.md).
+- Рішення: стек (ADR-0002), Better Auth (ADR-0003), Pinterest першим (ADR-0004), інструменти й версії (ADR-0005).
 - Перший користувач — Gushka (Instagram, Pinterest, Etsy).
-- Домен продукту: `adelie.space` (DNS на Cloudflare, активовано 2026-11-05). Приватна мережа: Tailscale.
-- Dev-сервер: VM `adelie` на домашньому Proxmox (Docker, Tailscale, ufw) — [infra/server-setup.md](infra/server-setup.md).
+- Домен `adelie.space` на Cloudflare. Приватна мережа: Tailscale.
+- Dev-сервер: VM `adelie` на Proxmox — Docker, PostgreSQL 18, Redis 8 (лише через Tailscale): [infra/server-setup.md](infra/server-setup.md).
+- Скелет монорепо: api (NestJS + Better Auth), web (Next.js), worker (BullMQ), db (Prisma), shared; CI.
+  Перевірено наживо проти dev-сервера: реєстрація → автоматичний workspace, чужий workspace → 404,
+  без сесії → 401, worker обробляє задачу з черги. Як запустити — [README](../README.md).
 
 ## На чому зупинились
 
-Dev-сервер готовий (порожній, лише Docker). Потрібен developer app Pinterest — створює власник проєкту.
+Скелет закомічено. `pnpm dev` (режим watch) ще не прогнаний — перевірено лише зібрані застосунки.
 
 ## Наступні кроки
 
-1. Створити developer app на developers.pinterest.com.
-2. PoC Pinterest API → `docs/integrations/pinterest.md`.
-3. Етап 1: скелет монорепо; Postgres + Redis на dev-сервері.
-4. Перевірити SSH-доступ до сервера зі стаціонарного ПК (ключі GitHub уже додано).
+1. На ПК увімкнути Tailscale, потім `pnpm env:pull && pnpm build && pnpm dev` — перевірити з нуля (і на другому ПК).
+2. Створити developer app на developers.pinterest.com → етап 0 (PoC Pinterest API).
+3. Етап 2: adapter-контракт, схема соцмереж/метрик, OAuth Pinterest.
 
 ## Відкриті питання
 
-- Інфраструктура на домашньому Proxmox: [plans/infra-discussion.md](plans/infra-discussion.md).
-
+- Мова інтерфейсу: англійська, українська чи обидві? (зараз заглушки англійською)
 - Хостинг production — кандидат домашній Proxmox, вирішуємо на етапі 4.
+- Cloudflare Tunnel — налаштувати, коли знадобиться публічна сторінка (privacy policy для Pinterest).
 - Etsy — майбутній напрям E-commerce Intelligence, поза MVP.
+- Деталі інфраструктури: [plans/infra-discussion.md](plans/infra-discussion.md).

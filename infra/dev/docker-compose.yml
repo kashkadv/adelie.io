@@ -1,0 +1,46 @@
+# Dev infrastructure: PostgreSQL + Redis.
+# Runs on the dev server (VM `adelie`) or locally.
+# Ports are published only on BIND_ADDR (Tailscale IP on the server, 127.0.0.1 locally):
+# Docker bypasses ufw, so never bind to 0.0.0.0.
+name: adelie-dev
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-adelie}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-adelie}
+    ports:
+      - '${BIND_ADDR:-127.0.0.1}:5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:8
+    restart: unless-stopped
+    # BullMQ requires noeviction; AOF for durability of queued jobs.
+    command: >
+      redis-server --appendonly yes --maxmemory-policy noeviction
+      --requirepass ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - '${BIND_ADDR:-127.0.0.1}:6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a $${REDIS_PASSWORD} --no-auth-warning ping | grep PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+  redis-data:

@@ -1,6 +1,6 @@
 # Документація Adelie
 
-Уся інформація про проєкт живе в цій папці. Почни з [rules.md](rules.md) і [status.md](status.md).
+Уся інформація про проєкт живе в цій папці. Як запустити код — [README у корені](../README.md). Почни з [rules.md](rules.md) і [status.md](status.md).
 
 | Документ | Опис |
 |---|---|
@@ -21,3 +21,4 @@
 - [ADR-0002](decisions/0002-stack-and-monorepo.md) — Стек і структура монорепо (прийнято)
 - [ADR-0003](decisions/0003-auth.md) — Автентифікація: Better Auth (прийнято)
 - [ADR-0004](decisions/0004-platform-order.md) — Порядок підключення платформ: Pinterest першим (прийнято)
+- [ADR-0005](decisions/0005-toolchain.md) — Інструменти та версії (прийнято)

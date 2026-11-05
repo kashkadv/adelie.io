@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Dependencies allowed to run install scripts (pnpm blocks them by default).
+allowBuilds:
+  prisma: true
+  '@prisma/engines': true
+  sharp: false
+  unrs-resolver: false
+  esbuild: false
+  msgpackr-extract: false

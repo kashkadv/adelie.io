@@ -36,17 +36,20 @@ Pinterest-акаунт → дані синхронізуються у фоні �
 
 ## Етап 1. Foundation
 
-- [ ] pnpm-монорепо: `apps/web`, `apps/api`, `apps/worker`, `packages/db`, `packages/shared`
-- [ ] Спільні налаштування TypeScript, ESLint, Prettier
-- [ ] Docker Compose: PostgreSQL, Redis
-- [ ] `packages/db`: Prisma, базова схема (User, Workspace, WorkspaceMember + таблиці Better Auth)
-- [ ] `apps/api`: NestJS, Better Auth, health-check, guard перевірки членства у workspace
-- [ ] Автоматичне створення workspace при реєстрації
-- [ ] `apps/web`: Next.js, Tailwind, shadcn/ui, сторінки логіну/реєстрації, базовий layout
-- [ ] `apps/worker`: BullMQ, тестова задача
-- [ ] Тести: налаштований runner, перший тест tenant-ізоляції
-- [ ] CI (GitHub Actions): lint, typecheck, test
-- [ ] README з інструкцією локального запуску (важливо для двох ПК)
+- [x] pnpm-монорепо: `apps/web`, `apps/api`, `apps/worker`, `packages/db`, `packages/shared`
+- [x] Спільні налаштування TypeScript, Prettier; lint: oxlint (api) + ESLint (web) — ADR-0005
+- [x] Docker Compose: PostgreSQL, Redis
+- [x] `packages/db`: Prisma, базова схема (User, Workspace, WorkspaceMember + таблиці Better Auth)
+- [x] `apps/api`: NestJS, Better Auth, health-check, guard перевірки членства у workspace
+- [x] Автоматичне створення workspace при реєстрації
+- [x] `apps/web`: Next.js, Tailwind, сторінки логіну/реєстрації, головна зі списком workspace
+- [ ] shadcn/ui — перенесено на етап 3 (UI)
+- [x] `apps/worker`: BullMQ, тестова задача
+- [x] Тести: налаштований runner, перший тест tenant-ізоляції
+- [x] CI (GitHub Actions): lint, typecheck, test
+- [x] README з інструкцією локального запуску (важливо для двох ПК)
+
+- [ ] Перевірити запуск з нуля на другому ПК
 
 **Критерій готовності:** на чистому ПК `git clone` → інструкція з README →
 працюють реєстрація, логін, web бачить api, worker обробляє тестову задачу.

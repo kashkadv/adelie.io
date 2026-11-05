@@ -1,0 +1,27 @@
+{
+  "name": "adelie",
+  "private": true,
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @adelie/db generate",
+    "db:migrate": "pnpm --filter @adelie/db migrate:dev",
+    "db:studio": "pnpm --filter @adelie/db studio",
+    "env:pull": "bash scripts/env-pull.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "prettier": "3.9.10",
+    "turbo": "2.11.10",
+    "typescript": "~6.0.3"
+  }
+}

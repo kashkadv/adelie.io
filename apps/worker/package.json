@@ -1,0 +1,21 @@
+{
+  "name": "@adelie/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@adelie/shared": "workspace:*",
+    "bullmq": "6.5.4",
+    "ioredis": "6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "tsx": "4.23.15"
+  }
+}
