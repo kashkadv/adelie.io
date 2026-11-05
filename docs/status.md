@@ -35,7 +35,7 @@ trial — 1000 запитів/добу, для заявки потрібна pri
 
 1. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
 2. Pinterest: застосунок `Adelie` (ID 1635003) — **Trial активний**, App secret на сервері.
-   Redirect URI додано. Лишилось: перевипустити тестовий маркер PoC 1 (потрапив у чат).
+   Redirect URI додано, тестовий маркер PoC 1 відкликано.
 3. Обговорити модель даних етапу 2: [plans/stage-2-data-model.md](plans/stage-2-data-model.md).
 4. Етап 2: adapter-контракт, схема соцмереж/метрик, OAuth Pinterest.
 
