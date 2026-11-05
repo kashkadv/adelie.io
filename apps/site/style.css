@@ -4,7 +4,7 @@
   --fg: #0a0e12;
   --muted: #6b6b6b;
   --line: #e6e6e6;
-  --max: 720px;
+  --max: 1120px;
   color-scheme: light;
 }
 
@@ -187,7 +187,9 @@ header.top {
   color: var(--muted);
 }
 
+/* Long-form text keeps a readable line length inside the wider page. */
 article.doc {
+  max-width: 720px;
   padding: 32px 0 64px;
 }
 
