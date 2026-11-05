@@ -36,9 +36,11 @@ trial — 1000 запитів/добу, для заявки потрібна pri
 1. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
 2. Pinterest: застосунок `Adelie` (ID 1635003) — **Trial активний**, App secret на сервері.
    Redirect URI додано, тестовий маркер PoC 1 відкликано.
-3. Обговорити модель даних етапу 2: [plans/stage-2-data-model.md](plans/stage-2-data-model.md).
-   Структуру простору вирішено: workspace → **проєкти** → акаунти, звіти за посиланням (ADR-0007).
-4. Етап 2: adapter-контракт, схема соцмереж/метрик, OAuth Pinterest.
+3. Модель даних етапу 2 **узгоджено**: [plans/stage-2-data-model.md](plans/stage-2-data-model.md),
+   ADR-0007 (workspace → проєкти → акаунти) і ADR-0008 (зберігання метрик).
+4. Етап 2, реалізація: Prisma-схема (Project, ProjectMember, SocialConnection, SocialAccount, SocialBoard,
+   SocialPost, MetricDefinition, MetricValue, PostMetricsLatest, SyncRun, SyncPayload), шифрування токенів,
+   adapter-контракт, OAuth Pinterest, синхронізація у worker, PoC 2 на акаунті Gushka.
 
 ## Відкриті питання
 

@@ -10,7 +10,7 @@
 | [decisions/](decisions/) | Архітектурні рішення (ADR) |
 | [plans/](plans/) | Плани реалізації |
 | [plans/mvp-1.md](plans/mvp-1.md) | План MVP-1: Pinterest end-to-end (в роботі) |
-| [plans/stage-2-data-model.md](plans/stage-2-data-model.md) | Етап 2: модель даних соцмереж і метрик (обговорення) |
+| [plans/stage-2-data-model.md](plans/stage-2-data-model.md) | Етап 2: модель даних соцмереж і метрик (узгоджено) |
 | [plans/mvp-discussion.md](plans/mvp-discussion.md) | Обговорення обсягу MVP і стеку (завершено) |
 | [plans/infra-discussion.md](plans/infra-discussion.md) | Обговорення інфраструктури на домашньому Proxmox (в роботі) |
 | [infra/server-setup.md](infra/server-setup.md) | Сервер на Proxmox: створення VM, доступ, журнал налаштування |
@@ -25,3 +25,4 @@
 - [ADR-0005](decisions/0005-toolchain.md) — Інструменти та версії (прийнято)
 - [ADR-0006](decisions/0006-i18n.md) — Мультимовність інтерфейсу: next-intl, en + uk (прийнято)
 - [ADR-0007](decisions/0007-workspace-projects.md) — Структура простору: workspace → проєкти → акаунти (прийнято)
+- [ADR-0008](decisions/0008-metrics-storage.md) — Зберігання метрик: довга таблиця, похідний шар, сирі відповіді 90 днів (прийнято)
