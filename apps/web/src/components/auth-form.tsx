@@ -10,7 +10,7 @@ import { AppShell } from './app-shell';
 type Mode = 'login' | 'register';
 
 const input =
-  'w-full rounded-md border border-black/15 dark:border-white/20 bg-transparent px-3 py-2 outline-none focus:border-current';
+  'w-full rounded-md border border-line bg-transparent px-3 py-2 outline-none focus:border-current';
 
 export function AuthForm({ mode }: { mode: Mode }) {
   const t = useTranslations('Auth');

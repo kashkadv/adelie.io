@@ -1,4 +1,5 @@
-// Theme: follows the system by default; an explicit choice is stored per browser.
+// Site behaviour: theme (system by default, explicit choice stored per browser)
+// and the footer language dropdown.
 // Loaded in <head> (blocking) so the saved theme applies before first paint.
 (function () {
   var KEY = 'adelie-theme';
@@ -22,6 +23,14 @@
   if (initial === 'light' || initial === 'dark') root.setAttribute('data-theme', initial);
 
   document.addEventListener('DOMContentLoaded', function () {
+    // Language dropdown in the footer: option values are the page URLs per language.
+    var lang = document.querySelector('[data-lang-select]');
+    if (lang) {
+      lang.addEventListener('change', function () {
+        window.location.href = lang.value;
+      });
+    }
+
     var button = document.querySelector('[data-theme-toggle]');
     if (!button) return;
     button.addEventListener('click', function () {

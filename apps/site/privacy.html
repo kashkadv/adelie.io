@@ -22,9 +22,6 @@
           Adelie
         </a>
         <div class="actions">
-          <nav class="lang">
-            <a href="/privacy" aria-current="true">EN</a> · <a href="/uk/privacy">UK</a>
-          </nav>
           <button
             class="theme-toggle"
             type="button"
@@ -136,8 +133,18 @@
       </article>
 
       <footer>
-        <span>© 2026 Adelie</span>
-        <a href="/">Home</a>
+        <div class="footer-links">
+          <span>© 2026 Adelie</span>
+          <a href="/privacy">Privacy Policy</a>
+          <a href="mailto:hello@adelie.space">hello@adelie.space</a>
+        </div>
+        <label class="lang-select">
+          <span class="visually-hidden">Language</span>
+          <select data-lang-select aria-label="Language">
+            <option value="/privacy" selected>English</option>
+            <option value="/uk/privacy">Українська</option>
+          </select>
+        </label>
       </footer>
     </div>
   </body>

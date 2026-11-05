@@ -3,22 +3,22 @@
 import { useTranslations } from 'next-intl';
 import { currentTheme, setTheme } from '@/lib/theme';
 
-/** Light/dark switch. Icons are swapped purely by CSS (`dark:`), so no hydration mismatch. */
+/** Light/dark switch (same as on the public site). Icons are swapped by CSS — no hydration mismatch. */
 export function ThemeToggle() {
   const t = useTranslations('Common');
 
   return (
     <button
       type="button"
+      className="theme-toggle"
       aria-label={t('toggleTheme')}
       title={t('toggleTheme')}
       onClick={() => setTheme(currentTheme() === 'dark' ? 'light' : 'dark')}
-      className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-black/15 dark:border-white/20"
     >
       {/* Shows the theme you would switch to: moon on light, sun on dark. */}
       <svg
+        className="to-dark"
         viewBox="0 0 24 24"
-        className="h-4 w-4 dark:hidden"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
@@ -29,8 +29,8 @@ export function ThemeToggle() {
         <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
       </svg>
       <svg
+        className="to-light"
         viewBox="0 0 24 24"
-        className="hidden h-4 w-4 dark:block"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"

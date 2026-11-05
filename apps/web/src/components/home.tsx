@@ -59,7 +59,7 @@ export function Home() {
         ) : workspaces.length === 0 ? (
           <p className="opacity-60">{t('noWorkspaces')}</p>
         ) : (
-          <ul className="divide-y divide-black/10 dark:divide-white/10 rounded-md border border-black/10 dark:border-white/10">
+          <ul className="divide-y divide-line rounded-md border border-line">
             {workspaces.map((w) => (
               <li key={w.id} className="flex justify-between px-4 py-3">
                 <span>{w.name}</span>

@@ -1,10 +1,19 @@
+'use client';
+
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { LocaleSwitcher } from './locale-switcher';
-import { Logo } from './logo';
 import { ThemeToggle } from './theme-toggle';
 
-/** Page frame: logo left and theme switch right in the header, language switcher in the footer. */
+const SITE_URL = 'https://adelie.space';
+const MARK_VIEWBOX = '0 0 465.206 520.464';
+
+/**
+ * Page frame. Header and footer are identical to the public site (apps/site):
+ * logo + name left, theme toggle right; footer links left, language dropdown right.
+ * Styles: .shell-* in globals.css (mirrors apps/site/style.css).
+ */
 export function AppShell({
   children,
   headerRight,
@@ -14,30 +23,35 @@ export function AppShell({
   headerRight?: ReactNode;
   centered?: boolean;
 }) {
+  const t = useTranslations('Common');
+  const locale = useLocale();
+  const privacyUrl = locale === 'en' ? `${SITE_URL}/privacy` : `${SITE_URL}/${locale}/privacy`;
+
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-6 py-5">
-        <Link href="/" className="text-2xl">
-          <Logo />
+    <div className="shell-wrap flex min-h-full flex-1 flex-col">
+      <header className="shell-header">
+        <Link href="/" className="shell-brand">
+          <svg viewBox={MARK_VIEWBOX} aria-hidden="true">
+            <use href="/logo.svg#mark" />
+          </svg>
+          Adelie
         </Link>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="shell-actions">
           {headerRight}
           <ThemeToggle />
         </div>
       </header>
 
-      <main
-        className={
-          centered
-            ? 'flex flex-1 items-center justify-center px-6 py-10'
-            : 'mx-auto w-full max-w-5xl flex-1 px-6 py-6'
-        }
-      >
+      <main className={centered ? 'flex flex-1 items-center justify-center py-10' : 'flex-1 py-6'}>
         {children}
       </main>
 
-      <footer className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 border-t border-black/10 px-6 py-4 text-sm opacity-80 dark:border-white/10">
-        <span>© Adelie</span>
+      <footer className="shell-footer">
+        <div className="footer-links">
+          <span>© 2026 Adelie</span>
+          <a href={privacyUrl}>{t('privacyPolicy')}</a>
+          <a href="mailto:hello@adelie.space">hello@adelie.space</a>
+        </div>
         <LocaleSwitcher />
       </footer>
     </div>

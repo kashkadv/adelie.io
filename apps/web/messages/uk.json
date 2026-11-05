@@ -3,7 +3,8 @@
     "loading": "Завантаження…",
     "language": "Мова",
     "genericError": "Щось пішло не так",
-    "toggleTheme": "Змінити тему"
+    "toggleTheme": "Змінити тему",
+    "privacyPolicy": "Політика конфіденційності"
   },
   "Auth": {
     "signInTitle": "Увійдіть у свій робочий простір",

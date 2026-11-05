@@ -3,7 +3,8 @@
     "loading": "Loading…",
     "language": "Language",
     "genericError": "Something went wrong",
-    "toggleTheme": "Toggle theme"
+    "toggleTheme": "Toggle theme",
+    "privacyPolicy": "Privacy Policy"
   },
   "Auth": {
     "signInTitle": "Sign in to your workspace",
