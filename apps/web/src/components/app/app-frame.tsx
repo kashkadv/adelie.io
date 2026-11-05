@@ -44,12 +44,12 @@ export function AppFrame({ children }: { children: ReactNode }) {
 
   return (
     <WorkspaceProvider>
-      <div className="flex h-dvh flex-col pb-3 md:pr-3">
+      <div className="flex h-dvh flex-col px-3 pb-3 md:px-5 md:pb-5">
         {/* Top bar (base layer) */}
-        <header className="flex h-16 shrink-0 items-center pr-3 md:pr-0">
+        <header className="flex h-16 shrink-0 items-center md:h-[72px]">
           <button
             type="button"
-            className="icon-btn ml-3 md:hidden"
+            className="icon-btn md:hidden"
             aria-label={t('openMenu')}
             onClick={() => setDrawerOpen(true)}
           >
@@ -102,7 +102,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
           )}
 
           {/* Content viewport (raised layer) */}
-          <main className="content-panel mx-3 min-w-0 flex-1 overflow-y-auto rounded-[32px] md:mx-0">
+          <main className="content-panel min-w-0 flex-1 overflow-y-auto rounded-[32px] md:ml-4">
             <div className="w-full p-5 md:p-8">{children}</div>
           </main>
         </div>
