@@ -29,8 +29,9 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-line: var(--line);
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* Brand fonts from next/font/local (layout.tsx): Geologica — text, Unbounded — display. */
+  --font-sans: var(--font-geologica), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: var(--font-unbounded), var(--font-sans);
 }
 
 html {
@@ -42,14 +43,14 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font:
-    16px/1.6 -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    'Helvetica Neue',
-    Arial,
-    sans-serif;
+  font: 16px/1.6 var(--font-sans);
+}
+
+/* Headings and the wordmark use the display font, as on the public site. */
+h1,
+h2,
+.shell-brand {
+  font-family: var(--font-display);
 }
 
 /* ---------- Shell: identical to the public site ---------- */
@@ -73,8 +74,8 @@ body {
   align-items: center;
   gap: 12px;
   font-weight: 600;
-  font-size: 24px;
-  letter-spacing: -0.02em;
+  font-size: 22px;
+  letter-spacing: -0.01em;
   text-decoration: none;
   color: inherit;
 }

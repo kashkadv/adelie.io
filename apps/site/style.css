@@ -1,3 +1,18 @@
+/* Brand fonts (self-hosted, SIL OFL): Unbounded — wordmark & headings, Geologica — text. */
+@font-face {
+  font-family: 'Unbounded';
+  src: url('/fonts/Unbounded.woff2') format('woff2');
+  font-weight: 200 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geologica';
+  src: url('/fonts/Geologica.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 /* Two themes. Default follows the system; [data-theme] on <html> is an explicit choice (theme.js). */
 :root {
   --bg: #ffffff;
@@ -5,6 +20,8 @@
   --muted: #6b6b6b;
   --line: #e6e6e6;
   --max: 1120px;
+  --font-text: 'Geologica', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Unbounded', var(--font-text);
   color-scheme: light;
 }
 
@@ -41,14 +58,13 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font:
-    16px/1.6 -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    'Helvetica Neue',
-    Arial,
-    sans-serif;
+  font: 16px/1.6 var(--font-text);
+}
+
+h1,
+h2,
+.brand {
+  font-family: var(--font-display);
 }
 
 a {
@@ -78,8 +94,8 @@ header.top {
   align-items: center;
   gap: 12px;
   font-weight: 600;
-  font-size: 24px;
-  letter-spacing: -0.02em;
+  font-size: 22px;
+  letter-spacing: -0.01em;
   text-decoration: none;
 }
 
@@ -141,11 +157,13 @@ header.top {
   padding: 96px 0 72px;
 }
 
+/* Unbounded is wide: slightly smaller sizes and neutral tracking than a regular grotesk. */
 .hero h1 {
-  font-size: clamp(36px, 7vw, 56px);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-  margin: 0 0 20px;
+  font-size: clamp(30px, 6vw, 52px);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  margin: 0 0 24px;
 }
 
 .hero p {
@@ -177,8 +195,9 @@ header.top {
 }
 
 .features h2 {
-  font-size: 15px;
-  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 0 8px;
 }
 
 .features p {
@@ -199,13 +218,15 @@ article.doc {
 }
 
 article.doc h1 {
-  font-size: 32px;
-  letter-spacing: -0.02em;
-  margin: 0 0 4px;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
 }
 
 article.doc h2 {
-  font-size: 18px;
+  font-size: 16px;
+  font-weight: 500;
   margin: 32px 0 8px;
 }
 
