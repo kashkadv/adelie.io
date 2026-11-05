@@ -22,11 +22,12 @@ _Оновлено: 2026-11-05_
 
 ## На чому зупинились
 
-Скелет закомічено. `pnpm dev` (режим watch) ще не прогнаний — перевірено лише зібрані застосунки.
+Скелет працює: `pnpm dev` успішно запущено на Mac (через Tailscale до dev-сервера).
+Лишилось перевірити запуск з нуля на стаціонарному ПК.
 
 ## Наступні кроки
 
-1. На ПК увімкнути Tailscale, потім `pnpm env:pull && pnpm build && pnpm dev` — перевірити з нуля (і на другому ПК).
+1. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
 2. Створити developer app на developers.pinterest.com → етап 0 (PoC Pinterest API).
 3. Етап 2: adapter-контракт, схема соцмереж/метрик, OAuth Pinterest.
 
