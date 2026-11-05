@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError, api } from '@/lib/api';
 import { resizeToSquare } from '@/lib/resize-image';
+import { InfoTip } from '../ui/info-tip';
 import { Select, type SelectOption } from '../ui/select';
 import { LocaleSwitcher } from '../locale-switcher';
 import { ThemeToggle } from '../theme-toggle';
@@ -49,7 +50,8 @@ function toForm(p: Profile): Form {
     whatsapp: s(p.whatsapp),
     viber: s(p.viber),
     linkedin: s(p.linkedin),
-    timezone: s(p.timezone),
+    // Not set yet → suggest the browser's time zone (saved only with the form).
+    timezone: p.timezone || browserTimezone(),
     workStart: s(p.workStart),
     workEnd: s(p.workEnd),
     workDays: p.workDays,
@@ -88,7 +90,8 @@ function Section({
       className="card animate-rise rounded-[24px] p-5 md:p-6"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <h2 className="mb-4 text-lg font-semibold">{title}</h2>
+      {/* Same left line as field labels: the field corner radius (14px). */}
+      <h2 className="mb-4 px-3.5 text-lg font-semibold">{title}</h2>
       {children}
     </section>
   );
@@ -103,6 +106,7 @@ function Field({
 }: {
   label: string;
   error?: string;
+  /** Explanation shown in an info tooltip next to the label — never as a caption under the field. */
   hint?: string;
   /** Custom controls (Select): a plain block, so clicks inside the popover are not redirected. */
   group?: boolean;
@@ -110,17 +114,18 @@ function Field({
 }) {
   const Wrapper = group ? 'div' : 'label';
   return (
-    // Label and hint start where the field's corner radius (14px) ends.
+    // Label and error start where the field's corner radius (14px) ends.
     <Wrapper className="block">
-      <span className="mb-1.5 block px-3.5 text-sm text-muted">{label}</span>
+      <span className="mb-1.5 flex items-center gap-1.5 px-3.5 text-sm text-muted">
+        {label}
+        {hint && <InfoTip text={hint} />}
+      </span>
       {children}
-      {error ? (
+      {error && (
         <span role="alert" className="mt-1 block px-3.5 text-xs text-red-600 dark:text-red-400">
           {error}
         </span>
-      ) : hint ? (
-        <span className="mt-1 block px-3.5 text-xs text-muted">{hint}</span>
-      ) : null}
+      )}
     </Wrapper>
   );
 }
@@ -316,17 +321,8 @@ function PersonalSettingsForm({ me }: { me: Me }) {
                 invalid={!!errors.timezone}
               />
             </Field>
-            {!form.timezone && (
-              <button
-                type="button"
-                className="-mt-2 self-start text-xs text-muted underline underline-offset-4 hover:text-foreground"
-                onClick={() => set('timezone')(browserTimezone())}
-              >
-                {t('useMyTimezone', { zone: browserTimezone() })}
-              </button>
-            )}
             <div>
-              <span className="mb-1.5 block text-sm text-muted">{t('fields.workDays')}</span>
+              <span className="mb-1.5 block px-3.5 text-sm text-muted">{t('fields.workDays')}</span>
               <div className="flex flex-wrap gap-2" role="group" aria-label={t('fields.workDays')}>
                 {weekdays.map(({ day, label }) => {
                   const on = form.workDays.includes(day);
@@ -363,6 +359,7 @@ function PersonalSettingsForm({ me }: { me: Me }) {
                   placeholder="––:––"
                   searchable
                   searchPlaceholder="09:00"
+                  suggested="09:00"
                   emptyText={t('nothingFound')}
                   ariaLabel={t('fields.workStart')}
                   invalid={!!errors.workStart}
@@ -376,6 +373,7 @@ function PersonalSettingsForm({ me }: { me: Me }) {
                   placeholder="––:––"
                   searchable
                   searchPlaceholder="18:00"
+                  suggested="18:00"
                   emptyText={t('nothingFound')}
                   ariaLabel={t('fields.workEnd')}
                   invalid={!!errors.workEnd}
@@ -393,11 +391,11 @@ function PersonalSettingsForm({ me }: { me: Me }) {
           </Section>
 
           <Section title={t('sections.interface')} delay={160}>
-            <div className="flex items-center justify-between gap-4 py-1">
+            <div className="flex items-center justify-between gap-4 py-1 pl-3.5">
               <span className="text-sm">{t('fields.theme')}</span>
               <ThemeToggle className="icon-btn border border-line" />
             </div>
-            <div className="flex items-center justify-between gap-4 py-1">
+            <div className="flex items-center justify-between gap-4 py-1 pl-3.5">
               <span className="text-sm">{t('fields.language')}</span>
               <LocaleSwitcher className="icon-btn border border-line" />
             </div>

@@ -19,6 +19,7 @@ export function Select({
   emptyText = '—',
   ariaLabel,
   invalid,
+  suggested,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -29,10 +30,13 @@ export function Select({
   emptyText?: string;
   ariaLabel?: string;
   invalid?: boolean;
+  /** Option to scroll to when nothing is selected yet (e.g. 09:00 for a start time). */
+  suggested?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
+  const [placement, setPlacement] = useState<'bottom' | 'top'>('bottom');
   const root = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLUListElement>(null);
   const search = useRef<HTMLInputElement>(null);
@@ -52,11 +56,30 @@ export function Select({
   function openList() {
     const index = Math.max(
       0,
-      options.findIndex((o) => o.value === value),
+      options.findIndex((o) => o.value === (value || suggested)),
     );
     setQuery('');
     setActive(index);
+    setPlacement(choosePlacement());
     setOpen(true);
+  }
+
+  /**
+   * Opens upward when there is not enough room below — measured against the scroll container
+   * the select lives in (the content panel), or the window.
+   */
+  function choosePlacement(): 'bottom' | 'top' {
+    const el = button.current;
+    if (!el) return 'bottom';
+    const rect = el.getBoundingClientRect();
+    const bounds = el.closest('main')?.getBoundingClientRect() ?? {
+      top: 0,
+      bottom: window.innerHeight,
+    };
+    const needed = (searchable ? 44 : 0) + Math.min(options.length * 36 + 12, 268) + 8;
+    const below = bounds.bottom - rect.bottom;
+    const above = rect.top - bounds.top;
+    return below < needed && above > below ? 'top' : 'bottom';
   }
 
   function choose(option: SelectOption | undefined) {
@@ -133,7 +156,11 @@ export function Select({
       </button>
 
       {open && (
-        <div className="glass glass-strong animate-rise absolute top-full right-0 left-0 z-50 mt-2 overflow-hidden rounded-2xl">
+        <div
+          className={`glass glass-strong animate-rise absolute right-0 left-0 z-50 overflow-hidden rounded-2xl ${
+            placement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+          }`}
+        >
           {searchable && (
             <div className="flex items-center gap-2 border-b border-line px-3.5">
               <Search size={16} className="shrink-0 text-muted" aria-hidden="true" />

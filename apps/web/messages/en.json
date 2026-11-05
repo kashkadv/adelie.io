@@ -119,7 +119,6 @@
       "contactEmail": "For colleagues; can differ from your sign-in email",
       "loginEmail": "Used to sign in. Changing it is not available yet."
     },
-    "useMyTimezone": "Use my time zone ({zone})",
     "uploadPhoto": "Upload photo",
     "changePhoto": "Change photo",
     "removePhoto": "Remove",

@@ -17,11 +17,12 @@
 
   /* Glass */
   --glass: rgb(255 255 255 / 0.55);
-  --glass-strong: rgb(255 255 255 / 0.78);
+  --glass-strong: rgb(255 255 255 / 0.85);
   --glass-border: rgb(255 255 255 / 0.7);
   --glass-highlight: rgb(255 255 255 / 0.9);
   --shadow: rgb(20 28 40 / 0.08);
   --hover: rgb(11 14 18 / 0.05);
+  --field-focus: rgb(11 14 18 / 0.28);
   --scroll-thumb: rgb(11 14 18 / 0.16);
   --scroll-thumb-hover: rgb(11 14 18 / 0.3);
 
@@ -59,11 +60,12 @@
   --line: rgb(255 255 255 / 0.07);
 
   --glass: rgb(24 28 35 / 0.55);
-  --glass-strong: rgb(24 28 35 / 0.8);
+  --glass-strong: rgb(24 28 35 / 0.88);
   --glass-border: rgb(255 255 255 / 0.07);
   --glass-highlight: rgb(255 255 255 / 0.06);
   --shadow: rgb(0 0 0 / 0.45);
   --hover: rgb(255 255 255 / 0.05);
+  --field-focus: rgb(255 255 255 / 0.3);
   --scroll-thumb: rgb(255 255 255 / 0.14);
   --scroll-thumb-hover: rgb(255 255 255 / 0.28);
 
@@ -123,9 +125,17 @@ body {
     color 300ms var(--ease-soft);
 }
 
-:focus-visible {
-  outline: 2px solid var(--foreground);
-  outline-offset: 2px;
+/* Keyboard focus ring for buttons and links. In the base layer, so utilities can override it;
+   text fields never get it — they show focus by a slightly darker border only. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--foreground);
+    outline-offset: 2px;
+  }
+
+  :where(input, textarea, select):focus-visible {
+    outline: none;
+  }
 }
 
 /* ---------- Scrollbars: the same thin rounded bar on every OS ---------- */
@@ -226,8 +236,11 @@ h3 {
     box-shadow: var(--card-shadow);
   }
 
+  /* Menus and dropdowns: denser glass with a stronger blur. */
   .glass-strong {
     background: var(--glass-strong);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
   }
 
   /* ---------- Form controls ---------- */
@@ -246,7 +259,7 @@ h3 {
 
   .field:focus,
   .field[aria-expanded='true'] {
-    border-color: var(--foreground);
+    border-color: var(--field-focus);
   }
 
   /* Fields show focus by the border color only — no outline or ring. */
@@ -318,7 +331,10 @@ h3 {
 }
 
 .animate-rise {
-  animation: rise-in 420ms var(--ease-soft) both;
+  /* `backwards`, not `both`: once finished the animation leaves no effect behind. A lingering
+     opacity/transform animation would make the element a backdrop root and cut the blur of
+     popovers inside it to the element's own area. */
+  animation: rise-in 420ms var(--ease-soft) backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
