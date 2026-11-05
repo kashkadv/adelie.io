@@ -23,6 +23,7 @@
   --shadow: rgb(20 28 40 / 0.08);
   --hover: rgb(11 14 18 / 0.05);
   --field-focus: rgb(11 14 18 / 0.28);
+  --popover-border: rgb(11 14 18 / 0.12);
   --scroll-thumb: rgb(11 14 18 / 0.16);
   --scroll-thumb-hover: rgb(11 14 18 / 0.3);
 
@@ -66,6 +67,7 @@
   --shadow: rgb(0 0 0 / 0.45);
   --hover: rgb(255 255 255 / 0.05);
   --field-focus: rgb(255 255 255 / 0.3);
+  --popover-border: rgb(255 255 255 / 0.14);
   --scroll-thumb: rgb(255 255 255 / 0.14);
   --scroll-thumb-hover: rgb(255 255 255 / 0.28);
 
@@ -239,6 +241,7 @@ h3 {
   /* Menus and dropdowns: denser glass with a stronger blur. */
   .glass-strong {
     background: var(--glass-strong);
+    border-color: var(--popover-border);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);
   }
