@@ -38,9 +38,10 @@ trial — 1000 запитів/добу, для заявки потрібна pri
    Redirect URI додано, тестовий маркер PoC 1 відкликано.
 3. Модель даних етапу 2 **узгоджено**: [plans/stage-2-data-model.md](plans/stage-2-data-model.md),
    ADR-0007 (workspace → проєкти → акаунти) і ADR-0008 (зберігання метрик).
-4. Етап 2, реалізація: Prisma-схема (Project, ProjectMember, SocialConnection, SocialAccount, SocialBoard,
-   SocialPost, MetricDefinition, MetricValue, PostMetricsLatest, SyncRun, SyncPayload), шифрування токенів,
-   adapter-контракт, OAuth Pinterest, синхронізація у worker, PoC 2 на акаунті Gushka.
+4. Етап 2, реалізація: ✅ Prisma-схема й міграція `stage2_social_metrics` (застосована на dev-сервері:
+   існуючий workspace отримав перший проєкт, довідник — 15 метрик Pinterest; роль MANAGER; реєстрація
+   створює проєкт). Далі: шифрування токенів → adapter-контракт → OAuth Pinterest → синхронізація у worker
+   → PoC 2 на акаунті Gushka.
 
 ## Відкриті питання
 

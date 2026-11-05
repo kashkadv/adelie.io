@@ -25,6 +25,7 @@
     "roles": {
       "OWNER": "Owner",
       "ADMIN": "Admin",
+      "MANAGER": "Manager",
       "ANALYST": "Analyst",
       "VIEWER": "Viewer"
     }

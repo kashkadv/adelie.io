@@ -17,7 +17,8 @@ Workspace                    організація (агенція/бізнес
            └── SocialAccount профіль/акаунт платформи (Pinterest-акаунт Gushka)
                 ├── SocialBoard   дошка Pinterest
                 ├── SocialPost    одиниця контенту (пін)
-                ├── MetricValue   значення метрик у часі (акаунта або поста)
+                ├── AccountMetricValue / PostMetricValue   значення метрик у часі
+                ├── PostMetricsLatest  похідний «широкий» рядок на пін
                 └── SyncRun       запуски синхронізації та їх результат
 MetricDefinition             довідник метрик (спільний, не по workspace)
 ```
@@ -64,7 +65,11 @@ MetricDefinition             довідник метрик (спільний, н
   `valueKind` (DAILY, LIFETIME, PERIOD, SNAPSHOT) — щоб не сумувати несумовне (ТЗ §6.3).
 - Опис метрики — ключ i18n (тултіп «що означає метрика»).
 
-### MetricValue (часовий ряд — одна «довга» таблиця)
+### AccountMetricValue / PostMetricValue (часовий ряд — «довгий» формат)
+
+Реалізовано двома таблицями однакової форми (див. ADR-0008): денний ряд акаунта і знімки пінів.
+Опис полів нижче — спільний.
+
 - `workspaceId`, `accountId`, `postId?` (порожній — метрика акаунта), `metricKey`.
 - `date` — день (UTC, як віддає платформа) або дата знімка для lifetime-значень.
 - `value` — число **або `null`** (немає даних ≠ 0).

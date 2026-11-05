@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth-client';
 import { AppShell } from './app-shell';
 
-type Role = 'OWNER' | 'ADMIN' | 'ANALYST' | 'VIEWER';
+type Role = 'OWNER' | 'ADMIN' | 'MANAGER' | 'ANALYST' | 'VIEWER';
 type Workspace = { id: string; name: string; role: Role };
 
 export function Home() {

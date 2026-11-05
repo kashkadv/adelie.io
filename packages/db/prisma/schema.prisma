@@ -23,9 +23,10 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions    Session[]
-  accounts    Account[]
-  memberships WorkspaceMember[]
+  sessions          Session[]
+  accounts          Account[]
+  memberships       WorkspaceMember[]
+  socialConnections SocialConnection[]
 
   @@map("user")
 }
@@ -82,6 +83,7 @@ model Verification {
 enum WorkspaceRole {
   OWNER
   ADMIN
+  MANAGER
   ANALYST
   VIEWER
 }
@@ -89,12 +91,11 @@ enum WorkspaceRole {
 model Workspace {
   id        String   @id @default(uuid(7)) @db.Uuid
   name      String
-  timezone  String   @default("UTC")
-  currency  String   @default("USD")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members WorkspaceMember[]
+  members  WorkspaceMember[]
+  projects Project[]
 
   @@map("workspace")
 }
@@ -109,7 +110,395 @@ model WorkspaceMember {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  projectAssignments ProjectMember[]
+
   @@unique([workspaceId, userId])
   @@index([userId])
   @@map("workspace_member")
+}
+
+// ---------- Projects (ADR-0007) ----------
+// Children of Project carry a denormalized `workspaceId` (tenant filter, PRD §4.3) without a
+// separate FK: deletion cascades through Project, and services always set it from the project.
+
+model Project {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  workspaceId  String    @db.Uuid
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name         String
+  timezone     String    @default("UTC")
+  currency     String    @default("USD")
+  reportLocale String    @default("en")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  members     ProjectMember[]
+  connections SocialConnection[]
+  accounts    SocialAccount[]
+
+  @@index([workspaceId])
+  @@map("project")
+}
+
+/// Assignment of a workspace member to a project. OWNER/ADMIN see all projects without it.
+model ProjectMember {
+  id          String          @id @default(uuid(7)) @db.Uuid
+  workspaceId String          @db.Uuid
+  projectId   String          @db.Uuid
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  memberId    String          @db.Uuid
+  member      WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+
+  @@unique([projectId, memberId])
+  @@index([memberId])
+  @@map("project_member")
+}
+
+// ---------- Social platforms ----------
+
+enum SocialPlatform {
+  PINTEREST
+  INSTAGRAM
+  TIKTOK
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  REAUTHORIZATION_REQUIRED
+  REVOKED
+}
+
+/// OAuth grant for one platform user. Tokens are encrypted at rest (AES-256-GCM,
+/// TOKEN_ENCRYPTION_KEY, `keyVersion` for rotation) and never sent to the frontend.
+model SocialConnection {
+  id                    String           @id @default(uuid(7)) @db.Uuid
+  workspaceId           String           @db.Uuid
+  projectId             String           @db.Uuid
+  project               Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  platform              SocialPlatform
+  externalUserId        String
+  scopes                String[]
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String?
+  keyVersion            Int              @default(1)
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  status                ConnectionStatus @default(ACTIVE)
+  connectedByUserId     String?
+  connectedBy           User?            @relation(fields: [connectedByUserId], references: [id], onDelete: SetNull)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  accounts SocialAccount[]
+  syncRuns SyncRun[]
+
+  @@unique([workspaceId, platform, externalUserId])
+  @@index([projectId])
+  @@map("social_connection")
+}
+
+/// A profile on a platform (e.g. Gushka's Pinterest business account).
+model SocialAccount {
+  id           String           @id @default(uuid(7)) @db.Uuid
+  workspaceId  String           @db.Uuid
+  projectId    String           @db.Uuid
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connectionId String           @db.Uuid
+  connection   SocialConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  platform     SocialPlatform
+  externalId   String
+  username     String?
+  displayName  String?
+  avatarUrl    String?
+  accountType  String?
+
+  /// Latest profile counters (history lives in AccountMetricValue). null = unavailable.
+  followersCount Int?
+  followingCount Int?
+  postsCount     Int?
+
+  /// Earliest date the platform returned history for (Pinterest: 90 days before connecting).
+  historyAvailableFrom DateTime? @db.Date
+  /// Date Adelie started collecting daily data itself (PRD §6.4, shown in the UI).
+  collectingSince      DateTime? @db.Date
+  lastSyncedAt         DateTime?
+  lastSuccessfulSyncAt DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  boards       SocialBoard[]
+  posts        SocialPost[]
+  metricValues AccountMetricValue[]
+  postMetrics  PostMetricValue[]
+  postLatest   PostMetricsLatest[]
+  syncRuns     SyncRun[]
+
+  @@unique([workspaceId, platform, externalId])
+  @@index([projectId])
+  @@index([connectionId])
+  @@map("social_account")
+}
+
+/// Pinterest board (ADR-0008). Board analytics = our aggregation of pin metrics.
+model SocialBoard {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  workspaceId String        @db.Uuid
+  projectId   String        @db.Uuid
+  accountId   String        @db.Uuid
+  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  externalId  String
+  name        String
+  description String?
+  privacy     String?
+  pinCount    Int?
+  coverUrl    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  posts SocialPost[]
+
+  @@unique([accountId, externalId])
+  @@map("social_board")
+}
+
+enum PostContentType {
+  IMAGE
+  VIDEO
+  CAROUSEL
+  PRODUCT
+  OTHER
+}
+
+/// A unit of content (a pin).
+model SocialPost {
+  id           String          @id @default(uuid(7)) @db.Uuid
+  workspaceId  String          @db.Uuid
+  projectId    String          @db.Uuid
+  accountId    String          @db.Uuid
+  account      SocialAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  boardId      String?         @db.Uuid
+  board        SocialBoard?    @relation(fields: [boardId], references: [id], onDelete: SetNull)
+  externalId   String
+  url          String?
+  contentType  PostContentType @default(OTHER)
+  title        String?
+  description  String?
+  thumbnailUrl String?
+  publishedAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  metricValues PostMetricValue[]
+  latest       PostMetricsLatest?
+
+  @@unique([accountId, externalId])
+  @@index([accountId, publishedAt])
+  @@index([boardId])
+  @@map("social_post")
+}
+
+// ---------- Metrics (ADR-0008) ----------
+
+enum MetricScope {
+  ACCOUNT
+  POST
+}
+
+enum MetricUnit {
+  COUNT
+  RATE
+  SECONDS
+}
+
+/// How values combine over a period. RATIO = recompute numerator/denominator, never average.
+enum MetricAggregation {
+  SUM
+  AVG
+  LAST
+  RATIO
+  NONE
+}
+
+enum MetricValueKind {
+  DAILY
+  LIFETIME
+  PERIOD
+  SNAPSHOT
+}
+
+enum DataStatus {
+  READY
+  PROCESSING
+  ESTIMATE
+  UNAVAILABLE
+}
+
+/// Metric catalogue (shared, not per workspace; seeded by migrations).
+/// UI description: i18n key `metrics.<key>`.
+model MetricDefinition {
+  id             Int               @id @default(autoincrement())
+  platform       SocialPlatform
+  scope          MetricScope
+  /// Our cross-platform key, e.g. `impressions`, `saves`, `engagement_rate`.
+  key            String
+  /// Original platform name, e.g. Pinterest `IMPRESSION`.
+  providerKey    String
+  unit           MetricUnit
+  aggregation    MetricAggregation
+  valueKind      MetricValueKind
+  /// For RATIO metrics: keys of the components (same platform and scope).
+  numeratorKey   String?
+  denominatorKey String?
+
+  accountValues AccountMetricValue[]
+  postValues    PostMetricValue[]
+
+  @@unique([platform, scope, key])
+  @@unique([platform, scope, providerKey])
+  @@map("metric_definition")
+}
+
+/// Account-level time series: one row per (account, metric, day, dimensions).
+/// Kept forever (cheap, and the platform cannot return it again after 90 days).
+model AccountMetricValue {
+  id             BigInt           @id @default(autoincrement())
+  workspaceId    String           @db.Uuid
+  accountId      String           @db.Uuid
+  account        SocialAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  metricId       Int
+  metric         MetricDefinition @relation(fields: [metricId], references: [id])
+  /// Platform day (UTC) or snapshot date.
+  date           DateTime         @db.Date
+  /// Canonical dimension string, e.g. `app_type=MOBILE`; '' = totals.
+  dimensionKey   String           @default("")
+  /// null = no data (never 0).
+  value          Float?
+  dataStatus     DataStatus
+  providerStatus String?
+  source         String
+  apiVersion     String
+  fetchedAt      DateTime
+
+  @@unique([accountId, metricId, date, dimensionKey])
+  @@index([workspaceId])
+  @@map("account_metric_value")
+}
+
+/// Post-level snapshots: a row is written only when the value changes; it is valid from `date`
+/// until the next row. Old snapshots may later be thinned (weekly → monthly).
+model PostMetricValue {
+  id             BigInt           @id @default(autoincrement())
+  workspaceId    String           @db.Uuid
+  accountId      String           @db.Uuid
+  account        SocialAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  postId         String           @db.Uuid
+  post           SocialPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  metricId       Int
+  metric         MetricDefinition @relation(fields: [metricId], references: [id])
+  date           DateTime         @db.Date
+  dimensionKey   String           @default("")
+  value          Float?
+  dataStatus     DataStatus
+  providerStatus String?
+  source         String
+  apiVersion     String
+  fetchedAt      DateTime
+
+  @@unique([postId, metricId, date, dimensionKey])
+  @@index([accountId])
+  @@index([workspaceId])
+  @@map("post_metric_value")
+}
+
+/// Derived wide row per post for sorting and top lists; recomputed by the worker after a sync.
+/// Source of truth is PostMetricValue. null = no data.
+model PostMetricsLatest {
+  postId         String        @id @db.Uuid
+  post           SocialPost    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  workspaceId    String        @db.Uuid
+  projectId      String        @db.Uuid
+  accountId      String        @db.Uuid
+  account        SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  boardId        String?       @db.Uuid
+  impressions    Int?
+  saves          Int?
+  pinClicks      Int?
+  outboundClicks Int?
+  engagements    Int?
+  videoViews     Int?
+  engagementRate Float?
+  /// Worst status among the underlying values.
+  dataStatus     DataStatus
+  asOfDate       DateTime      @db.Date
+  updatedAt      DateTime      @updatedAt
+
+  @@index([accountId])
+  @@index([projectId])
+  @@index([boardId])
+  @@map("post_metrics_latest")
+}
+
+// ---------- Synchronization ----------
+
+enum SyncKind {
+  INITIAL
+  DAILY
+  MANUAL
+  RETRY
+}
+
+enum SyncStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+  REAUTHORIZATION_REQUIRED
+}
+
+model SyncRun {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  workspaceId   String           @db.Uuid
+  projectId     String           @db.Uuid
+  connectionId  String           @db.Uuid
+  connection    SocialConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  accountId     String?          @db.Uuid
+  account       SocialAccount?   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  kind          SyncKind
+  status        SyncStatus       @default(PENDING)
+  correlationId String
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  requestCount  Int              @default(0)
+  /// Counters: posts/boards/values upserted, skipped, etc.
+  stats         Json?
+  errorCode     String?
+  errorMessage  String?
+  createdAt     DateTime         @default(now())
+
+  payloads SyncPayload[]
+
+  @@index([connectionId, createdAt])
+  @@index([accountId, createdAt])
+  @@index([workspaceId])
+  @@map("sync_run")
+}
+
+/// Raw API response bodies, kept 90 days (ADR-0008) to re-derive metrics after a mapping bug.
+/// Response body only — request headers (tokens) are never stored.
+model SyncPayload {
+  id          BigInt   @id @default(autoincrement())
+  workspaceId String   @db.Uuid
+  syncRunId   String   @db.Uuid
+  syncRun     SyncRun  @relation(fields: [syncRunId], references: [id], onDelete: Cascade)
+  endpoint    String
+  params      Json?
+  httpStatus  Int
+  body        Json
+  fetchedAt   DateTime
+
+  @@index([syncRunId])
+  @@index([fetchedAt])
+  @@map("sync_payload")
 }

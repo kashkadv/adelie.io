@@ -15,12 +15,15 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        // MVP-1: every new user gets a personal workspace where they are OWNER.
+        // MVP-1: every new user gets a personal workspace where they are OWNER,
+        // with a first project (ADR-0007).
         after: async (user) => {
+          const name = user.name ? `${user.name}'s workspace` : 'My workspace';
           await prisma.workspace.create({
             data: {
-              name: user.name ? `${user.name}'s workspace` : 'My workspace',
+              name,
               members: { create: { userId: user.id, role: 'OWNER' } },
+              projects: { create: { name: user.name || 'My project' } },
             },
           });
         },
