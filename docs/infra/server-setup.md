@@ -58,6 +58,8 @@ ssh adelie@192.168.3.158       # з домашньої мережі
 - Секрети на сервері, не в репо: `~/.cloudflared/cert.pem` (керування тунелями й DNS зони
   `adelie.space`) і `~/.cloudflared/<tunnel-id>.json` (credentials тунелю).
 - Деплой сайту і конфігу: `pnpm deploy:edge` (rsync на сервер + `docker compose up`).
+- Кеш: Cloudflare кешує статику. Деплой додає до посилань на CSS/JS/SVG/іконки `?v=<хеш>`
+  (лише в копії на сервері) — нова версія видна одразу; HTML кешується 5 хв.
 - Новий піддомен: `ssh adelie@adelie cloudflared tunnel route dns adelie <host>`,
   додати правило в `cloudflared.yml`, `pnpm deploy:edge`.
 - В акаунті Cloudflare є інший тунель — «Proxmox Home Tunnel» — він не стосується Adelie, не чіпати.

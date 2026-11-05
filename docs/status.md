@@ -18,7 +18,9 @@ _Оновлено: 2026-11-05_
 - Скелет монорепо: api (NestJS + Better Auth), web (Next.js), worker (BullMQ), db (Prisma), shared; CI.
   Перевірено наживо проти dev-сервера: реєстрація → автоматичний workspace, чужий workspace → 404,
   без сесії → 401, worker обробляє задачу з черги.
-- Публічний сайт https://adelie.space (лендінг + privacy policy, en/uk) через Cloudflare Tunnel.
+- Публічний сайт https://adelie.space (лендінг + privacy policy, en/uk, світла/темна тема) через Cloudflare Tunnel.
+- Бренд: оригінальний силует пінгвіна — `assets/brand/penguin-original.svg`; логотип і favicon на сайті та в застосунку
+  (іконки генерує `node scripts/brand-icons.mjs`). Назва — завжди «Adelie» з великої.
 - Мультимовність: en + uk, нові мови додаються без переробок (ADR-0006). Як запустити — [README](../README.md).
 
 ## На чому зупинились
@@ -39,6 +41,6 @@ trial — 1000 запитів/добу, для заявки потрібна pri
 
 - Хостинг production — кандидат домашній Proxmox, вирішуємо на етапі 4.
 - Privacy policy — чорновик для MVP; перед комерційним запуском переглянути юридично.
-- Логотип на сайті — тимчасовий силует; замінити адаптованим логотипом кав'ярні (ТЗ 1.3).
 - Etsy — майбутній напрям E-commerce Intelligence, поза MVP.
 - Деталі інфраструктури: [plans/infra-discussion.md](plans/infra-discussion.md).
+- Вебзастосунок зараз лише слідує системній темі; ручний перемикач теми, як на сайті, — додати разом з UI (етап 3).

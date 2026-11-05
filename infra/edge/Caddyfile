@@ -21,9 +21,16 @@
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		X-Frame-Options "DENY"
-		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 		-Server
 	}
+
+	# Assets are referenced with ?v=<content hash> (scripts/deploy-edge.sh) → safe to cache long.
+	# Everything else (HTML) — short cache so Cloudflare picks up new deploys quickly.
+	@versioned query v=*
+	header @versioned Cache-Control "public, max-age=31536000, immutable"
+	@unversioned not query v=*
+	header @unversioned Cache-Control "public, max-age=300"
 
 	handle_errors {
 		respond "{err.status_code}" {err.status_code}

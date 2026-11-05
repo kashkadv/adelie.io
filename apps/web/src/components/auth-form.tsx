@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { LocaleSwitcher } from './locale-switcher';
+import { Logo } from './logo';
 
 type Mode = 'login' | 'register';
 
@@ -43,6 +44,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+      <Logo className="text-2xl" />
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
         <h1 className="text-2xl font-semibold">
           {mode === 'register' ? t('registerTitle') : t('signInTitle')}

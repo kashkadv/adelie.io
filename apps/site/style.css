@@ -1,18 +1,29 @@
+/* Two themes. Default follows the system; [data-theme] on <html> is an explicit choice (theme.js). */
 :root {
   --bg: #ffffff;
-  --fg: #111111;
+  --fg: #0a0e12;
   --muted: #6b6b6b;
   --line: #e6e6e6;
   --max: 720px;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b0b0b;
-    --fg: #f2f2f2;
+  :root:not([data-theme='light']) {
+    --bg: #0a0e12;
+    --fg: #ffffff;
     --muted: #9a9a9a;
-    --line: #232323;
+    --line: #22262b;
+    color-scheme: dark;
   }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0a0e12;
+  --fg: #ffffff;
+  --muted: #9a9a9a;
+  --line: #22262b;
+  color-scheme: dark;
 }
 
 * {
@@ -21,6 +32,9 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Without this, macOS renders light-on-dark text noticeably heavier ("bold"). */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -64,14 +78,63 @@ header.top {
   text-decoration: none;
 }
 
+/* The penguin uses currentColor: dark on light theme, white on dark theme. */
 .brand svg {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 29px;
+  color: var(--fg);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .lang {
   font-size: 14px;
   color: var(--muted);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Show the icon of the theme you would switch to. */
+.theme-toggle .to-light {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .theme-toggle .to-light {
+    display: block;
+  }
+  :root:not([data-theme='light']) .theme-toggle .to-dark {
+    display: none;
+  }
+}
+
+:root[data-theme='dark'] .theme-toggle .to-light {
+  display: block;
+}
+
+:root[data-theme='dark'] .theme-toggle .to-dark {
+  display: none;
 }
 
 .lang a {
