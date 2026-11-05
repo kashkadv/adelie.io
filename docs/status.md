@@ -34,8 +34,8 @@ trial — 1000 запитів/добу, для заявки потрібна pri
 ## Наступні кроки
 
 1. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
-2. Business-акаунт Pinterest «Adelie» (пошта `hello@adelie.space`) → з нього developer app
-   (інструкція в integrations/pinterest.md) → PoC.
+2. Pinterest: business-акаунт «Adelie» створено, застосунок `Adelie` (ID 1635003) подано — чекаємо Trial.
+   Після схвалення: App secret → сервер (`~/adelie/app.env`), redirect URI, PoC.
 3. Етап 2: adapter-контракт, схема соцмереж/метрик, OAuth Pinterest.
 
 ## Відкриті питання

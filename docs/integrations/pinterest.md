@@ -1,6 +1,7 @@
 # Pinterest API
 
-- **Статус:** етап 0 — дослідження. PoC ще не виконано.
+- **Статус:** етап 0 — застосунок `Adelie` (App ID `1635003`) подано 2026-11-05, Trial: очікування доступу.
+  PoC ще не виконано.
 - **Оновлено:** 2026-11-05
 
 Позначки: ✅ — підтверджено офіційною специфікацією API, ⚠️ — з вторинних джерел
@@ -115,8 +116,9 @@ Developer-застосунок реєструється від **окремог�
    - читає дані пінів/дошок — «Так, мої дані» (власні піни автентифікованого користувача).
 3. Сайт: `https://adelie.space`; privacy policy: `https://adelie.space/privacy` ✅ опубліковано.
 4. Дочекатись схвалення → trial access.
-5. У налаштуваннях застосунку додати redirect URI для розробки:
-   `http://localhost:4000/integrations/pinterest/callback` ⚠️ (перевірити, що localhost дозволений).
+5. У налаштуваннях застосунку додати redirect URI (шлях за ТЗ §12 — `GET /social/:platform/callback`):
+   - розробка: `http://localhost:4000/social/pinterest/callback` ⚠️ (перевірити, що localhost дозволений);
+   - production: `https://api.adelie.space/social/pinterest/callback`.
 6. App ID і App secret **не комітити** — покласти на dev-сервер у `~/adelie/app.env`
    (підхопиться `pnpm env:pull`).
 
