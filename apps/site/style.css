@@ -1,4 +1,4 @@
-/* Brand fonts (self-hosted, SIL OFL): Inter — text, Onest — headings, Yuyu Short — the wordmark. */
+/* Brand fonts (self-hosted, SIL OFL): Inter — text, Onest — headings, Playwrite IT Trad — the wordmark. */
 @font-face {
   font-family: 'Inter';
   src: url('/fonts/Inter.woff2') format('woff2');
@@ -7,9 +7,9 @@
 }
 
 @font-face {
-  font-family: 'Yuyu Short';
-  src: url('/fonts/YuyuShort.woff2') format('woff2');
-  font-weight: 400;
+  font-family: 'Playwrite IT Trad';
+  src: url('/fonts/PlaywriteITTrad.woff2') format('woff2');
+  font-weight: 300;
   font-display: swap;
 }
 
@@ -68,7 +68,7 @@ body {
   font: 16px/1.6 var(--font-text);
 }
 
-/* Headings — Onest; the wordmark "Adelie" — Yuyu Short (.brand). */
+/* Headings — Onest; the wordmark "Adelie" — Playwrite IT Trad (.brand). */
 h1,
 h2 {
   font-family: var(--font-display);
@@ -100,10 +100,10 @@ header.top {
   display: flex;
   align-items: center;
   gap: 16px;
-  font-weight: 400;
-  font-size: 43px;
+  font-weight: 300;
+  font-size: 27px;
   line-height: 1;
-  font-family: 'Yuyu Short', var(--font-text);
+  font-family: 'Playwrite IT Trad', var(--font-text);
   letter-spacing: 0;
   text-decoration: none;
 }

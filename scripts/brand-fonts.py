@@ -1,7 +1,8 @@
-"""Builds self-hosted brand fonts (Inter, Onest, Yuyu Short) as subset WOFF2.
+"""Builds self-hosted brand fonts (Inter, Onest, Playwrite IT Trad) as subset WOFF2.
 
-Inter — UI and body text, Onest — headings, Yuyu Short — the "Adelie" wordmark only
-(Latin-only font: allowed because the name is always written in Latin).
+Inter — UI and body text, Onest — headings, Playwrite IT Trad — the "Adelie" wordmark only
+(Latin-only font: allowed because the name is always written in Latin). The wordmark font is
+pinned to one weight and cut down to the letters of the name, so it stays tiny.
 
 Source: github.com/google/fonts (SIL OFL 1.1). Subset: Latin, Latin-1, Cyrillic incl.
 Ukrainian, common punctuation and currency. Output goes to assets/fonts/ and is copied to
@@ -20,34 +21,40 @@ import urllib.request
 
 from fontTools import subset
 from fontTools.ttLib import TTFont
+from fontTools.varLib import instancer
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BASE = "https://raw.githubusercontent.com/google/fonts/main/ofl"
-FONTS = {
-    "inter": ("Inter[opsz,wght].ttf", "Inter.woff2"),
-    "yuyushort": ("YuyuShort-Regular.ttf", "YuyuShort.woff2"),
-    "onest": ("Onest[wght].ttf", "Onest.woff2"),
-}
 UNICODES = (
     "U+0020-007E,U+00A0-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,"
     "U+0400-045F,U+0490-0491,U+04B0-04B1,U+2010-2027,U+2030-203A,U+2116,U+20AC,U+20B4,"
     "U+2122,U+2190-2193,U+2212,U+2215"
 )
+WORDMARK = "U+0020,U+0041,U+0064,U+0065,U+0069,U+006C"  # " Adeil" — the letters of "Adelie"
+
+# family dir in google/fonts -> (source file, output file, unicodes, pinned axes or None)
+FONTS = {
+    "inter": ("Inter[opsz,wght].ttf", "Inter.woff2", UNICODES, None),
+    "onest": ("Onest[wght].ttf", "Onest.woff2", UNICODES, None),
+    "playwriteittrad": ("PlaywriteITTrad[wght].ttf", "PlaywriteITTrad.woff2", WORDMARK, {"wght": 300}),
+}
 
 out_dir = ROOT / "assets" / "fonts"
 out_dir.mkdir(parents=True, exist_ok=True)
 
-for family, (src_name, out_name) in FONTS.items():
+for family, (src_name, out_name, unicodes, pinned) in FONTS.items():
     url = f"{BASE}/{family}/{urllib.parse.quote(src_name)}"
     data = urllib.request.urlopen(url, timeout=60).read()
     font = TTFont(io.BytesIO(data))
+    if pinned:
+        font = instancer.instantiateVariableFont(font, pinned)
     options = subset.Options()
     options.flavor = "woff2"
     options.layout_features = ["*"]
     options.name_IDs = ["*"]
     options.notdef_outline = True
     subsetter = subset.Subsetter(options=options)
-    subsetter.populate(unicodes=subset.parse_unicodes(UNICODES))
+    subsetter.populate(unicodes=subset.parse_unicodes(unicodes))
     subsetter.subset(font)
     font.flavor = "woff2"
     font.save(out_dir / out_name)
