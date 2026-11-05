@@ -29,7 +29,7 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-line: var(--line);
-  /* Brand fonts from next/font/local (layout.tsx): Tektur — text, Onest — display (headings, wordmark). */
+  /* Brand fonts from next/font/local (layout.tsx): Tektur — text and wordmark, Onest — headings. */
   --font-sans: var(--font-tektur), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: var(--font-onest), var(--font-sans);
 }
@@ -46,10 +46,9 @@ body {
   font: 16px/1.6 var(--font-sans);
 }
 
-/* Headings and the wordmark use the display font, as on the public site. */
+/* Headings — Onest; the wordmark "Adelie" stays in the text font (Tektur), as on the public site. */
 h1,
-h2,
-.shell-brand {
+h2 {
   font-family: var(--font-display);
 }
 

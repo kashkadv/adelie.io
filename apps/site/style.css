@@ -1,4 +1,4 @@
-/* Brand fonts (self-hosted, SIL OFL): Onest — wordmark & headings, Tektur — text. */
+/* Brand fonts (self-hosted, SIL OFL): Onest — headings, Tektur — text and the wordmark. */
 @font-face {
   font-family: 'Tektur';
   src: url('/fonts/Tektur.woff2') format('woff2');
@@ -62,9 +62,9 @@ body {
   font: 16px/1.6 var(--font-text);
 }
 
+/* Headings — Onest; the wordmark "Adelie" stays in the text font (Tektur). */
 h1,
-h2,
-.brand {
+h2 {
   font-family: var(--font-display);
 }
 
