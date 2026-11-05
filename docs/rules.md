@@ -30,6 +30,12 @@
 
 ## 4. Git
 
+- Після пушу перевіряти, що CI зелений (GitHub Actions). Червоний CI на `main` — лагодити першочергово.
+  Відтворити CI локально: чистий `git clone` у тимчасову папку → `CI=true pnpm install --frozen-lockfile`
+  → `pnpm format:check` → `pnpm exec turbo run lint typecheck test build --force`.
+- pnpm 12 вимагає явного рішення для кожного пакета з install-скриптом (`allowBuilds` у
+  `pnpm-workspace.yaml`); інакше в CI install падає (`ERR_PNPM_IGNORED_BUILDS`).
+
 - Основна гілка — `main`.
 - Повідомлення комітів у стилі Conventional Commits англійською:
   `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`.

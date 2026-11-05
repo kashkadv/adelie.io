@@ -10,3 +10,5 @@ allowBuilds:
   unrs-resolver: false
   esbuild: false
   msgpackr-extract: false
+  '@parcel/watcher': false
+  '@swc/core': false
