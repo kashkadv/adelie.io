@@ -5,8 +5,8 @@
     "genericError": "Щось пішло не так"
   },
   "Auth": {
-    "signInTitle": "Вхід в Adelie",
-    "registerTitle": "Створення акаунта Adelie",
+    "signInTitle": "Увійдіть у свій робочий простір",
+    "registerTitle": "Створіть акаунт",
     "name": "Ім'я",
     "email": "Email",
     "password": "Пароль",

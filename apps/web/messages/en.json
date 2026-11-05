@@ -5,8 +5,8 @@
     "genericError": "Something went wrong"
   },
   "Auth": {
-    "signInTitle": "Sign in to Adelie",
-    "registerTitle": "Create your Adelie account",
+    "signInTitle": "Sign in to your workspace",
+    "registerTitle": "Create your account",
     "name": "Name",
     "email": "Email",
     "password": "Password",

@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth-client';
-import { LocaleSwitcher } from './locale-switcher';
-import { Logo } from './logo';
+import { AppShell } from './app-shell';
 
 type Role = 'OWNER' | 'ADMIN' | 'ANALYST' | 'VIEWER';
 type Workspace = { id: string; name: string; role: Role };
@@ -37,13 +36,9 @@ export function Home() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-8 p-6">
-      <header className="flex items-center justify-between gap-4">
-        <h1 className="text-xl">
-          <Logo />
-        </h1>
-        <div className="flex items-center gap-4 text-sm">
-          <LocaleSwitcher />
+    <AppShell
+      headerRight={
+        <>
           <span className="opacity-70">{session.user.email}</span>
           <button
             className="underline"
@@ -54,9 +49,9 @@ export function Home() {
           >
             {tAuth('signOut')}
           </button>
-        </div>
-      </header>
-
+        </>
+      }
+    >
       <section className="space-y-2">
         <h2 className="text-sm uppercase tracking-wide opacity-60">{t('workspaces')}</h2>
         {workspaces === null ? (
@@ -74,6 +69,6 @@ export function Home() {
           </ul>
         )}
       </section>
-    </main>
+    </AppShell>
   );
 }
