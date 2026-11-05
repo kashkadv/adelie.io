@@ -18,6 +18,7 @@ _Оновлено: 2026-11-05_
 - Скелет монорепо: api (NestJS + Better Auth), web (Next.js), worker (BullMQ), db (Prisma), shared; CI.
   Перевірено наживо проти dev-сервера: реєстрація → автоматичний workspace, чужий workspace → 404,
   без сесії → 401, worker обробляє задачу з черги.
+- Публічний сайт https://adelie.space (лендінг + privacy policy, en/uk) через Cloudflare Tunnel.
 - Мультимовність: en + uk, нові мови додаються без переробок (ADR-0006). Як запустити — [README](../README.md).
 
 ## На чому зупинились
@@ -30,13 +31,14 @@ trial — 1000 запитів/добу, для заявки потрібна pri
 ## Наступні кроки
 
 1. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
-2. Опублікувати `adelie.space` + `/privacy` (потрібно для Pinterest app).
+2. Налаштувати пошту `hello@` / `privacy@adelie.space` (Cloudflare Email Routing) — адреси вказані на сайті.
 3. Створити developer app на developers.pinterest.com (інструкція в integrations/pinterest.md) → PoC.
 4. Етап 2: adapter-контракт, схема соцмереж/метрик, OAuth Pinterest.
 
 ## Відкриті питання
 
 - Хостинг production — кандидат домашній Proxmox, вирішуємо на етапі 4.
-- Cloudflare Tunnel — налаштувати, коли знадобиться публічна сторінка (privacy policy для Pinterest).
+- Privacy policy — чорновик для MVP; перед комерційним запуском переглянути юридично.
+- Логотип на сайті — тимчасовий силует; замінити адаптованим логотипом кав'ярні (ТЗ 1.3).
 - Etsy — майбутній напрям E-commerce Intelligence, поза MVP.
 - Деталі інфраструктури: [plans/infra-discussion.md](plans/infra-discussion.md).

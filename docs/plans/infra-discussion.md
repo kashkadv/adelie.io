@@ -74,3 +74,4 @@
 5. DNS-записи поки не створюємо — їх додасть Cloudflare Tunnel пізніше.
 - **Доступ:** власник надав root SSH до хоста Proxmox; VM створено автоматично
   (cloud-init). Працюємо лише з VM 104 `adelie`, інше на хості не чіпаємо. Інструкція: [infra/server-setup.md](../infra/server-setup.md).
+- **Публічний доступ:** Cloudflare Tunnel `adelie` на VM (2026-11-05) — див. [infra/server-setup.md](../infra/server-setup.md).

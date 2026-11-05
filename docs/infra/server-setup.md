@@ -14,6 +14,7 @@
 | Tailscale | `adelie` / `100.102.237.81` |
 | Користувач | `adelie` (sudo без пароля, група `docker`) |
 | Часовий пояс | Europe/Kyiv |
+| Cloudflare Tunnel | `adelie` (`1ff90529-f842-46e1-ad6c-3349752468b3`) → `adelie.space`, `www.adelie.space` |
 
 Ресурси хоста обмежені: 13 GB RAM, з них ~4 GB — Home Assistant, плюс LXC
 `backend`, `gateway`, `media-stack` (не стосуються Adelie, не чіпати).
@@ -46,6 +47,20 @@ ssh adelie@192.168.3.158       # з домашньої мережі
 - qemu-guest-agent, unattended-upgrades, ufw
 - Docker Engine 29.x + compose plugin (get.docker.com)
 - Tailscale 1.104
+- cloudflared 2026.10 (apt, pkg.cloudflare.com) — для керування тунелем; сам тунель працює в Docker
+
+## Публічний доступ (Cloudflare Tunnel)
+
+Стек `infra/edge/` (docker compose `adelie-edge`): `cloudflared` + `caddy` зі статичним сайтом
+`apps/site/`. Портів назовні не публікує — трафік приходить лише через тунель.
+
+- Конфіг тунелю: `infra/edge/cloudflared.yml` (hostname → сервіс).
+- Секрети на сервері, не в репо: `~/.cloudflared/cert.pem` (керування тунелями й DNS зони
+  `adelie.space`) і `~/.cloudflared/<tunnel-id>.json` (credentials тунелю).
+- Деплой сайту і конфігу: `pnpm deploy:edge` (rsync на сервер + `docker compose up`).
+- Новий піддомен: `ssh adelie@adelie cloudflared tunnel route dns adelie <host>`,
+  додати правило в `cloudflared.yml`, `pnpm deploy:edge`.
+- В акаунті Cloudflare є інший тунель — «Proxmox Home Tunnel» — він не стосується Adelie, не чіпати.
 
 ## Журнал налаштування
 
@@ -59,6 +74,10 @@ ssh adelie@192.168.3.158       # з домашньої мережі
   timezone Europe/Kyiv.
 - VM авторизовано в tailnet як `adelie`.
 - Увімкнено ufw (правила вище).
+- Postgres 18 + Redis 8 (`infra/dev/`, секрети згенеровано на сервері), перша міграція.
+- Встановлено cloudflared, авторизовано на зону `adelie.space` (`cloudflared tunnel login`, власник).
+- Створено тунель `adelie`, CNAME `adelie.space` і `www.adelie.space` → тунель.
+- Розгорнуто `infra/edge` (cloudflared + caddy): лендінг і privacy policy на https://adelie.space.
 
 ## Відтворення VM з нуля (на хості Proxmox)
 

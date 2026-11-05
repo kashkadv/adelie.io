@@ -16,7 +16,8 @@
     "db:generate": "pnpm --filter @adelie/db generate",
     "db:migrate": "pnpm --filter @adelie/db migrate:dev",
     "db:studio": "pnpm --filter @adelie/db studio",
-    "env:pull": "bash scripts/env-pull.sh"
+    "env:pull": "bash scripts/env-pull.sh",
+    "deploy:edge": "bash scripts/deploy-edge.sh"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

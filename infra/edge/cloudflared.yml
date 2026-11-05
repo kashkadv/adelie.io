@@ -1,0 +1,12 @@
+# Cloudflare Tunnel "adelie" (locally managed). DNS CNAMEs are created with
+# `cloudflared tunnel route dns adelie <hostname>` — see docs/infra/server-setup.md.
+tunnel: 1ff90529-f842-46e1-ad6c-3349752468b3
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: adelie.space
+    service: http://site:80
+  - hostname: www.adelie.space
+    service: http://site:80
+  # Later: app.adelie.space -> web, api.adelie.space -> api
+  - service: http_status:404

@@ -1,0 +1,170 @@
+:root {
+  --bg: #ffffff;
+  --fg: #111111;
+  --muted: #6b6b6b;
+  --line: #e6e6e6;
+  --max: 720px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0b0b;
+    --fg: #f2f2f2;
+    --muted: #9a9a9a;
+    --line: #232323;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font:
+    16px/1.6 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+.wrap {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+header.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.brand svg {
+  width: 28px;
+  height: 28px;
+}
+
+.lang {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.lang a {
+  text-decoration: none;
+}
+
+.lang a[aria-current='true'] {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.hero {
+  padding: 96px 0 72px;
+}
+
+.hero h1 {
+  font-size: clamp(36px, 7vw, 56px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin: 0 0 20px;
+}
+
+.hero p {
+  font-size: 19px;
+  color: var(--muted);
+  margin: 0;
+  max-width: 560px;
+}
+
+.features {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 72px;
+}
+
+@media (min-width: 640px) {
+  .features {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.features div {
+  background: var(--bg);
+  padding: 20px;
+}
+
+.features h2 {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+
+.features p {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.status {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+article.doc {
+  padding: 32px 0 64px;
+}
+
+article.doc h1 {
+  font-size: 32px;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+
+article.doc h2 {
+  font-size: 18px;
+  margin: 32px 0 8px;
+}
+
+article.doc .meta {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0 0 24px;
+}
+
+footer {
+  border-top: 1px solid var(--line);
+  padding: 24px 0 40px;
+  font-size: 14px;
+  color: var(--muted);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}

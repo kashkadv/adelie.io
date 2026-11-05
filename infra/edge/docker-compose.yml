@@ -1,0 +1,29 @@
+# Public edge on the server: Cloudflare Tunnel + static site.
+# No ports are published — all public traffic arrives through the tunnel.
+# Deploy with scripts/deploy-edge.sh.
+name: adelie-edge
+
+services:
+  site:
+    image: caddy:2
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../apps/site:/srv:ro
+      - caddy-data:/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.0
+    restart: unless-stopped
+    # Run as the server user that owns the credentials file (mode 0400).
+    user: '1000:1000'
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared.yml:/etc/cloudflared/config.yml:ro
+      # Tunnel credentials (secret) stay on the server, created by `cloudflared tunnel create`.
+      - ${HOME}/.cloudflared/1ff90529-f842-46e1-ad6c-3349752468b3.json:/etc/cloudflared/credentials.json:ro
+    depends_on:
+      - site
+
+volumes:
+  caddy-data:

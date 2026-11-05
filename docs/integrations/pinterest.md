@@ -81,8 +81,7 @@ Rates (`*_RATE`) — похідні значення, не сумуються (�
 1. Увійти на https://developers.pinterest.com (рекомендовано — business-акаунт Pinterest).
 2. **My apps → Connect app** (назва може відрізнятися): назва `Adelie`, опис
    «Marketing analytics: read-only access to account and Pin analytics».
-3. Сайт: `https://adelie.space`; privacy policy: `https://adelie.space/privacy`
-   (сторінку треба опублікувати до подачі).
+3. Сайт: `https://adelie.space`; privacy policy: `https://adelie.space/privacy` ✅ опубліковано.
 4. Дочекатись схвалення → trial access.
 5. У налаштуваннях застосунку додати redirect URI для розробки:
    `http://localhost:4000/integrations/pinterest/callback` ⚠️ (перевірити, що localhost дозволений).
