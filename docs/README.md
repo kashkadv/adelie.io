@@ -9,6 +9,7 @@
 | [product-requirements.md](product-requirements.md) | Вимоги до продукту та технічне завдання (v1.1) |
 | [decisions/](decisions/) | Архітектурні рішення (ADR) |
 | [plans/](plans/) | Плани реалізації |
+| [plans/mvp-discussion.md](plans/mvp-discussion.md) | Обговорення обсягу MVP і стеку (в роботі) |
 
 ## Рішення (ADR)
 
