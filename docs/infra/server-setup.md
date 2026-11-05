@@ -1,40 +1,76 @@
 # Сервер Adelie на домашньому Proxmox
 
-Інструкція створення VM і доступу. Секрети (ключі, паролі, токени) сюди не пишемо.
+Що і як налаштовано. Секрети (ключі, паролі, токени) сюди не пишемо.
 
-## 1. Створення VM (вручну, через Proxmox UI)
+## Поточний стан
 
-- ОС: **Ubuntu Server 24.04 LTS** (ISO з ubuntu.com).
-- Ім'я VM: `adelie`.
-- Ресурси (старт): 2–4 vCPU, 6–8 GB RAM, 60 GB диск. Можна збільшити пізніше.
-- Опції: увімкнути **QEMU Guest Agent**.
-- Під час встановлення Ubuntu:
-  - username: `adelie`;
-  - увімкнути **Install OpenSSH server**;
-  - **Import SSH identity → from GitHub**, username `kashkadv` — ключі з GitHub
-    одразу дадуть SSH-доступ з усіх ПК, де ці ключі є.
+| Параметр | Значення |
+|---|---|
+| Хост Proxmox | `pve`, `192.168.3.69` (UI: `:8006`), Proxmox VE 9.2, у tailnet |
+| VM | ID `104`, ім'я `adelie`, автозапуск з хостом |
+| ОС | Ubuntu Server 24.04 LTS (cloud image + cloud-init) |
+| Ресурси | 4 vCPU, 4 GB RAM (balloon min 2 GB), 60 GB диск на `local-lvm` |
+| LAN IP | `192.168.3.158` (DHCP — бажано закріпити на роутері) |
+| Tailscale | `adelie` / `100.102.237.81` |
+| Користувач | `adelie` (sudo без пароля, група `docker`) |
+| Часовий пояс | Europe/Kyiv |
 
-## 2. Tailscale у VM
+Ресурси хоста обмежені: 13 GB RAM, з них ~4 GB — Home Assistant, плюс LXC
+`backend`, `gateway`, `media-stack` (не стосуються Adelie, не чіпати).
 
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up --ssh=false
-```
+## Доступ
 
-Відкрити посилання з виводу, авторизувати в тому ж tailnet, що й ПК.
-У консолі Tailscale перейменувати машину на `adelie` (MagicDNS-ім'я).
-
-## 3. Доступ
-
-З будь-якого ПК у tailnet:
+SSH лише за ключами. Авторизовані ключі: ключі GitHub-акаунта `kashkadv`
++ `id_ed25519` з Mac.
 
 ```bash
-ssh adelie@adelie
+ssh adelie@adelie              # через Tailscale (будь-де)
+ssh adelie@192.168.3.158       # з домашньої мережі
 ```
 
-Далі налаштування VM (Docker, firewall, сервіси) виконується через SSH і
-документується нижче.
+Додати ключ нового ПК: з машини, що вже має доступ,
+`ssh adelie@adelie 'cat >> ~/.ssh/authorized_keys' < ~/.ssh/<key>.pub`.
+
+## Firewall (ufw)
+
+- Вхідні за замовчуванням заборонені.
+- SSH (22) — лише з `192.168.3.0/24`.
+- Усе на інтерфейсі `tailscale0` — дозволено.
+
+**Увага:** Docker обходить ufw для опублікованих портів. У compose публікувати
+порти лише на `127.0.0.1` або Tailscale IP (`100.102.237.81:5432:5432`),
+ніколи не на `0.0.0.0`.
+
+## Встановлено
+
+- qemu-guest-agent, unattended-upgrades, ufw
+- Docker Engine 29.x + compose plugin (get.docker.com)
+- Tailscale 1.104
 
 ## Журнал налаштування
 
-_(заповнюється в міру роботи)_
+### 2026-11-05
+
+- Додано SSH-ключ Mac (`id_ed25519`) у `root` хоста Proxmox (власником).
+- Завантажено Ubuntu 24.04 cloud image у `/var/lib/vz/import/` на хості.
+- Створено VM 104 `adelie` (`qm create` + import-from cloud image + cloud-init:
+  користувач `adelie`, SSH-ключі, DHCP).
+- Оновлено систему, встановлено qemu-guest-agent, Docker, Tailscale,
+  timezone Europe/Kyiv.
+- VM авторизовано в tailnet як `adelie`.
+- Увімкнено ufw (правила вище).
+
+## Відтворення VM з нуля (на хості Proxmox)
+
+```bash
+qm create 104 --name adelie --ostype l26 --machine q35 --cpu host --cores 4 \
+  --memory 4096 --balloon 2048 --net0 virtio,bridge=vmbr0 \
+  --scsihw virtio-scsi-single --agent enabled=1 --onboot 1
+qm set 104 --scsi0 local-lvm:0,import-from=/var/lib/vz/import/noble-server-cloudimg-amd64.img,discard=on,iothread=1,ssd=1
+qm resize 104 scsi0 60G
+qm set 104 --ide2 local-lvm:cloudinit --boot order=scsi0 --serial0 socket --vga serial0
+qm set 104 --ciuser adelie --sshkeys <keys.pub> --ipconfig0 ip=dhcp
+qm start 104
+```
+
+Далі: apt upgrade, qemu-guest-agent, Docker (get.docker.com), Tailscale, ufw — як вище.
