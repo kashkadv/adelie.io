@@ -36,6 +36,9 @@ MetricDefinition             довідник метрик (спільний, н
 - `platform` (PINTEREST, далі INSTAGRAM, TIKTOK…), `externalUserId`, `scopes[]`.
 - `accessToken`, `refreshToken` — **зашифровані** (AES-256-GCM, ключ `TOKEN_ENCRYPTION_KEY`,
   з полем `keyVersion` для майбутньої ротації ключа). Ніколи не віддаються у фронтенд.
+  Реалізовано: `@adelie/shared/crypto` — формат `v<версія>.<iv>.<tag>.<дані>`; шифротекст прив'язаний
+  до контексту (AAD: workspace, платформа, користувач, поле), тож скопійований в інший рядок не розшифрується.
+  Ротація: `TOKEN_ENCRYPTION_KEY_VERSION` + `TOKEN_ENCRYPTION_PREVIOUS_KEYS` (див. `.env.example`).
 - `accessTokenExpiresAt`, `refreshTokenExpiresAt`.
 - `status`: ACTIVE / REAUTHORIZATION_REQUIRED / REVOKED; `connectedByUserId`.
 - Унікальність: (workspace, platform, externalUserId).
