@@ -27,5 +27,7 @@ _Оновлено: 2026-11-05_
 
 ## Відкриті питання
 
-- Хостинг — вирішуємо на етапі 4.
+- Інфраструктура на домашньому Proxmox: [plans/infra-discussion.md](plans/infra-discussion.md).
+
+- Хостинг production — кандидат домашній Proxmox, вирішуємо на етапі 4.
 - Etsy — майбутній напрям E-commerce Intelligence, поза MVP.

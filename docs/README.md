@@ -11,6 +11,7 @@
 | [plans/](plans/) | Плани реалізації |
 | [plans/mvp-1.md](plans/mvp-1.md) | План MVP-1: Pinterest end-to-end (в роботі) |
 | [plans/mvp-discussion.md](plans/mvp-discussion.md) | Обговорення обсягу MVP і стеку (завершено) |
+| [plans/infra-discussion.md](plans/infra-discussion.md) | Обговорення інфраструктури на домашньому Proxmox (в роботі) |
 | [integrations/](integrations/) | Документація API платформ (створюється на етапі 0) |
 
 ## Рішення (ADR)
