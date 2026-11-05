@@ -64,6 +64,12 @@ ssh adelie@192.168.3.158       # з домашньої мережі
   додати правило в `cloudflared.yml`, `pnpm deploy:edge`.
 - В акаунті Cloudflare є інший тунель — «Proxmox Home Tunnel» — він не стосується Adelie, не чіпати.
 
+## Пошта домену
+
+Cloudflare Email Routing (лише прийом, переадресація): `hello@adelie.space`, `privacy@adelie.space`
+→ Gmail власника. MX/SPF-записи додає Cloudflare автоматично. Надсилати листи від імені
+домену Email Routing не вміє — для цього знадобиться окремий SMTP-сервіс (пізніше).
+
 ## Журнал налаштування
 
 ### 2026-11-05

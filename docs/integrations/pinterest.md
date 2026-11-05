@@ -76,9 +76,22 @@ Rates (`*_RATE`) — похідні значення, не сумуються (�
 - Публічна сторінка з privacy policy, ймовірно, обов'язкова → `adelie.space/privacy`.
 - API безкоштовний.
 
+## Хто власник застосунку
+
+Developer-застосунок реєструється від **окремого business-акаунта Pinterest «Adelie»**
+(пошта `hello@adelie.space`), а не від особистого акаунта чи акаунта клієнта.
+
+- Акаунт розробника лише «володіє» реєстрацією (App ID, secret, налаштування, заявки на доступ).
+  Даних клієнтів він не бачить.
+- Клієнти (напр. Gushka) підключаються через OAuth у самому Adelie; токени й дані зберігаються
+  на сервері Adelie у workspace клієнта. Один застосунок на всіх клієнтів.
+- Окремий бренд-акаунт: застосунок не прив'язаний до особи, легко передати компанії.
+
+Порядок: Email Routing для `adelie.space` → business-акаунт Pinterest «Adelie» → developer app.
+
 ## Як створити застосунок (виконує власник проєкту)
 
-1. Увійти на https://developers.pinterest.com (рекомендовано — business-акаунт Pinterest).
+1. Увійти на https://developers.pinterest.com під business-акаунтом «Adelie».
 2. **My apps → Connect app** (назва може відрізнятися): назва `Adelie`, опис
    «Marketing analytics: read-only access to account and Pin analytics».
 3. Сайт: `https://adelie.space`; privacy policy: `https://adelie.space/privacy` ✅ опубліковано.

@@ -34,8 +34,9 @@ trial — 1000 запитів/добу, для заявки потрібна pri
 ## Наступні кроки
 
 1. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
-2. Налаштувати пошту `hello@` / `privacy@adelie.space` (Cloudflare Email Routing) — адреси вказані на сайті.
-3. Створити developer app на developers.pinterest.com (інструкція в integrations/pinterest.md) → PoC.
+2. Cloudflare Email Routing: `hello@` і `privacy@adelie.space` → Gmail власника (адреси вказані на сайті).
+3. Business-акаунт Pinterest «Adelie» (пошта `hello@adelie.space`) → з нього developer app
+   (інструкція в integrations/pinterest.md) → PoC.
 4. Етап 2: adapter-контракт, схема соцмереж/метрик, OAuth Pinterest.
 
 ## Відкриті питання
