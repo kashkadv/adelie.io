@@ -117,8 +117,9 @@ Developer-застосунок реєструється від **окремог�
 3. Сайт: `https://adelie.space`; privacy policy: `https://adelie.space/privacy` ✅ опубліковано.
 4. Дочекатись схвалення → trial access.
 5. У налаштуваннях застосунку додати redirect URI (шлях за ТЗ §12 — `GET /social/:platform/callback`):
-   - розробка: `http://localhost:4000/social/pinterest/callback` ⚠️ (перевірити, що localhost дозволений);
+   - розробка: `http://localhost:4000/social/pinterest/callback`;
    - production: `https://api.adelie.space/social/pinterest/callback`.
+   ✅ Обидва додано в кабінеті 2026-11-05 (localhost прийнято).
 6. App ID і App secret **не комітити** — покласти на dev-сервер у `~/adelie/app.env`
    (підхопиться `pnpm env:pull`).
 
