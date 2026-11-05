@@ -22,3 +22,4 @@
 - [ADR-0003](decisions/0003-auth.md) — Автентифікація: Better Auth (прийнято)
 - [ADR-0004](decisions/0004-platform-order.md) — Порядок підключення платформ: Pinterest першим (прийнято)
 - [ADR-0005](decisions/0005-toolchain.md) — Інструменти та версії (прийнято)
+- [ADR-0006](decisions/0006-i18n.md) — Мультимовність інтерфейсу: next-intl, en + uk (прийнято)

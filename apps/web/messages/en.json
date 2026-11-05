@@ -1,0 +1,30 @@
+{
+  "Common": {
+    "loading": "Loading…",
+    "language": "Language",
+    "genericError": "Something went wrong"
+  },
+  "Auth": {
+    "signInTitle": "Sign in to Adelie",
+    "registerTitle": "Create your Adelie account",
+    "name": "Name",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "createAccount": "Create account",
+    "haveAccount": "Have an account?",
+    "noAccount": "No account?",
+    "createOne": "Create one",
+    "signOut": "Sign out"
+  },
+  "Home": {
+    "workspaces": "Workspaces",
+    "noWorkspaces": "No workspaces.",
+    "roles": {
+      "OWNER": "Owner",
+      "ADMIN": "Admin",
+      "ANALYST": "Analyst",
+      "VIEWER": "Viewer"
+    }
+  }
+}

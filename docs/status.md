@@ -17,7 +17,8 @@ _Оновлено: 2026-11-05_
 - Dev-сервер: VM `adelie` на Proxmox — Docker, PostgreSQL 18, Redis 8 (лише через Tailscale): [infra/server-setup.md](infra/server-setup.md).
 - Скелет монорепо: api (NestJS + Better Auth), web (Next.js), worker (BullMQ), db (Prisma), shared; CI.
   Перевірено наживо проти dev-сервера: реєстрація → автоматичний workspace, чужий workspace → 404,
-  без сесії → 401, worker обробляє задачу з черги. Як запустити — [README](../README.md).
+  без сесії → 401, worker обробляє задачу з черги.
+- Мультимовність: en + uk, нові мови додаються без переробок (ADR-0006). Як запустити — [README](../README.md).
 
 ## На чому зупинились
 
@@ -31,7 +32,6 @@ _Оновлено: 2026-11-05_
 
 ## Відкриті питання
 
-- Мова інтерфейсу: англійська, українська чи обидві? (зараз заглушки англійською)
 - Хостинг production — кандидат домашній Proxmox, вирішуємо на етапі 4.
 - Cloudflare Tunnel — налаштувати, коли знадобиться публічна сторінка (privacy policy для Pinterest).
 - Etsy — майбутній напрям E-commerce Intelligence, поза MVP.

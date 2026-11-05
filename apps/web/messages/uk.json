@@ -1,0 +1,30 @@
+{
+  "Common": {
+    "loading": "Завантаження…",
+    "language": "Мова",
+    "genericError": "Щось пішло не так"
+  },
+  "Auth": {
+    "signInTitle": "Вхід в Adelie",
+    "registerTitle": "Створення акаунта Adelie",
+    "name": "Ім'я",
+    "email": "Email",
+    "password": "Пароль",
+    "signIn": "Увійти",
+    "createAccount": "Створити акаунт",
+    "haveAccount": "Вже маєте акаунт?",
+    "noAccount": "Немає акаунта?",
+    "createOne": "Створити",
+    "signOut": "Вийти"
+  },
+  "Home": {
+    "workspaces": "Робочі простори",
+    "noWorkspaces": "Немає робочих просторів.",
+    "roles": {
+      "OWNER": "Власник",
+      "ADMIN": "Адміністратор",
+      "ANALYST": "Аналітик",
+      "VIEWER": "Глядач"
+    }
+  }
+}
