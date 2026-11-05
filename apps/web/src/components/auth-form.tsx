@@ -43,8 +43,13 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
   return (
     <AppShell centered>
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-2xl font-semibold">
+      {/* The form is a size container: the title scales with its width to stay on one line. */}
+      <form onSubmit={onSubmit} className="@container w-full max-w-md space-y-4">
+        <h1
+          className="mb-6 font-semibold leading-tight whitespace-nowrap"
+          // Longest title (uk) is ~20.1em wide in Unbounded 600 → 22px fits 448px; shrinks on narrow screens.
+          style={{ fontSize: 'min(22px, calc(100cqi / 20.6))' }}
+        >
           {mode === 'register' ? t('registerTitle') : t('signInTitle')}
         </h1>
         {mode === 'register' && (
