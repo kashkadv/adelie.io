@@ -26,8 +26,7 @@ Dev-сервер готовий (порожній, лише Docker). Потрі�
 1. Створити developer app на developers.pinterest.com.
 2. PoC Pinterest API → `docs/integrations/pinterest.md`.
 3. Етап 1: скелет монорепо; Postgres + Redis на dev-сервері.
-4. Закріпити IP `192.168.3.158` за VM на роутері (DHCP reservation).
-5. Додати SSH-ключ стаціонарного ПК на сервер.
+4. Перевірити SSH-доступ до сервера зі стаціонарного ПК (ключі GitHub уже додано).
 
 ## Відкриті питання
 

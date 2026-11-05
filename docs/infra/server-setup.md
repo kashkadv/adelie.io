@@ -10,7 +10,7 @@
 | VM | ID `104`, ім'я `adelie`, автозапуск з хостом |
 | ОС | Ubuntu Server 24.04 LTS (cloud image + cloud-init) |
 | Ресурси | 4 vCPU, 4 GB RAM (balloon min 2 GB), 60 GB диск на `local-lvm` |
-| LAN IP | `192.168.3.158` (DHCP — бажано закріпити на роутері) |
+| LAN IP | `192.168.3.158` (закріплено на роутері за MAC `BC:24:11:EF:A6:F7`) |
 | Tailscale | `adelie` / `100.102.237.81` |
 | Користувач | `adelie` (sudo без пароля, група `docker`) |
 | Часовий пояс | Europe/Kyiv |
