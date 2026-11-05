@@ -14,6 +14,7 @@ _Оновлено: 2026-11-05_
 - Обговорення MVP завершено: [plans/mvp-discussion.md](plans/mvp-discussion.md).
 - Рішення: стек (ADR-0002), auth — Better Auth (ADR-0003), Pinterest першим (ADR-0004).
 - Перший користувач — Gushka (Instagram, Pinterest, Etsy).
+- Домен продукту: `adelie.space`. Приватна мережа між машинами: Tailscale.
 
 ## На чому зупинились
 
