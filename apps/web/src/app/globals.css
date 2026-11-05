@@ -301,6 +301,8 @@ h3 {
 :root[data-sidebar='collapsed'] .sidebar .label {
   opacity: 0;
   max-width: 0;
+  padding: 0;
+  margin: 0;
 }
 
 .sidebar .slot {

@@ -99,9 +99,9 @@ header.top {
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   font-weight: 400;
-  font-size: 34px;
+  font-size: 37px;
   line-height: 1;
   font-family: 'Yuyu Short', var(--font-text);
   letter-spacing: 0;
