@@ -6,7 +6,7 @@ import { themeInitScript } from '@/lib/theme';
 import './globals.css';
 
 // Brand fonts (self-hosted, SIL OFL; built by scripts/brand-fonts.py) — same as the public site:
-// Inter — text and UI, Onest — headings, Tektur — the "Adelie" wordmark only.
+// Inter — text and UI, Onest — headings, Yuyu Short — the "Adelie" wordmark only.
 const inter = localFont({
   src: '../fonts/Inter.woff2',
   weight: '100 900',
@@ -21,10 +21,10 @@ const onest = localFont({
   display: 'swap',
 });
 
-const tektur = localFont({
-  src: '../fonts/Tektur.woff2',
-  weight: '400 900',
-  variable: '--font-tektur',
+const yuyuShort = localFont({
+  src: '../fonts/YuyuShort.woff2',
+  weight: '400',
+  variable: '--font-yuyu-short',
   display: 'swap',
   preload: false,
 });
@@ -41,7 +41,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
     // before hydration (e.g. location="..."). Applies to these elements' attributes only.
     <html
       lang="en"
-      className={`${inter.variable} ${onest.variable} ${tektur.variable}`}
+      className={`${inter.variable} ${onest.variable} ${yuyuShort.variable}`}
       suppressHydrationWarning
     >
       <head>

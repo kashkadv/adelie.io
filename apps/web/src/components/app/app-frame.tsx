@@ -65,7 +65,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
             <span className="slot">
               <BrandMark className="h-7 w-6" />
             </span>
-            <span className="label wordmark text-xl">Adelie</span>
+            <span className="label wordmark text-[30px]">Adelie</span>
           </Link>
           {/* Project switcher above the content panel: gap (24px) + corner radius (32px). */}
           <div className="hidden min-w-0 md:ml-14 md:block">
@@ -73,7 +73,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
           </div>
           <Link href="/" className="ml-2 flex items-center gap-2 md:hidden" aria-label="Adelie">
             <BrandMark className="h-6 w-5" />
-            <span className="wordmark text-lg">Adelie</span>
+            <span className="wordmark text-[26px]">Adelie</span>
           </Link>
 
           {/* Ends where the content panel's top-right corner radius (32px) begins. */}

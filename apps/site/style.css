@@ -1,4 +1,4 @@
-/* Brand fonts (self-hosted, SIL OFL): Inter — text, Onest — headings, Tektur — the wordmark. */
+/* Brand fonts (self-hosted, SIL OFL): Inter — text, Onest — headings, Yuyu Short — the wordmark. */
 @font-face {
   font-family: 'Inter';
   src: url('/fonts/Inter.woff2') format('woff2');
@@ -7,10 +7,9 @@
 }
 
 @font-face {
-  font-family: 'Tektur';
-  src: url('/fonts/Tektur.woff2') format('woff2');
-  font-weight: 400 900;
-  font-stretch: 75% 100%;
+  font-family: 'Yuyu Short';
+  src: url('/fonts/YuyuShort.woff2') format('woff2');
+  font-weight: 400;
   font-display: swap;
 }
 
@@ -69,7 +68,7 @@ body {
   font: 16px/1.6 var(--font-text);
 }
 
-/* Headings — Onest; the wordmark "Adelie" — Tektur (.brand). */
+/* Headings — Onest; the wordmark "Adelie" — Yuyu Short (.brand). */
 h1,
 h2 {
   font-family: var(--font-display);
@@ -101,9 +100,10 @@ header.top {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-weight: 600;
-  font-size: 24px;
-  font-family: 'Tektur', var(--font-text);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1;
+  font-family: 'Yuyu Short', var(--font-text);
   letter-spacing: 0;
   text-decoration: none;
 }

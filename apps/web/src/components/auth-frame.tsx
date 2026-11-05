@@ -20,7 +20,7 @@ export function AuthFrame({ children }: { children: ReactNode }) {
       <header className="flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
           <BrandMark className="h-8 w-7" />
-          <span className="wordmark text-2xl">Adelie</span>
+          <span className="wordmark text-[34px]">Adelie</span>
         </Link>
         <div className="flex items-center gap-1">
           <ThemeToggle />

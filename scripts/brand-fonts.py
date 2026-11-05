@@ -1,6 +1,7 @@
-"""Builds self-hosted brand fonts (Inter, Onest, Tektur) as subset variable WOFF2.
+"""Builds self-hosted brand fonts (Inter, Onest, Yuyu Short) as subset WOFF2.
 
-Inter — UI and body text, Onest — headings, Tektur — the "Adelie" wordmark only.
+Inter — UI and body text, Onest — headings, Yuyu Short — the "Adelie" wordmark only
+(Latin-only font: allowed because the name is always written in Latin).
 
 Source: github.com/google/fonts (SIL OFL 1.1). Subset: Latin, Latin-1, Cyrillic incl.
 Ukrainian, common punctuation and currency. Output goes to assets/fonts/ and is copied to
@@ -24,7 +25,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 BASE = "https://raw.githubusercontent.com/google/fonts/main/ofl"
 FONTS = {
     "inter": ("Inter[opsz,wght].ttf", "Inter.woff2"),
-    "tektur": ("Tektur[wdth,wght].ttf", "Tektur.woff2"),
+    "yuyushort": ("YuyuShort-Regular.ttf", "YuyuShort.woff2"),
     "onest": ("Onest[wght].ttf", "Onest.woff2"),
 }
 UNICODES = (
