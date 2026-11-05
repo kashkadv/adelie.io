@@ -6,17 +6,29 @@
 
 ## Сутності
 
+Структура простору — [ADR-0007](../decisions/0007-workspace-projects.md): workspace → проєкти → акаунти.
+
 ```text
-Workspace
- └── SocialConnection        OAuth-підключення (хто, яка платформа, зашифровані токени, scopes, статус)
-      └── SocialAccount      профіль/акаунт платформи (Pinterest-акаунт Gushka)
-           ├── SocialPost    одиниця контенту (пін)
-           ├── MetricValue   значення метрик у часі (акаунта або поста)
-           └── SyncRun       запуски синхронізації та їх результат
+Workspace                    організація (агенція/бізнес): команда, ролі, ізоляція даних
+ ├── WorkspaceMember         роль у workspace (Owner/Admin/Manager/Analyst/Viewer)
+ └── Project                 клієнт агенції або бренд: налаштування, звіти
+      ├── ProjectMember      призначення співробітника на проєкт (для Manager/Analyst/Viewer)
+      └── SocialConnection   OAuth-підключення (платформа, зашифровані токени, scopes, статус)
+           └── SocialAccount профіль/акаунт платформи (Pinterest-акаунт Gushka)
+                ├── SocialPost    одиниця контенту (пін)
+                ├── MetricValue   значення метрик у часі (акаунта або поста)
+                └── SyncRun       запуски синхронізації та їх результат
 MetricDefinition             довідник метрик (спільний, не по workspace)
 ```
 
-Усе, що належить клієнту, має `workspaceId` (ТЗ §4.3).
+Усе, що належить клієнту, має `workspaceId` (ізоляція, ТЗ §4.3) і `projectId` (доступ за проєктом).
+
+### Project
+- `name`, `timezone`, `currency`, `reportLocale` (налаштування клієнта/бренду переїжджають сюди з Workspace).
+- При реєстрації створюється workspace + перший проєкт.
+
+### ProjectMember
+- (project, workspaceMember). Owner/Admin бачать усі проєкти без призначення.
 
 ### SocialConnection
 - `platform` (PINTEREST, далі INSTAGRAM, TIKTOK…), `externalUserId`, `scopes[]`.
@@ -68,6 +80,8 @@ MetricDefinition             довідник метрик (спільний, н
   а не окремим запитом на кожен пін; адаптер читає `x-ratelimit-*` і пригальмовує.
 
 ## Питання на обговорення
+
+0. ~~Структура простору~~ → вирішено: [ADR-0007](../decisions/0007-workspace-projects.md).
 
 1. **Метрики в одній «довгій» таблиці** (MetricValue) замість окремих колонок під кожну платформу —
    гнучко, нові платформи без міграцій. Обсяги в нас невеликі, Postgres впорається. Згоден?
