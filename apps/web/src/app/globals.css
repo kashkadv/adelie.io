@@ -277,16 +277,16 @@ h3 {
 
 /* ---------- Sidebar (expanded / collapsed via <html data-sidebar>) ---------- */
 
-/* Inner width of the collapsed sidebar (76px − 2×12px padding). Every row starts with an icon slot of
-   this width, so icons sit on one vertical axis in both states. */
+/* Inner width of the collapsed sidebar (68px − 2×12px padding). Every row starts with an icon slot of
+   this width and rows are as tall as it, so collapsed items are square and icons share one axis. */
 .sidebar {
-  --slot: 52px;
+  --slot: 44px;
   width: 264px;
   transition: width 320ms var(--ease-soft);
 }
 
 :root[data-sidebar='collapsed'] .sidebar {
-  width: 76px;
+  width: 68px;
 }
 
 .sidebar .label {

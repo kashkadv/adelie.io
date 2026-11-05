@@ -9,6 +9,7 @@ import { authClient } from '@/lib/auth-client';
 import { BrandMark } from '../brand';
 import { LocaleSwitcher } from '../locale-switcher';
 import { ThemeToggle } from '../theme-toggle';
+import { ProjectSwitcher } from './project-switcher';
 import { Sidebar } from './sidebar';
 import { UserMenu } from './user-menu';
 import { WorkspaceProvider } from './workspace-context';
@@ -66,12 +67,17 @@ export function AppFrame({ children }: { children: ReactNode }) {
             </span>
             <span className="label wordmark text-xl">Adelie</span>
           </Link>
+          {/* Project switcher above the content panel: gap (16px) + corner radius (32px). */}
+          <div className="hidden min-w-0 md:ml-12 md:block">
+            <ProjectSwitcher />
+          </div>
           <Link href="/" className="ml-2 flex items-center gap-2 md:hidden" aria-label="Adelie">
             <BrandMark className="h-6 w-5" />
             <span className="wordmark text-lg">Adelie</span>
           </Link>
 
-          <div className="ml-auto flex items-center gap-1">
+          {/* Ends where the content panel's top-right corner radius (32px) begins. */}
+          <div className="ml-auto flex items-center gap-1 md:mr-8">
             <ThemeToggle />
             <LocaleSwitcher />
             <span className="ml-2">
@@ -81,8 +87,8 @@ export function AppFrame({ children }: { children: ReactNode }) {
         </header>
 
         <div className="flex min-h-0 flex-1">
-          {/* Sidebar (base layer) */}
-          <div className="hidden md:block">
+          {/* Sidebar (base layer); starts where the content panel's top corner radius (32px) ends. */}
+          <div className="hidden pt-8 md:block">
             <Sidebar />
           </div>
 
@@ -96,7 +102,15 @@ export function AppFrame({ children }: { children: ReactNode }) {
                 onClick={() => setDrawerOpen(false)}
               />
               <div className="sidebar-drawer content-panel animate-rise absolute inset-y-3 left-3 rounded-[28px] py-3">
-                <Sidebar collapsible={false} onNavigate={() => setDrawerOpen(false)} />
+                <Sidebar
+                  collapsible={false}
+                  onNavigate={() => setDrawerOpen(false)}
+                  header={
+                    <div className="mb-3">
+                      <ProjectSwitcher />
+                    </div>
+                  }
+                />
               </div>
             </div>
           )}

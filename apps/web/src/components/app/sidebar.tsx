@@ -13,7 +13,7 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { isSidebarCollapsed, setSidebarCollapsed } from '@/lib/theme';
-import { ProjectSwitcher } from './project-switcher';
+import type { ReactNode } from 'react';
 
 type NavKey = 'overview' | 'accounts' | 'content' | 'reports' | 'settings';
 
@@ -32,18 +32,21 @@ const NAV: { key: NavKey; href: string; icon: LucideIcon }[] = [
 export function Sidebar({
   onNavigate,
   collapsible = true,
+  header,
 }: {
   onNavigate?: () => void;
   collapsible?: boolean;
+  /** Extra content on top (the mobile drawer shows the project switcher there). */
+  header?: ReactNode;
 }) {
   const t = useTranslations('Nav');
   const pathname = usePathname();
 
   return (
     <aside className="sidebar flex h-full flex-col gap-1 px-3 pb-1">
-      <ProjectSwitcher />
+      {header}
 
-      <nav className="mt-3 flex flex-1 flex-col gap-1" aria-label={t('main')}>
+      <nav className="flex flex-1 flex-col gap-1" aria-label={t('main')}>
         {NAV.map(({ key, href, icon: Icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
           return (
@@ -73,7 +76,7 @@ export function Sidebar({
           type="button"
           onClick={() => setSidebarCollapsed(!isSidebarCollapsed())}
           data-tip={t('expand')}
-          className="flex h-10 items-center rounded-2xl pr-3 text-sm text-muted transition-colors duration-200 hover:bg-hover hover:text-foreground"
+          className="flex h-11 items-center rounded-2xl pr-3 text-sm text-muted transition-colors duration-200 hover:bg-hover hover:text-foreground"
         >
           <span className="slot">
             <PanelLeftClose

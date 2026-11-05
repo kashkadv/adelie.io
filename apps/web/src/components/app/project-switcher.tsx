@@ -36,19 +36,16 @@ export function ProjectSwitcher() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        data-tip={name}
-        className="flex w-full items-center rounded-2xl py-2 pr-3 text-left transition-colors duration-200 hover:bg-hover"
+        className="flex w-full max-w-72 items-center gap-3 rounded-2xl py-1.5 pr-3 pl-1.5 text-left transition-colors duration-200 hover:bg-hover"
       >
-        <span className="slot">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent font-display text-sm font-semibold text-accent-foreground">
-            {name.charAt(0).toUpperCase()}
-          </span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent font-display text-sm font-semibold text-accent-foreground">
+          {name.charAt(0).toUpperCase()}
         </span>
-        <span className="label min-w-0 flex-1">
+        <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">{name}</span>
           <span className="block truncate text-xs text-muted">{workspace?.name ?? ''}</span>
         </span>
-        <ChevronsUpDown className="label ml-2 shrink-0 text-muted" size={16} aria-hidden="true" />
+        <ChevronsUpDown className="shrink-0 text-muted" size={16} aria-hidden="true" />
       </button>
 
       {open && workspace && (
