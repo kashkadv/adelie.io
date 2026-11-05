@@ -78,7 +78,7 @@ Next.js + Tailwind + shadcn/ui (frontend), Docker Compose локально.
 
 - **Стек:** варіант A → [ADR-0002](../decisions/0002-stack-and-monorepo.md) (прийнято).
 - **Auth:** готове безкоштовне рішення без ліцензійних проблем →
-  пропозиція Better Auth, [ADR-0003](../decisions/0003-auth.md) (чекає підтвердження).
+  Better Auth, [ADR-0003](../decisions/0003-auth.md) (прийнято).
 - **Тестові акаунти:** TikTok і Pinterest є. Instagram — робочий акаунт,
   можливий лише доступ на читання.
 - **Перший користувач:** знайомий бізнес Gushka.
