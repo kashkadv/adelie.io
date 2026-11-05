@@ -6,6 +6,13 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
+    "@adelie/db#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "generated/**"]
+    },
+    "@adelie/db#typecheck": {
+      "dependsOn": ["@adelie/db#build"]
+    },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
