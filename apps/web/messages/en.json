@@ -12,6 +12,8 @@
     "name": "Name",
     "email": "Email",
     "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "signIn": "Sign in",
     "createAccount": "Create account",
     "haveAccount": "Have an account?",

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { AppShell } from './app-shell';
+import { PasswordInput } from './password-input';
 
 type Mode = 'login' | 'register';
 
@@ -69,10 +70,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
           required
           autoComplete="email"
         />
-        <input
+        <PasswordInput
           className={input}
           name="password"
-          type="password"
           placeholder={t('password')}
           required
           minLength={8}

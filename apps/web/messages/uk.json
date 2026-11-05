@@ -12,6 +12,8 @@
     "name": "Ім'я",
     "email": "Email",
     "password": "Пароль",
+    "showPassword": "Показати пароль",
+    "hidePassword": "Сховати пароль",
     "signIn": "Увійти",
     "createAccount": "Створити акаунт",
     "haveAccount": "Вже маєте акаунт?",
