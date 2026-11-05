@@ -3,6 +3,7 @@ import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { auth } from './auth/auth.js';
 import { HealthController } from './health.controller.js';
 import { PrismaService } from './prisma.service.js';
+import { ProfileController } from './profile/profile.controller.js';
 import { WorkspaceAccessGuard } from './workspaces/workspace-access.guard.js';
 import { WorkspacesController } from './workspaces/workspaces.controller.js';
 
@@ -10,7 +11,7 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
   // AuthModule registers a global guard: every route requires a session
   // unless marked with @AllowAnonymous().
   imports: [AuthModule.forRoot({ auth })],
-  controllers: [HealthController, WorkspacesController],
+  controllers: [HealthController, ProfileController, WorkspacesController],
   providers: [PrismaService, WorkspaceAccessGuard],
 })
 export class AppModule {}

@@ -27,6 +27,7 @@ model User {
   accounts          Account[]
   memberships       WorkspaceMember[]
   socialConnections SocialConnection[]
+  profile           UserProfile?
 
   @@map("user")
 }
@@ -76,6 +77,42 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+// ---------- Personal profile (ADR-0010) ----------
+
+/// Personal settings of a user, one per person across all workspaces. Visible to the user and to
+/// members of workspaces they share. `user.name` is kept in sync as "firstName lastName".
+model UserProfile {
+  userId    String  @id
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName String?
+  lastName  String?
+  jobTitle  String?
+
+  /// Avatar, resized on the client to 256×256 (WebP/JPEG/PNG, ≤ 150 KB). Moves to object storage later.
+  avatar          Bytes?
+  avatarMime      String?
+  avatarUpdatedAt DateTime?
+
+  /// Contact email for colleagues; may differ from the sign-in email (user.email).
+  contactEmail String?
+  phone        String?
+  telegram     String?
+  whatsapp     String?
+  viber        String?
+  linkedin     String?
+
+  /// Working hours: IANA timezone, ISO weekdays (1 = Monday … 7 = Sunday), "HH:MM" interval.
+  timezone  String?
+  workDays  Int[]   @default([1, 2, 3, 4, 5])
+  workStart String?
+  workEnd   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_profile")
 }
 
 // ---------- Workspaces ----------

@@ -80,5 +80,67 @@
       "subtitle": "Project, team and workspace",
       "text": "Project timezone and currency, team members and their access will be managed here."
     }
+  },
+  "Profile": {
+    "menuItem": "Profile",
+    "title": "Profile",
+    "subtitle": "How colleagues in your workspaces see and reach you",
+    "sections": {
+      "profile": "Personal details",
+      "contacts": "Contacts",
+      "workingHours": "Working hours",
+      "signIn": "Sign-in",
+      "interface": "Interface"
+    },
+    "fields": {
+      "firstName": "First name",
+      "lastName": "Last name",
+      "jobTitle": "Job title",
+      "contactEmail": "Contact email",
+      "phone": "Phone",
+      "telegram": "Telegram",
+      "whatsapp": "WhatsApp",
+      "viber": "Viber",
+      "linkedin": "LinkedIn",
+      "timezone": "Time zone",
+      "workDays": "Working days",
+      "workStart": "From",
+      "workEnd": "To",
+      "loginEmail": "Sign-in email",
+      "theme": "Theme",
+      "language": "Language"
+    },
+    "placeholders": {
+      "jobTitle": "e.g. SMM manager",
+      "timezone": "Not set",
+      "search": "Search"
+    },
+    "hints": {
+      "contactEmail": "For colleagues; can differ from your sign-in email",
+      "loginEmail": "Used to sign in. Changing it is not available yet."
+    },
+    "useMyTimezone": "Use my time zone ({zone})",
+    "uploadPhoto": "Upload photo",
+    "changePhoto": "Change photo",
+    "removePhoto": "Remove",
+    "save": "Save",
+    "saved": "Saved",
+    "fixErrors": "Check the highlighted fields",
+    "errors": {
+      "tooLong": "Too long",
+      "invalidEmail": "Enter a valid email",
+      "invalidPhone": "Enter a phone number, e.g. +380 67 123 45 67",
+      "invalidTelegram": "Enter a Telegram username, e.g. @username",
+      "invalidLinkedin": "Enter a LinkedIn profile link",
+      "invalidTimezone": "Unknown time zone",
+      "invalidDays": "Invalid days",
+      "invalidTime": "Enter time as HH:MM",
+      "timeRequired": "Set both start and end",
+      "endBeforeStart": "End must be after start",
+      "invalidType": "Invalid value",
+      "invalidImage": "Use a JPEG, PNG or WebP image",
+      "tooLarge": "The image is too large"
+    },
+    "nothingFound": "Nothing found"
   }
 }

@@ -22,6 +22,8 @@
   --glass-highlight: rgb(255 255 255 / 0.9);
   --shadow: rgb(20 28 40 / 0.08);
   --hover: rgb(11 14 18 / 0.05);
+  --scroll-thumb: rgb(11 14 18 / 0.16);
+  --scroll-thumb-hover: rgb(11 14 18 / 0.3);
 
   /* Content viewport (raised layer) and cards inside it */
   --panel: rgb(255 255 255 / 0.62);
@@ -62,6 +64,8 @@
   --glass-highlight: rgb(255 255 255 / 0.06);
   --shadow: rgb(0 0 0 / 0.45);
   --hover: rgb(255 255 255 / 0.05);
+  --scroll-thumb: rgb(255 255 255 / 0.14);
+  --scroll-thumb-hover: rgb(255 255 255 / 0.28);
 
   --panel: rgb(20 24 30 / 0.72);
   --panel-border: rgb(255 255 255 / 0.07);
@@ -122,6 +126,49 @@ body {
 :focus-visible {
   outline: 2px solid var(--foreground);
   outline-offset: 2px;
+}
+
+/* ---------- Scrollbars: the same thin rounded bar on every OS ---------- */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--scroll-thumb) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scroll-thumb-hover);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Keep the bar on the straight part of rounded scrollers (radius 32px / 16px). */
+.content-panel::-webkit-scrollbar-track {
+  margin-block: 30px;
+}
+
+.scroll-thin::-webkit-scrollbar-track {
+  margin-block: 10px;
+}
+
+/* Firefox has no ::-webkit-scrollbar; only it gets the standard properties (Chromium would
+   otherwise let them override the custom bar above). */
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
 }
 
 h1,
@@ -197,9 +244,18 @@ h3 {
       box-shadow 200ms var(--ease-soft);
   }
 
-  .field:focus {
+  .field:focus,
+  .field[aria-expanded='true'] {
     border-color: var(--foreground);
-    box-shadow: 0 0 0 4px var(--hover);
+  }
+
+  /* Fields show focus by the border color only — no outline or ring. */
+  .field:focus-visible {
+    outline: none;
+  }
+
+  .field[aria-invalid='true'] {
+    border-color: rgb(220 38 38 / 0.6);
   }
 
   .btn-primary {

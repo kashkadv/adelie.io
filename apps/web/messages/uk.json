@@ -80,5 +80,67 @@
       "subtitle": "Проєкт, команда й робочий простір",
       "text": "Тут будуть часовий пояс і валюта проєкту, учасники команди та їх доступи."
     }
+  },
+  "Profile": {
+    "menuItem": "Профіль",
+    "title": "Профіль",
+    "subtitle": "Як вас бачать і як з вами зв'язуються колеги з ваших робочих просторів",
+    "sections": {
+      "profile": "Особисті дані",
+      "contacts": "Контакти",
+      "workingHours": "Робочий час",
+      "signIn": "Вхід",
+      "interface": "Інтерфейс"
+    },
+    "fields": {
+      "firstName": "Ім'я",
+      "lastName": "Прізвище",
+      "jobTitle": "Посада",
+      "contactEmail": "Контактна пошта",
+      "phone": "Телефон",
+      "telegram": "Telegram",
+      "whatsapp": "WhatsApp",
+      "viber": "Viber",
+      "linkedin": "LinkedIn",
+      "timezone": "Часовий пояс",
+      "workDays": "Робочі дні",
+      "workStart": "З",
+      "workEnd": "До",
+      "loginEmail": "Пошта для входу",
+      "theme": "Тема",
+      "language": "Мова"
+    },
+    "placeholders": {
+      "jobTitle": "напр. SMM-менеджер",
+      "timezone": "Не вказано",
+      "search": "Пошук"
+    },
+    "hints": {
+      "contactEmail": "Для колег; може відрізнятися від пошти для входу",
+      "loginEmail": "Використовується для входу. Змінити її поки не можна."
+    },
+    "useMyTimezone": "Мій часовий пояс ({zone})",
+    "uploadPhoto": "Завантажити фото",
+    "changePhoto": "Змінити фото",
+    "removePhoto": "Видалити",
+    "save": "Зберегти",
+    "saved": "Збережено",
+    "fixErrors": "Перевірте виділені поля",
+    "errors": {
+      "tooLong": "Задовго",
+      "invalidEmail": "Вкажіть коректну пошту",
+      "invalidPhone": "Вкажіть номер, напр. +380 67 123 45 67",
+      "invalidTelegram": "Вкажіть нік у Telegram, напр. @username",
+      "invalidLinkedin": "Вкажіть посилання на профіль LinkedIn",
+      "invalidTimezone": "Невідомий часовий пояс",
+      "invalidDays": "Некоректні дні",
+      "invalidTime": "Вкажіть час у форматі ГГ:ХХ",
+      "timeRequired": "Вкажіть і початок, і кінець",
+      "endBeforeStart": "Кінець має бути пізніше за початок",
+      "invalidType": "Некоректне значення",
+      "invalidImage": "Підійде JPEG, PNG або WebP",
+      "tooLarge": "Зображення завелике"
+    },
+    "nothingFound": "Нічого не знайдено"
   }
 }
