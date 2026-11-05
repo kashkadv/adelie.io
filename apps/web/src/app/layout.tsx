@@ -5,7 +5,15 @@ import { LocaleProvider } from '@/components/locale-provider';
 import { themeInitScript } from '@/lib/theme';
 import './globals.css';
 
-// Brand fonts (self-hosted, SIL OFL; built by scripts/brand-fonts.py) — same as the public site.
+// Brand fonts (self-hosted, SIL OFL; built by scripts/brand-fonts.py) — same as the public site:
+// Inter — text and UI, Onest — headings, Tektur — the "Adelie" wordmark only.
+const inter = localFont({
+  src: '../fonts/Inter.woff2',
+  weight: '100 900',
+  variable: '--font-inter',
+  display: 'swap',
+});
+
 const onest = localFont({
   src: '../fonts/Onest.woff2',
   weight: '100 900',
@@ -18,6 +26,7 @@ const tektur = localFont({
   weight: '400 900',
   variable: '--font-tektur',
   display: 'swap',
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -32,14 +41,15 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
     // before hydration (e.g. location="..."). Applies to these elements' attributes only.
     <html
       lang="en"
-      className={`${onest.variable} ${tektur.variable} h-full`}
+      className={`${inter.variable} ${onest.variable} ${tektur.variable}`}
       suppressHydrationWarning
     >
       <head>
-        {/* Sets data-theme before first paint (no flash of the wrong theme). */}
+        {/* Sets data-theme and data-sidebar before first paint (no flash). */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+      <body suppressHydrationWarning>
+        <div className="app-backdrop" aria-hidden="true" />
         <Suspense>
           <LocaleProvider>{children}</LocaleProvider>
         </Suspense>

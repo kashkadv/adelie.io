@@ -5,13 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { authClient } from '@/lib/auth-client';
-import { AppShell } from './app-shell';
+import { AuthFrame } from './auth-frame';
 import { PasswordInput } from './password-input';
 
 type Mode = 'login' | 'register';
 
-const input =
-  'w-full rounded-md border border-line bg-transparent px-3 py-2 outline-none focus:border-current';
+const input = 'field';
 
 export function AuthForm({ mode }: { mode: Mode }) {
   const t = useTranslations('Auth');
@@ -43,9 +42,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
   }
 
   return (
-    <AppShell centered>
+    <AuthFrame>
       {/* The form is a size container: the title scales with its width to stay on one line. */}
-      <form onSubmit={onSubmit} className="@container w-full max-w-md space-y-4">
+      <form onSubmit={onSubmit} className="@container w-full space-y-4">
         <h1
           className="mb-6 font-semibold leading-tight whitespace-nowrap"
           // Longest title (uk) is ~15.5em wide in Onest 600 → 28px fits 448px; shrinks on narrow screens.
@@ -78,32 +77,32 @@ export function AuthForm({ mode }: { mode: Mode }) {
           minLength={8}
           autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
         />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-md bg-foreground px-3 py-2 text-background disabled:opacity-50"
-        >
+        {error && (
+          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+            {error}
+          </p>
+        )}
+        <button type="submit" disabled={pending} className="btn-primary">
           {pending ? '…' : mode === 'register' ? t('createAccount') : t('signIn')}
         </button>
-        <p className="text-sm opacity-70">
+        <p className="text-center text-sm text-muted">
           {mode === 'register' ? (
             <>
               {t('haveAccount')}{' '}
-              <Link href="/login" className="underline">
+              <Link href="/login" className="text-foreground underline underline-offset-4">
                 {t('signIn')}
               </Link>
             </>
           ) : (
             <>
               {t('noAccount')}{' '}
-              <Link href="/register" className="underline">
+              <Link href="/register" className="text-foreground underline underline-offset-4">
                 {t('createOne')}
               </Link>
             </>
           )}
         </p>
       </form>
-    </AppShell>
+    </AuthFrame>
   );
 }

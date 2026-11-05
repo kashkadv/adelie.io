@@ -21,15 +21,64 @@
     "createOne": "Create one",
     "signOut": "Sign out"
   },
-  "Home": {
+  "Roles": {
+    "OWNER": "Owner",
+    "ADMIN": "Admin",
+    "MANAGER": "Manager",
+    "ANALYST": "Analyst",
+    "VIEWER": "Viewer"
+  },
+  "Nav": {
+    "main": "Main navigation",
+    "overview": "Overview",
+    "accounts": "Accounts",
+    "content": "Content",
+    "reports": "Reports",
+    "settings": "Settings",
+    "projects": "Projects",
     "workspaces": "Workspaces",
-    "noWorkspaces": "No workspaces.",
-    "roles": {
-      "OWNER": "Owner",
-      "ADMIN": "Admin",
-      "MANAGER": "Manager",
-      "ANALYST": "Analyst",
-      "VIEWER": "Viewer"
+    "collapse": "Collapse",
+    "expand": "Expand sidebar",
+    "toggleSidebar": "Collapse or expand the sidebar",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "Overview": {
+    "title": "Overview",
+    "subtitle": "Project {project}",
+    "noData": "No data yet",
+    "metrics": {
+      "impressions": "Impressions",
+      "saves": "Saves",
+      "outboundClicks": "Outbound clicks",
+      "followers": "Followers"
+    },
+    "connectTitle": "Connect your first account",
+    "connectText": "Adelie collects analytics from your social accounts every day. Pinterest comes first — Instagram and TikTok are next.",
+    "connectPinterest": "Connect Pinterest",
+    "soon": "Soon"
+  },
+  "Sections": {
+    "soonTitle": "Coming soon",
+    "accounts": {
+      "title": "Accounts",
+      "subtitle": "Social accounts connected to this project",
+      "text": "Connected Pinterest, Instagram and TikTok accounts, their sync status and data history will be listed here."
+    },
+    "content": {
+      "title": "Content",
+      "subtitle": "Pins and posts with their metrics",
+      "text": "All published content with metrics, filters and top performers will appear here once an account is connected."
+    },
+    "reports": {
+      "title": "Reports",
+      "subtitle": "Snapshots to share with clients",
+      "text": "Build a report for a period and share it by a secret link — no sign-in needed for the reader."
+    },
+    "settings": {
+      "title": "Settings",
+      "subtitle": "Project, team and workspace",
+      "text": "Project timezone and currency, team members and their access will be managed here."
     }
   }
 }

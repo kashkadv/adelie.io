@@ -1,4 +1,11 @@
-/* Brand fonts (self-hosted, SIL OFL): Onest — headings, Tektur — text and the wordmark. */
+/* Brand fonts (self-hosted, SIL OFL): Inter — text, Onest — headings, Tektur — the wordmark. */
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 @font-face {
   font-family: 'Tektur';
   src: url('/fonts/Tektur.woff2') format('woff2');
@@ -21,7 +28,7 @@
   --muted: #6b6b6b;
   --line: #e6e6e6;
   --max: 1120px;
-  --font-text: 'Tektur', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-text: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Onest', var(--font-text);
   color-scheme: light;
 }
@@ -62,7 +69,7 @@ body {
   font: 16px/1.6 var(--font-text);
 }
 
-/* Headings — Onest; the wordmark "Adelie" stays in the text font (Tektur). */
+/* Headings — Onest; the wordmark "Adelie" — Tektur (.brand). */
 h1,
 h2 {
   font-family: var(--font-display);
@@ -96,6 +103,7 @@ header.top {
   gap: 12px;
   font-weight: 600;
   font-size: 24px;
+  font-family: 'Tektur', var(--font-text);
   letter-spacing: 0;
   text-decoration: none;
 }

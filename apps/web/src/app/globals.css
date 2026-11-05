@@ -1,26 +1,73 @@
 @import 'tailwindcss';
 
 /*
- * Themes: light / dark. <html data-theme> is set before first paint by the inline
- * script in layout.tsx (saved choice → system preference). `dark:` utilities follow it.
- * Tokens and the shell (header/footer) mirror apps/site/style.css — keep them identical.
+ * Adelie design system (ADR-0009): penguin tones, glass surfaces, soft motion.
+ * Themes: light / dark. <html data-theme> (and data-sidebar) are set before first paint by the
+ * inline script in layout.tsx. `dark:` utilities follow data-theme.
+ * Dark theme: everything dark, white only as a highlight (active item, key numbers, primary action).
  */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #0a0e12;
-  --muted: #6b6b6b;
-  --line: #e6e6e6;
-  --shell-max: 1120px;
+  /* Base */
+  --background: #eceef1;
+  --foreground: #0b0e12;
+  --muted: #646b76;
+  --line: rgb(11 14 18 / 0.08);
+
+  /* Glass */
+  --glass: rgb(255 255 255 / 0.55);
+  --glass-strong: rgb(255 255 255 / 0.78);
+  --glass-border: rgb(255 255 255 / 0.7);
+  --glass-highlight: rgb(255 255 255 / 0.9);
+  --shadow: rgb(20 28 40 / 0.08);
+  --hover: rgb(11 14 18 / 0.05);
+
+  /* Highlight: the black "pill" in light theme */
+  --accent: #0b0e12;
+  --accent-foreground: #ffffff;
+
+  /* Background glow (behind the glass) */
+  --glow-1: rgb(63 132 212 / 0.16);
+  --glow-2: rgb(232 150 46 / 0.12);
+  --glow-3: rgb(11 14 18 / 0.06);
+
+  /* Chart series — penguin palette, fixed order (validated, ADR-0009) */
+  --series-1: #2f6fb5; /* ocean */
+  --series-2: #d9543a; /* gentoo beak */
+  --series-3: #2aa39a; /* glacier */
+  --series-4: #e8962e; /* emperor gold */
+  --series-5: #d36a9a; /* krill */
+
   color-scheme: light;
 }
 
 :root[data-theme='dark'] {
-  --background: #0a0e12;
-  --foreground: #ffffff;
-  --muted: #9a9a9a;
-  --line: #22262b;
+  --background: #07090c;
+  --foreground: #f2f4f7;
+  --muted: #8b929d;
+  --line: rgb(255 255 255 / 0.07);
+
+  --glass: rgb(24 28 35 / 0.55);
+  --glass-strong: rgb(24 28 35 / 0.8);
+  --glass-border: rgb(255 255 255 / 0.07);
+  --glass-highlight: rgb(255 255 255 / 0.06);
+  --shadow: rgb(0 0 0 / 0.45);
+  --hover: rgb(255 255 255 / 0.05);
+
+  --accent: #f2f4f7;
+  --accent-foreground: #07090c;
+
+  --glow-1: rgb(63 132 212 / 0.14);
+  --glow-2: rgb(194 122 18 / 0.08);
+  --glow-3: rgb(255 255 255 / 0.03);
+
+  --series-1: #3f84d4;
+  --series-2: #dc5a3e;
+  --series-3: #0f978a;
+  --series-4: #c27a12;
+  --series-5: #c95a8d;
+
   color-scheme: dark;
 }
 
@@ -29,88 +76,253 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-line: var(--line);
-  /* Brand fonts from next/font/local (layout.tsx): Tektur — text and wordmark, Onest — headings. */
-  --font-sans: var(--font-tektur), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-hover: var(--hover);
+  /* Fonts from next/font/local (layout.tsx): Inter — text/UI, Onest — headings, Tektur — wordmark. */
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: var(--font-onest), var(--font-sans);
+  --font-wordmark: var(--font-tektur), var(--font-sans);
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html {
+  height: 100%;
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body {
+  min-height: 100%;
   background: var(--background);
   color: var(--foreground);
-  font: 16px/1.6 var(--font-sans);
+  font: 15px/1.55 var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01';
+  transition:
+    background-color 300ms var(--ease-soft),
+    color 300ms var(--ease-soft);
 }
 
-/* Headings — Onest; the wordmark "Adelie" stays in the text font (Tektur), as on the public site. */
+:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
 h1,
-h2 {
+h2,
+h3 {
   font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
-/* ---------- Shell: identical to the public site ---------- */
-
-.shell-wrap {
-  width: 100%;
-  max-width: var(--shell-max);
-  margin: 0 auto;
-  padding: 0 16px;
+/* Numbers in tables and metrics line up. */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
-.shell-header {
+/* ---------- Background: soft glow behind the glass ---------- */
+
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(40vmax 40vmax at 12% 8%, var(--glow-1), transparent 60%),
+    radial-gradient(36vmax 36vmax at 92% 18%, var(--glow-2), transparent 60%),
+    radial-gradient(50vmax 50vmax at 70% 110%, var(--glow-3), transparent 60%), var(--background);
+}
+
+@layer components {
+  /* ---------- Glass ---------- */
+
+  .glass {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      inset 0 1px 0 var(--glass-highlight),
+      0 10px 40px -12px var(--shadow);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    backdrop-filter: blur(28px) saturate(160%);
+  }
+
+  .glass-strong {
+    background: var(--glass-strong);
+  }
+
+  /* ---------- Form controls ---------- */
+
+  .field {
+    width: 100%;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--glass-strong);
+    padding: 10px 14px;
+    outline: none;
+    transition:
+      border-color 200ms var(--ease-soft),
+      box-shadow 200ms var(--ease-soft);
+  }
+
+  .field:focus {
+    border-color: var(--foreground);
+    box-shadow: 0 0 0 4px var(--hover);
+  }
+
+  .btn-primary {
+    width: 100%;
+    border-radius: 14px;
+    padding: 10px 14px;
+    font-weight: 500;
+    background: var(--accent);
+    color: var(--accent-foreground);
+    transition:
+      transform 200ms var(--ease-soft),
+      opacity 200ms var(--ease-soft);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0) scale(0.99);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    transform: none;
+  }
+
+  /* Small square icon button (theme, language, collapse…). */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    color: var(--muted);
+    transition:
+      background-color 200ms var(--ease-soft),
+      color 200ms var(--ease-soft);
+  }
+
+  .icon-btn:hover {
+    background: var(--hover);
+    color: var(--foreground);
+  }
+}
+
+/* ---------- Motion ---------- */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-rise {
+  animation: rise-in 420ms var(--ease-soft) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* ---------- Sidebar (expanded / collapsed via <html data-sidebar>) ---------- */
+
+/* Inner width of the collapsed sidebar (76px − 2×12px padding). Every row starts with an icon slot of
+   this width, so icons sit on one vertical axis in both states. */
+.sidebar {
+  --slot: 52px;
+  width: 264px;
+  transition: width 320ms var(--ease-soft);
+}
+
+:root[data-sidebar='collapsed'] .sidebar {
+  width: 76px;
+}
+
+.sidebar .label {
+  white-space: nowrap;
+  overflow: hidden;
+  transition:
+    opacity 200ms var(--ease-soft),
+    max-width 320ms var(--ease-soft);
+  max-width: 200px;
+}
+
+:root[data-sidebar='collapsed'] .sidebar .label {
+  opacity: 0;
+  max-width: 0;
+}
+
+.sidebar .slot {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 0;
-}
-
-.shell-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-weight: 600;
-  font-size: 24px;
-  letter-spacing: 0;
-  text-decoration: none;
-  color: inherit;
-}
-
-.shell-brand svg {
-  width: 29px;
-  height: 32px;
-  color: var(--foreground);
-}
-
-.shell-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  font-size: 14px;
-}
-
-.theme-toggle {
-  display: inline-flex;
+  width: var(--slot);
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--foreground);
-  cursor: pointer;
 }
 
-.theme-toggle svg {
-  width: 16px;
-  height: 16px;
+/* Tooltip with the item name, only when the sidebar is collapsed. */
+.sidebar [data-tip] {
+  position: relative;
 }
 
+:root[data-sidebar='collapsed'] .sidebar [data-tip]:hover::after,
+:root[data-sidebar='collapsed'] .sidebar [data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  white-space: nowrap;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  box-shadow: 0 8px 24px -8px var(--shadow);
+  z-index: 50;
+  pointer-events: none;
+  animation: rise-in 180ms var(--ease-soft) both;
+}
+
+/* The mobile drawer always shows the expanded sidebar. */
+.sidebar-drawer .sidebar {
+  width: 264px;
+}
+
+.sidebar-drawer .sidebar .label {
+  opacity: 1;
+  max-width: 200px;
+}
+
+.collapse-icon {
+  transition: transform 320ms var(--ease-soft);
+}
+
+:root[data-sidebar='collapsed'] .collapse-icon {
+  transform: rotate(180deg);
+}
+
+/* Theme toggle shows the theme you would switch to: moon on light, sun on dark. */
 .theme-toggle .to-light {
   display: none;
 }
@@ -123,58 +335,8 @@ h2 {
   display: none;
 }
 
-.shell-footer {
-  border-top: 1px solid var(--line);
-  padding: 24px 0 40px;
-  font-size: 14px;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.shell-footer a {
-  color: inherit;
-}
-
-.footer-links {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.lang-select {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.lang-select select {
-  appearance: none;
-  -webkit-appearance: none;
-  font: inherit;
-  color: var(--foreground);
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 6px 32px 6px 12px;
-  cursor: pointer;
-}
-
-.lang-select select:disabled {
-  opacity: 0.5;
-}
-
-.lang-select::after {
-  content: '';
-  position: absolute;
-  right: 12px;
-  width: 7px;
-  height: 7px;
-  border-right: 1.5px solid var(--muted);
-  border-bottom: 1.5px solid var(--muted);
-  transform: translateY(-2px) rotate(45deg);
-  pointer-events: none;
+.wordmark {
+  font-family: var(--font-wordmark);
+  font-weight: 600;
+  letter-spacing: 0;
 }
