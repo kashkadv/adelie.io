@@ -131,7 +131,7 @@ body {
    text fields never get it — they show focus by a slightly darker border only. */
 @layer base {
   :focus-visible {
-    outline: 2px solid var(--foreground);
+    outline: 2px solid var(--field-focus);
     outline-offset: 2px;
   }
 
@@ -430,6 +430,29 @@ h3 {
   /* Own keyframes keep translateY(-50%): a generic animation would reset the transform and drop the
      tooltip below the icon. */
   animation: tip-in 180ms var(--ease-soft) both;
+}
+
+/* InfoTip (portalled tooltip): a short slide from the icon's side. */
+@keyframes tip-above {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes tip-below {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.animate-tip-above {
+  animation: tip-above 160ms var(--ease-soft) backwards;
+}
+
+.animate-tip-below {
+  animation: tip-below 160ms var(--ease-soft) backwards;
 }
 
 @keyframes tip-in {
