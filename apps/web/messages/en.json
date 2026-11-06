@@ -201,7 +201,9 @@
       "personal": "Personal account: boards and pins are not available.",
       "personalHint": "Pinterest shares pins and boards only of business accounts with apps. Switching to a free business account in Pinterest settings unlocks them; profile and account analytics already work.",
       "partial": "Part of the data was not available during the last sync.",
-      "failed": "The last sync failed. Adelie will retry within an hour."
+      "failed": "The last sync failed. Adelie will retry within an hour.",
+      "partialHint": "Some steps were skipped because the platform did not allow them; everything else is up to date. Adelie tries again with the next sync.",
+      "failedHint": "Adelie could not reach the platform. It will retry automatically within an hour; nothing needs to be done."
     },
     "platformsTitle": "Platforms",
     "emptyTitle": "No accounts yet",

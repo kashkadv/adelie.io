@@ -122,30 +122,32 @@ function AccountRow({ account }: { account: SocialAccount }) {
           <InfoTip text={t('collectingHint')} />
         </p>
 
-        {/* Status */}
-        <span
-          className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
-            needsReauth
-              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-              : 'bg-hover text-muted'
-          }`}
-        >
-          {needsReauth ? (
-            <AlertTriangle size={14} aria-hidden="true" />
-          ) : (
-            <CheckCircle2 size={14} aria-hidden="true" />
+        {/* Status (+ a warning icon with an explanation, instead of a banner). Fixed width, so the
+            columns of all rows line up whether or not a row has a warning. */}
+        <div className="flex shrink-0 items-center justify-end gap-2 md:w-48">
+          <span
+            className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
+              needsReauth
+                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                : 'bg-hover text-muted'
+            }`}
+          >
+            {needsReauth ? (
+              <AlertTriangle size={14} aria-hidden="true" />
+            ) : (
+              <CheckCircle2 size={14} aria-hidden="true" />
+            )}
+            {t(`status.${account.status}`)}
+          </span>
+          {syncNote && (
+            <InfoTip
+              tone="warning"
+              title={t(`sync.${syncNote}`)}
+              text={t(`sync.${syncNote}Hint`)}
+            />
           )}
-          {t(`status.${account.status}`)}
-        </span>
+        </div>
       </div>
-
-      {syncNote && (
-        <p className="mt-3 flex items-center gap-1.5 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-800 md:ml-14 dark:text-amber-300">
-          <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
-          <span className="flex-1">{t(`sync.${syncNote}`)}</span>
-          {syncNote === 'personal' && <InfoTip text={t('sync.personalHint')} />}
-        </p>
-      )}
     </li>
   );
 }
