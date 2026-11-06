@@ -15,7 +15,9 @@ services:
   migrate:
     <<: *app
     restart: 'no'
-    command: ['pnpm', '--filter', '@adelie/db', 'exec', 'prisma', 'migrate', 'deploy']
+    # Binaries are called directly: `pnpm run/exec` would try to re-install dependencies first.
+    working_dir: /app/packages/db
+    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
     networks: [data]
 
   api:
@@ -42,7 +44,8 @@ services:
 
   web:
     <<: *app
-    command: ['pnpm', '--filter', '@adelie/web', 'start']
+    working_dir: /app/apps/web
+    command: ['node_modules/.bin/next', 'start', '--port', '3000']
     depends_on: [api]
     networks:
       edge:
