@@ -21,7 +21,7 @@ export function Checkbox({
       aria-label={label}
       title={label}
       onClick={() => onChange(checked !== true)}
-      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors duration-150 ${
+      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 ${
         on
           ? 'border-accent bg-accent text-accent-foreground'
           : 'border-[var(--field-focus)] hover:border-foreground/40'
