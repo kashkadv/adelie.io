@@ -23,11 +23,12 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions          Session[]
-  accounts          Account[]
-  memberships       WorkspaceMember[]
-  socialConnections SocialConnection[]
-  profile           UserProfile?
+  sessions           Session[]
+  accounts           Account[]
+  memberships        WorkspaceMember[]
+  socialConnections  SocialConnection[]
+  profile            UserProfile?
+  connectInvitations ConnectInvitation[]
 
   @@map("user")
 }
@@ -172,6 +173,7 @@ model Project {
   members     ProjectMember[]
   connections SocialConnection[]
   accounts    SocialAccount[]
+  invitations ConnectInvitation[]
 
   @@index([workspaceId])
   @@map("project")
@@ -233,6 +235,32 @@ model SocialConnection {
   @@unique([workspaceId, platform, externalUserId])
   @@index([projectId])
   @@map("social_connection")
+}
+
+/// Invitation link to connect a social account to a project without signing in to Adelie
+/// (ADR-0012): for a client of the agency, or the user's own account in another browser.
+/// Single-use, expires, revocable. The token itself is never stored in plain text.
+model ConnectInvitation {
+  id              String         @id @default(uuid(7)) @db.Uuid
+  workspaceId     String         @db.Uuid
+  projectId       String         @db.Uuid
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  platform        SocialPlatform
+  /// SHA-256 of the token — the lookup key.
+  tokenHash       String         @unique
+  /// The token encrypted (AES-GCM) so members can copy the link again.
+  tokenEncrypted  String
+  createdByUserId String?
+  createdBy       User?          @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  expiresAt       DateTime
+  usedAt          DateTime?
+  revokedAt       DateTime?
+  /// The connection created through this invitation.
+  connectionId    String?        @db.Uuid
+  createdAt       DateTime       @default(now())
+
+  @@index([projectId])
+  @@map("connect_invitation")
 }
 
 /// A profile on a platform (e.g. Gushka's Pinterest business account).

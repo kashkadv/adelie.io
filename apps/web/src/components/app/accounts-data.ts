@@ -74,3 +74,58 @@ export function useProjectAccounts() {
     canConnect: !!workspace && CONNECT_ROLES.includes(workspace.role),
   };
 }
+
+export type Invitation = {
+  id: string;
+  platform: 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK';
+  url: string;
+  expiresAt: string;
+  createdAt: string;
+  createdBy: string | null;
+};
+
+/** Pending connect invitations of the current project (ADR-0012); empty for roles without access. */
+export function useProjectInvitations() {
+  const { workspace, project } = useWorkspace();
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const base = workspace && project ? `/workspaces/${workspace.id}/projects/${project.id}` : null;
+  const allowed = !!workspace && CONNECT_ROLES.includes(workspace.role);
+
+  const load = useCallback(async () => {
+    if (!base || !allowed) return [];
+    return api<Invitation[]>(`${base}/invitations`).catch(() => []);
+  }, [base, allowed]);
+
+  useEffect(() => {
+    let cancelled = false;
+    load().then((list) => !cancelled && setInvitations(list));
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
+
+  /** Creates an invitation and returns its link. */
+  const create = useCallback(
+    async (platform: 'pinterest') => {
+      if (!base) throw new Error('No project');
+      const invitation = await api<Invitation>(`${base}/invitations`, {
+        method: 'POST',
+        json: { platform },
+      });
+      setInvitations(await load());
+      return invitation.url;
+    },
+    [base, load],
+  );
+
+  const revoke = useCallback(
+    async (id: string) => {
+      if (!base) return;
+      await api(`${base}/invitations/${id}`, { method: 'DELETE' });
+      setInvitations((list) => list.filter((i) => i.id !== id));
+    },
+    [base],
+  );
+
+  return { invitations, create, revoke };
+}

@@ -3,8 +3,11 @@
 import {
   AlertTriangle,
   ArrowRight,
+  Check,
   CheckCircle2,
   ChevronDown,
+  Copy,
+  Link2,
   Pin,
   Plug,
   Plus,
@@ -14,7 +17,7 @@ import {
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { InfoTip } from '../ui/info-tip';
-import { useProjectAccounts, type SocialAccount } from './accounts-data';
+import { useProjectAccounts, useProjectInvitations, type SocialAccount } from './accounts-data';
 import { EmptyState, PageHeader } from './page-header';
 
 type ConnectResult = 'connected' | 'denied' | 'expired' | 'alreadyConnected' | 'error';
@@ -137,10 +140,13 @@ function ConnectMenu({
   canConnect,
   connecting,
   onConnect,
+  onInvite,
 }: {
   canConnect: boolean;
   connecting: boolean;
   onConnect: () => void;
+  /** Creates a connect invitation for Pinterest and copies its link (ADR-0012). */
+  onInvite: () => void;
 }) {
   const t = useTranslations('Accounts');
   const [open, setOpen] = useState(false);
@@ -206,6 +212,19 @@ function ConnectMenu({
             <span className="flex-1">{t('platforms.PINTEREST')}</span>
             <ArrowRight size={14} className="text-muted" aria-hidden="true" />
           </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onInvite();
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs text-muted hover:bg-hover hover:text-foreground"
+          >
+            <Link2 size={16} strokeWidth={1.75} className="ml-px" aria-hidden="true" />
+            <span className="flex-1">{t('copyInvite')}</span>
+          </button>
+          <div className="my-1 h-px bg-line" />
           {(['INSTAGRAM', 'TIKTOK'] as const).map((p) => (
             <div
               key={p}
@@ -228,6 +247,26 @@ function ConnectMenu({
 export function Accounts() {
   const t = useTranslations('Accounts');
   const { accounts, connect, canConnect } = useProjectAccounts();
+  const { invitations, create: createInvitation, revoke } = useProjectInvitations();
+  const [notice, setNotice] = useState<'inviteCopied' | 'inviteFailed' | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const format = useFormatter();
+
+  async function onInvite() {
+    try {
+      const url = await createInvitation('pinterest');
+      await navigator.clipboard.writeText(url);
+      setNotice('inviteCopied');
+    } catch {
+      setNotice('inviteFailed');
+    }
+  }
+
+  async function copyAgain(id: string, url: string) {
+    await navigator.clipboard.writeText(url).catch(() => undefined);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 2000);
+  }
   const [result, dismiss] = useConnectResult();
   const [connecting, setConnecting] = useState(false);
   const [startError, setStartError] = useState(false);
@@ -250,7 +289,12 @@ export function Accounts() {
         title={t('title')}
         subtitle={t('subtitle')}
         action={
-          <ConnectMenu canConnect={canConnect} connecting={connecting} onConnect={onConnect} />
+          <ConnectMenu
+            canConnect={canConnect}
+            connecting={connecting}
+            onConnect={onConnect}
+            onInvite={onInvite}
+          />
         }
       />
 
@@ -283,6 +327,32 @@ export function Accounts() {
         </div>
       )}
 
+      {notice && (
+        <div
+          role="status"
+          className={`animate-rise mb-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${
+            notice === 'inviteCopied'
+              ? 'border-line bg-hover'
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300'
+          }`}
+        >
+          {notice === 'inviteCopied' ? (
+            <Link2 size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+          ) : (
+            <AlertTriangle size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+          )}
+          <p className="flex-1">{t(notice)}</p>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            aria-label={t('dismiss')}
+            className="icon-btn -my-1.5 h-8 w-8"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
       {accounts && accounts.length === 0 && (
         <EmptyState
           icon={<Plug size={24} strokeWidth={1.75} aria-hidden="true" />}
@@ -296,6 +366,61 @@ export function Accounts() {
           <AccountCard key={account.id} account={account} />
         ))}
       </div>
+
+      {invitations.length > 0 && (
+        <section className="animate-rise mt-8">
+          <h2 className="mb-3 flex items-center gap-2 px-3.5 text-lg font-semibold">
+            {t('invitationsTitle')}
+            <InfoTip text={t('invitationsHint')} />
+          </h2>
+          <ul className="card divide-y divide-line rounded-[24px]">
+            {invitations.map((inv) => (
+              <li key={inv.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
+                <Link2
+                  size={18}
+                  strokeWidth={1.75}
+                  className="shrink-0 text-muted"
+                  aria-hidden="true"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {inv.createdBy
+                      ? t('invitationBy', {
+                          platform: t(`platforms.${inv.platform}`),
+                          name: inv.createdBy,
+                        })
+                      : t('invitationNoName', { platform: t(`platforms.${inv.platform}`) })}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {t('invitationExpires', {
+                      date: format.dateTime(new Date(inv.expiresAt), { dateStyle: 'medium' }),
+                    })}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyAgain(inv.id, inv.url)}
+                  className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-sm hover:bg-hover"
+                >
+                  {copiedId === inv.id ? (
+                    <Check size={14} aria-hidden="true" />
+                  ) : (
+                    <Copy size={14} aria-hidden="true" />
+                  )}
+                  {copiedId === inv.id ? t('copied') : t('copy')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => revoke(inv.id)}
+                  className="rounded-xl px-3 py-1.5 text-sm text-muted hover:bg-hover hover:text-foreground"
+                >
+                  {t('revoke')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }

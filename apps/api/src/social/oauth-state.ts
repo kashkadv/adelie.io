@@ -1,9 +1,13 @@
 // OAuth `state` for connecting social accounts: a signed, short-lived token that binds the callback
-// to the user and project that started it (CSRF protection; ADR-0011). Stateless: HMAC-SHA256.
+// to whoever started it (CSRF protection; ADR-0011, ADR-0012). Stateless: HMAC-SHA256.
+// Exactly one binding: `userId` (a signed-in member connects) or `invitationId` (connect by invitation).
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export interface OAuthState {
-  userId: string;
+  /** Signed-in flow: the callback must come with this user's session. */
+  userId?: string;
+  /** Invitation flow: no session needed; the invitation must still be valid. */
+  invitationId?: string;
   workspaceId: string;
   projectId: string;
   platform: string;

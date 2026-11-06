@@ -1,6 +1,5 @@
 import {
   Controller,
-  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -9,19 +8,10 @@ import {
   Query,
   Req,
   Res,
-  ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common';
-import type { SocialPlatform } from '@adelie/db';
-import {
-  HttpClient,
-  PINTEREST_API,
-  PinterestAdapter,
-  isAdapterError,
-  type PlatformAdapter,
-} from '@adelie/platforms';
-import { socialTokenAad, tokenCipherFromEnv, type TokenCipher } from '@adelie/shared/crypto';
-import { Session, type UserSession } from '@thallesp/nestjs-better-auth';
+import { isAdapterError } from '@adelie/platforms';
+import { OptionalAuth, Session, type UserSession } from '@thallesp/nestjs-better-auth';
 import type { Response } from 'express';
 import { config } from '../config.js';
 import { PrismaService } from '../prisma.service.js';
@@ -31,49 +21,20 @@ import {
   WorkspaceRoles,
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
-import { createState, verifyState } from './oauth-state.js';
-
-/** Roles that may connect accounts (ADR-0007: Owner, Admin, Manager). */
-const CONNECT_ROLES = ['OWNER', 'ADMIN', 'MANAGER'] as const;
-
-/** URL path segment → platform. Only Pinterest for now (ADR-0004). */
-const PLATFORMS: Record<string, SocialPlatform> = { pinterest: 'PINTEREST' };
-
-/** Outcome of a connect attempt, passed to the web app as ?connect=… on /accounts. */
-type ConnectResult = 'connected' | 'denied' | 'expired' | 'alreadyConnected' | 'error';
-
-let cipher: TokenCipher | undefined;
-function tokenCipher(): TokenCipher {
-  cipher ??= tokenCipherFromEnv();
-  return cipher;
-}
-
-function adapterFor(slug: string): {
-  platform: SocialPlatform;
-  adapter: PlatformAdapter;
-  http: HttpClient;
-} {
-  const platform = PLATFORMS[slug];
-  if (!platform) throw new NotFoundException();
-  if (!config.pinterest) throw new ServiceUnavailableException('Pinterest is not configured');
-  return {
-    platform,
-    adapter: new PinterestAdapter(config.pinterest),
-    http: new HttpClient({ baseUrl: PINTEREST_API }),
-  };
-}
-
-function redirectUri(slug: string): string {
-  return `${config.apiUrl}/social/${slug}/callback`;
-}
+import { CONNECT_ROLES, ConnectService, type ConnectResult } from './connect.service.js';
+import { invitationStatus } from './invitation-token.js';
+import { createState, verifyState, type OAuthState } from './oauth-state.js';
 
 /**
- * Connecting social accounts to a project (ADR-0011). Tokens are stored encrypted
- * (@adelie/shared/crypto) and never leave the API.
+ * Connecting social accounts to a project (ADR-0011): the signed-in flow and the shared OAuth
+ * callback, which also completes connect invitations (ADR-0012).
  */
 @Controller()
 export class SocialController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly connector: ConnectService,
+  ) {}
 
   private async visibleProject(ctx: WorkspaceRequestContext, projectId: string) {
     const project = await this.prisma.client.project.findFirst({
@@ -84,7 +45,7 @@ export class SocialController {
     return project;
   }
 
-  /** Accounts connected to a project, with their connection status. */
+  /** Accounts connected to a project, with their connection status and latest sync. */
   @Get('workspaces/:workspaceId/projects/:projectId/accounts')
   @UseGuards(WorkspaceAccessGuard)
   async list(
@@ -123,7 +84,7 @@ export class SocialController {
     }));
   }
 
-  /** Starts OAuth: returns the platform consent URL to send the browser to. */
+  /** Starts OAuth for the signed-in member: returns the platform consent URL. */
   @Post('workspaces/:workspaceId/projects/:projectId/connections/:platform')
   @UseGuards(WorkspaceAccessGuard)
   @WorkspaceRoles(...CONNECT_ROLES)
@@ -133,7 +94,7 @@ export class SocialController {
     @Req() request: { workspace: WorkspaceRequestContext },
     @Session() session: UserSession,
   ) {
-    const { adapter } = adapterFor(slug);
+    const { adapter } = this.connector.adapterFor(slug);
     await this.visibleProject(request.workspace, projectId);
     const state = createState(
       {
@@ -144,33 +105,40 @@ export class SocialController {
       },
       config.auth.secret,
     );
-    return { url: adapter.authorizeUrl(state, redirectUri(slug)) };
+    return { url: adapter.authorizeUrl(state, this.connector.redirectUri(slug)) };
   }
 
   /**
-   * OAuth redirect target (PRD §12: GET /social/:platform/callback). Always ends with a redirect
-   * back to the web app's Accounts page with the outcome.
+   * OAuth redirect target (PRD §12: GET /social/:platform/callback). Signed-in flow → back to
+   * /accounts; invitation flow (no Adelie session needed) → the public result page.
    */
   @Get('social/:platform/callback')
+  @OptionalAuth()
   async callback(
     @Param('platform') slug: string,
     @Query() query: Record<string, string | undefined>,
-    @Session() session: UserSession,
+    @Session() session: UserSession | null,
     @Res() res: Response,
   ) {
+    const state = query['state'] ? verifyState(query['state'], config.auth.secret) : null;
+    const viaInvitation = !!state?.invitationId;
     const back = (result: ConnectResult) =>
       res.redirect(
-        `${config.webUrl}/accounts?connect=${result}&platform=${encodeURIComponent(slug)}`,
+        viaInvitation
+          ? `${config.webUrl}/connect/result?connect=${result}&platform=${encodeURIComponent(slug)}`
+          : `${config.webUrl}/accounts?connect=${result}&platform=${encodeURIComponent(slug)}`,
       );
 
-    const state = query['state'] ? verifyState(query['state'], config.auth.secret) : null;
-    if (!state || state.platform !== slug || state.userId !== session.user.id)
-      return back('expired');
+    if (!state || state.platform !== slug) return back('expired');
+    if (!viaInvitation && (!session || state.userId !== session.user.id)) return back('expired');
     if (query['error'] || !query['code']) return back('denied');
 
     try {
-      const result = await this.connect(slug, query['code'], state);
-      return back(result);
+      return back(
+        viaInvitation
+          ? await this.completeInvitation(slug, query['code'], state)
+          : await this.completeSignedIn(slug, query['code'], state),
+      );
     } catch (error) {
       // Never log tokens; adapter errors carry no secrets.
       console.error('Connect failed', slug, isAdapterError(error) ? error.kind : error);
@@ -178,93 +146,60 @@ export class SocialController {
     }
   }
 
-  private async connect(
+  private async completeSignedIn(
     slug: string,
     code: string,
-    state: { userId: string; workspaceId: string; projectId: string },
+    state: OAuthState,
   ): Promise<ConnectResult> {
     const { workspaceId, projectId, userId } = state;
-
     // Re-check access: membership or role may have changed since the flow started.
     const member = await this.prisma.client.workspaceMember.findUnique({
-      where: { workspaceId_userId: { workspaceId, userId } },
+      where: { workspaceId_userId: { workspaceId, userId: userId! } },
       select: { id: true, role: true },
     });
-    if (!member || !(CONNECT_ROLES as readonly string[]).includes(member.role)) {
-      throw new ForbiddenException();
-    }
+    if (!member || !(CONNECT_ROLES as readonly string[]).includes(member.role)) return 'expired';
     await this.visibleProject({ workspaceId, memberId: member.id, role: member.role }, projectId);
-
-    const { platform, adapter, http } = adapterFor(slug);
-    const tokens = await adapter.exchangeCode(code, redirectUri(slug), http);
-    const account = await adapter.getAccount({ accessToken: tokens.accessToken, http });
-
-    const key = { workspaceId, platform, externalUserId: account.externalId };
-    const existing = await this.prisma.client.socialConnection.findUnique({
-      where: { workspaceId_platform_externalUserId: key },
-      select: { projectId: true },
+    const { result } = await this.connector.connect({
+      slug,
+      code,
+      workspaceId,
+      projectId,
+      connectedByUserId: userId!,
     });
-    // One platform account belongs to one project of a workspace.
-    if (existing && existing.projectId !== projectId) return 'alreadyConnected';
+    return result;
+  }
 
-    const c = tokenCipher();
-    const secrets = {
-      accessTokenEncrypted: c.encrypt(
-        tokens.accessToken,
-        socialTokenAad(workspaceId, platform, account.externalId, 'access'),
-      ),
-      refreshTokenEncrypted: tokens.refreshToken
-        ? c.encrypt(
-            tokens.refreshToken,
-            socialTokenAad(workspaceId, platform, account.externalId, 'refresh'),
-          )
-        : null,
-      keyVersion: c.keyVersion,
-      accessTokenExpiresAt: tokens.accessTokenExpiresAt ?? null,
-      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt ?? null,
-      scopes: tokens.scopes,
-      status: 'ACTIVE' as const,
-      connectedByUserId: userId,
-    };
-    const profile = {
-      username: account.username ?? null,
-      displayName: account.displayName ?? null,
-      avatarUrl: account.avatarUrl ?? null,
-      accountType: account.accountType ?? null,
-      followersCount: account.followersCount,
-      followingCount: account.followingCount,
-      postsCount: account.postsCount,
-    };
-
-    await this.prisma.client.$transaction(async (tx) => {
-      const connection = await tx.socialConnection.upsert({
-        where: { workspaceId_platform_externalUserId: key },
-        create: { ...key, projectId, ...secrets },
-        update: secrets,
-        select: { id: true },
-      });
-      await tx.socialAccount.upsert({
-        where: {
-          workspaceId_platform_externalId: {
-            workspaceId,
-            platform,
-            externalId: account.externalId,
-          },
-        },
-        create: {
-          workspaceId,
-          projectId,
-          connectionId: connection.id,
-          platform,
-          externalId: account.externalId,
-          ...profile,
-          // Adelie's own daily history starts today (PRD §6.4).
-          collectingSince: new Date(new Date().toISOString().slice(0, 10)),
-        },
-        update: { connectionId: connection.id, ...profile },
-      });
+  private async completeInvitation(
+    slug: string,
+    code: string,
+    state: OAuthState,
+  ): Promise<ConnectResult> {
+    const invitation = await this.prisma.client.connectInvitation.findUnique({
+      where: { id: state.invitationId! },
     });
-    // Next step (worker): enqueue the INITIAL sync (90 days of history) for this account.
-    return 'connected';
+    if (
+      !invitation ||
+      invitationStatus(invitation) !== 'valid' ||
+      invitation.workspaceId !== state.workspaceId ||
+      invitation.projectId !== state.projectId
+    ) {
+      return 'expired';
+    }
+    const { result, connectionId } = await this.connector.connect({
+      slug,
+      code,
+      workspaceId: invitation.workspaceId,
+      projectId: invitation.projectId,
+      // Audit: the member who sent the invitation.
+      connectedByUserId: invitation.createdByUserId,
+    });
+    if (result === 'connected') {
+      // Single use. Conditional, so two parallel callbacks cannot both consume it.
+      await this.prisma.client.connectInvitation.updateMany({
+        where: { id: invitation.id, usedAt: null },
+        data: { usedAt: new Date(), connectionId: connectionId ?? null },
+      });
+    }
+    return result;
   }
 }

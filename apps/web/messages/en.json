@@ -184,6 +184,59 @@
     },
     "platformsTitle": "Platforms",
     "emptyTitle": "No accounts yet",
-    "emptyText": "Connect a social account with the button in the top-right corner — Adelie starts collecting its data right away."
+    "emptyText": "Connect a social account with the button in the top-right corner — Adelie starts collecting its data right away.",
+    "copyInvite": "Copy invitation link",
+    "inviteCopied": "Invitation link copied — valid for 7 days, single use.",
+    "inviteFailed": "Could not create the invitation.",
+    "invitationsTitle": "Pending invitations",
+    "invitationBy": "{platform} · from {name}",
+    "invitationNoName": "{platform}",
+    "invitationExpires": "valid until {date}",
+    "copy": "Copy link",
+    "copied": "Copied",
+    "revoke": "Revoke",
+    "invitationsHint": "Send the link to whoever owns the account — a client, or yourself in another browser. They connect it without an Adelie account; the link works once and expires in 7 days."
+  },
+  "Invite": {
+    "title": "Connect {platform} to Adelie",
+    "lead": "{name} from {workspace} invites you to connect your account so they can see its analytics.",
+    "leadNoName": "{workspace} invites you to connect your account so they can see its analytics.",
+    "workspace": "Workspace",
+    "project": "Project",
+    "access": "Access",
+    "readOnly": "Read-only",
+    "validUntil": "Link valid until",
+    "explain": "You will sign in on {platform} and confirm access there. Adelie can only read profile, boards, pins and their statistics — it cannot post, edit or delete anything. Access can be revoked at any time in your {platform} settings.",
+    "continue": "Continue to {platform}",
+    "startFailed": "Could not start the connection. Please try again.",
+    "unavailableTitle": "This link does not work",
+    "unavailable": {
+      "missing": "The invitation was not found. Ask whoever sent it for a new link.",
+      "expired": "The invitation has expired. Ask whoever sent it for a new link.",
+      "used": "This invitation has already been used.",
+      "revoked": "The invitation was cancelled by whoever sent it."
+    },
+    "result": {
+      "connected": {
+        "title": "Account connected",
+        "text": "Thank you! Your account is connected; you can close this page."
+      },
+      "denied": {
+        "title": "Connection cancelled",
+        "text": "Access was not granted. You can open the invitation link again whenever you are ready."
+      },
+      "expired": {
+        "title": "The link is no longer valid",
+        "text": "The invitation expired or was used. Ask whoever sent it for a new link."
+      },
+      "alreadyConnected": {
+        "title": "Already connected",
+        "text": "This account is already connected to another project of the same workspace."
+      },
+      "error": {
+        "title": "Something went wrong",
+        "text": "The account could not be connected. Please try again a bit later."
+      }
+    }
   }
 }

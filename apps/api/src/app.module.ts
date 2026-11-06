@@ -4,6 +4,8 @@ import { auth } from './auth/auth.js';
 import { HealthController } from './health.controller.js';
 import { PrismaService } from './prisma.service.js';
 import { ProfileController } from './profile/profile.controller.js';
+import { ConnectService } from './social/connect.service.js';
+import { InvitationsController } from './social/invitations.controller.js';
 import { SocialController } from './social/social.controller.js';
 import { WorkspaceAccessGuard } from './workspaces/workspace-access.guard.js';
 import { WorkspacesController } from './workspaces/workspaces.controller.js';
@@ -12,7 +14,13 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
   // AuthModule registers a global guard: every route requires a session
   // unless marked with @AllowAnonymous().
   imports: [AuthModule.forRoot({ auth })],
-  controllers: [HealthController, ProfileController, SocialController, WorkspacesController],
-  providers: [PrismaService, WorkspaceAccessGuard],
+  controllers: [
+    HealthController,
+    InvitationsController,
+    ProfileController,
+    SocialController,
+    WorkspacesController,
+  ],
+  providers: [ConnectService, PrismaService, WorkspaceAccessGuard],
 })
 export class AppModule {}
