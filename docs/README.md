@@ -31,3 +31,4 @@
 - [ADR-0010](decisions/0010-personal-profile.md) — Профіль користувача: ім'я, посада, фото, контакти, робочий час (прийнято)
 - [ADR-0011](decisions/0011-platform-adapters.md) — Контракт адаптера платформ (прийнято)
 - [ADR-0012](decisions/0012-connect-invitations.md) — Запрошення на підключення акаунта (прийнято)
+- [ADR-0013](decisions/0013-post-daily-metrics.md) — Щоденні метрики публікацій і метрики за період (прийнято)

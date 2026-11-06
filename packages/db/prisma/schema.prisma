@@ -296,6 +296,7 @@ model SocialAccount {
   posts        SocialPost[]
   metricValues AccountMetricValue[]
   postMetrics  PostMetricValue[]
+  postDaily    PostMetricDaily[]
   postLatest   PostMetricsLatest[]
   syncRuns     SyncRun[]
 
@@ -353,10 +354,14 @@ model SocialPost {
   description  String?
   thumbnailUrl String?
   publishedAt  DateTime?
+  /// Days covered by PostMetricDaily (ADR-0013): inside this range a missing day means zero activity.
+  dailyFrom    DateTime?       @db.Date
+  dailyTo      DateTime?       @db.Date
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
   metricValues PostMetricValue[]
+  dailyValues  PostMetricDaily[]
   latest       PostMetricsLatest?
 
   @@unique([accountId, externalId])
@@ -420,6 +425,7 @@ model MetricDefinition {
 
   accountValues AccountMetricValue[]
   postValues    PostMetricValue[]
+  postDaily     PostMetricDaily[]
 
   @@unique([platform, scope, key])
   @@unique([platform, scope, providerKey])
@@ -476,6 +482,28 @@ model PostMetricValue {
   @@index([accountId])
   @@index([workspaceId])
   @@map("post_metric_value")
+}
+
+/// Daily per-post values (ADR-0013) for metrics over a period. Sparse: a READY day with zero activity
+/// has no row — within SocialPost.dailyFrom..dailyTo a missing day means 0, outside it means no data.
+/// metricId points to the post metric (e.g. Pinterest POST `impressions`); the value is that day's count.
+model PostMetricDaily {
+  postId      String           @db.Uuid
+  post        SocialPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  workspaceId String           @db.Uuid
+  accountId   String           @db.Uuid
+  account     SocialAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  metricId    Int
+  metric      MetricDefinition @relation(fields: [metricId], references: [id])
+  date        DateTime         @db.Date
+  value       Float?
+  dataStatus  DataStatus
+  fetchedAt   DateTime
+
+  @@id([postId, metricId, date])
+  @@index([accountId, date])
+  @@index([workspaceId])
+  @@map("post_metric_daily")
 }
 
 /// Derived wide row per post for sorting and top lists; recomputed by the worker after a sync.

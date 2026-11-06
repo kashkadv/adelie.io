@@ -75,3 +75,31 @@ export function latestRow(
   }
   return row;
 }
+
+const addDays = (yyyyMmDd: string, n: number) => {
+  const d = new Date(`${yyyyMmDd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+/** How many recent days are re-fetched for an active post: late-arriving and PROCESSING days. */
+export const DAILY_REFRESH_DAYS = 7;
+
+/**
+ * Which days of a post's daily metrics to fetch (ADR-0013), or null when none:
+ * - never fetched → its whole history the platform allows (from publication);
+ * - its lifetime totals changed, or recent days are not final → the last week, and any gap;
+ * - otherwise nothing: no new activity, so the covered range just extends to today.
+ */
+export function dailyFetchWindow(
+  post: { publishedAt: string | null; dailyTo: string | null },
+  opts: { today: string; historyDays: number; changed: boolean; pending: boolean },
+): { from: string; to: string } | null {
+  const earliest = addDays(opts.today, -(opts.historyDays - 1));
+  const clamp = (d: string) => (d < earliest ? earliest : d);
+  if (!post.dailyTo) {
+    return { from: clamp(post.publishedAt ?? earliest), to: opts.today };
+  }
+  if (!opts.changed && !opts.pending) return null;
+  return { from: clamp(addDays(post.dailyTo, -(DAILY_REFRESH_DAYS - 1))), to: opts.today };
+}

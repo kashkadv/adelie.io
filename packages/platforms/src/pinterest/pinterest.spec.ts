@@ -220,6 +220,45 @@ describe('PinterestAdapter data', () => {
   });
 });
 
+describe('PinterestAdapter pin analytics', () => {
+  it('requests one pin and returns daily POST points tied to it', async () => {
+    const { client, seen } = http({
+      '/v5/pins/987/analytics': [
+        {
+          all: {
+            daily_metrics: [
+              { date: '2026-11-05', data_status: 'READY', metrics: { IMPRESSION: 4, SAVE: 1 } },
+            ],
+            lifetime_metrics: { IMPRESSION: 100 },
+          },
+        },
+      ],
+    });
+    const points = await adapter.getPostMetrics(
+      { accessToken: 'at', http: client },
+      { postExternalId: '987', from: '2026-08-09', to: '2026-11-06' },
+    );
+    const q = seen[0]!.url.searchParams;
+    expect(q.get('start_date')).toBe('2026-08-09');
+    expect(q.get('metric_types')).toBe('IMPRESSION,SAVE,PIN_CLICK,OUTBOUND_CLICK');
+    expect(points).toEqual([
+      expect.objectContaining({
+        providerKey: 'IMPRESSION',
+        scope: 'POST',
+        postExternalId: '987',
+        date: '2026-11-05',
+        value: 4,
+      }),
+      expect.objectContaining({
+        providerKey: 'SAVE',
+        scope: 'POST',
+        postExternalId: '987',
+        value: 1,
+      }),
+    ]);
+  });
+});
+
 describe('mapping', () => {
   it('analytics: statuses, -1 and BEFORE_* become null with the original status kept', () => {
     const points = mapAccountAnalytics({

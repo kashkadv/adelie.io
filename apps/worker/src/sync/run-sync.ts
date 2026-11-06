@@ -14,7 +14,7 @@ import {
 } from '@adelie/platforms';
 import type { SyncKind } from '@adelie/shared';
 import { socialTokenAad, type TokenCipher } from '@adelie/shared/crypto';
-import { dimensionKey, latestRow, snapshotChanged } from './metrics.js';
+import { dailyFetchWindow, dimensionKey, latestRow, snapshotChanged } from './metrics.js';
 import { analyticsRange } from './schedule.js';
 
 export interface SyncDeps {
@@ -202,6 +202,105 @@ export async function runSync(
     }
   }
 
+  async function syncPostDaily(changedPosts: Set<string>) {
+    const today = day(now());
+    const posts = await prisma.socialPost.findMany({
+      where: { accountId: account!.id, isOwn: true },
+      select: { id: true, externalId: true, publishedAt: true, dailyFrom: true, dailyTo: true },
+    });
+    const since = new Date(asDate(today).getTime() - 7 * 86_400_000);
+    const pending = new Set(
+      (
+        await prisma.postMetricDaily.findMany({
+          where: { accountId: account!.id, date: { gte: since }, dataStatus: { not: 'READY' } },
+          distinct: ['postId'],
+          select: { postId: true },
+        })
+      ).map((r) => r.postId),
+    );
+    for (const post of posts) {
+      const window = dailyFetchWindow(
+        {
+          publishedAt: post.publishedAt ? day(post.publishedAt) : null,
+          dailyTo: post.dailyTo ? day(post.dailyTo) : null,
+        },
+        {
+          today,
+          historyDays: adapter.capabilities.historyDays,
+          changed: changedPosts.has(post.id),
+          pending: pending.has(post.id),
+        },
+      );
+      if (!window) {
+        // No new activity: the covered range simply reaches today (missing days = 0).
+        if (post.dailyTo) {
+          await prisma.socialPost.update({
+            where: { id: post.id },
+            data: { dailyTo: asDate(today) },
+          });
+        }
+        count('postDailyUnchanged');
+        continue;
+      }
+      let points: MetricPoint[];
+      try {
+        points = await withTokenRetry(() =>
+          adapter.getPostMetrics!(ctx(), { postExternalId: post.externalId, ...window }),
+        );
+      } catch (error) {
+        // One pin without analytics (e.g. removed meanwhile) must not stop the others.
+        if (isAdapterError(error, 'NOT_AVAILABLE') || isAdapterError(error, 'INVALID')) {
+          count('postDailyUnavailable');
+          continue;
+        }
+        throw error;
+      }
+      const rows = points.flatMap((p) => {
+        const def = resolve(p);
+        // Sparse: a final zero day needs no row (ADR-0013).
+        if (!def || (p.dataStatus === 'READY' && !p.value)) return [];
+        return [
+          {
+            postId: post.id,
+            workspaceId: account!.workspaceId,
+            accountId: account!.id,
+            metricId: def.id,
+            date: asDate(p.date),
+            value: p.value,
+            dataStatus: p.dataStatus,
+            fetchedAt: now(),
+          },
+        ];
+      });
+      await prisma.$transaction([
+        prisma.postMetricDaily.deleteMany({
+          where: { postId: post.id, date: { gte: asDate(window.from), lte: asDate(window.to) } },
+        }),
+        prisma.postMetricDaily.createMany({ data: rows }),
+        prisma.socialPost.update({
+          where: { id: post.id },
+          data: {
+            dailyFrom: post.dailyFrom ?? asDate(window.from),
+            dailyTo: asDate(window.to),
+          },
+        }),
+      ]);
+      count('postDailyFetched');
+      count('postDailyValues', rows.length);
+    }
+  }
+
+  /** Refreshes the access token once on TOKEN_EXPIRED and retries. */
+  async function withTokenRetry<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      if (!isAdapterError(error, 'TOKEN_EXPIRED')) throw error;
+      await refresh();
+      return fn();
+    }
+  }
+
   let status: 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'REAUTHORIZATION_REQUIRED' = 'SUCCESS';
   let errorCode: string | null = null;
   let errorMessage: string | null = null;
@@ -289,6 +388,7 @@ export async function runSync(
     })) {
       previous.set(`${v.postId}:${v.metricId}`, { value: v.value, dataStatus: v.dataStatus });
     }
+    const changedPosts = new Set<string>();
     await step('posts', async () => {
       for await (const page of adapter.listPosts(ctx())) {
         const postIds = new Map<string, string>();
@@ -345,10 +445,16 @@ export async function runSync(
             update: values,
           });
           previous.set(prevKey, { value: m.value, dataStatus: m.dataStatus });
+          changedPosts.add(postId);
           count('postValues');
         }
       }
     });
+
+    // 3b. Daily metrics per own post (ADR-0013): only posts with new activity or unsettled days.
+    if (adapter.getPostMetrics) {
+      await step('postDaily', () => syncPostDaily(changedPosts));
+    }
 
     // 4. Account analytics: totals, then each supported breakdown.
     const range = analyticsRange(job.kind, now(), adapter.capabilities.historyDays);

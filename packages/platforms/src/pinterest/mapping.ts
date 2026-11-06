@@ -220,3 +220,14 @@ export function mapAccountAnalytics(
   }
   return points;
 }
+
+/**
+ * /pins/{id}/analytics → daily POST metric points. Same response shape as the account analytics
+ * ("all" → daily_metrics); the keys are the platform's (IMPRESSION, SAVE, …).
+ */
+export function mapPinAnalytics(
+  raw: PinterestAnalyticsResponse,
+  postExternalId: string,
+): MetricPoint[] {
+  return mapAccountAnalytics(raw).map((p) => ({ ...p, scope: 'POST' as const, postExternalId }));
+}

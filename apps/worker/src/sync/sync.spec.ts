@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { dimensionKey, latestRow, snapshotChanged, worstStatus } from './metrics.js';
+import {
+  dailyFetchWindow,
+  dimensionKey,
+  latestRow,
+  snapshotChanged,
+  worstStatus,
+} from './metrics.js';
 import { analyticsRange, dueSync } from './schedule.js';
 
 const at = (iso: string) => new Date(iso);
@@ -103,5 +109,36 @@ describe('metric helpers', () => {
       asOfDate: '2026-11-06',
     });
     expect(latestRow([])).toBeNull();
+  });
+});
+
+describe('dailyFetchWindow', () => {
+  const base = { today: '2026-11-06', historyDays: 90, changed: false, pending: false };
+
+  it('first time: from publication, clamped to the platform history', () => {
+    expect(dailyFetchWindow({ publishedAt: '2026-10-10', dailyTo: null }, base)).toEqual({
+      from: '2026-10-10',
+      to: '2026-11-06',
+    });
+    expect(dailyFetchWindow({ publishedAt: '2025-01-01', dailyTo: null }, base)).toEqual({
+      from: '2026-08-09',
+      to: '2026-11-06',
+    });
+  });
+
+  it('no activity and final days: nothing to fetch', () => {
+    expect(dailyFetchWindow({ publishedAt: null, dailyTo: '2026-11-05' }, base)).toBeNull();
+  });
+
+  it('changed or pending: the last week, covering any gap', () => {
+    const w = { publishedAt: null, dailyTo: '2026-11-05' };
+    expect(dailyFetchWindow(w, { ...base, changed: true })).toEqual({
+      from: '2026-10-30',
+      to: '2026-11-06',
+    });
+    expect(dailyFetchWindow(w, { ...base, pending: true })?.from).toBe('2026-10-30');
+    expect(
+      dailyFetchWindow({ publishedAt: null, dailyTo: '2026-10-01' }, { ...base, changed: true }),
+    ).toEqual({ from: '2026-09-25', to: '2026-11-06' });
   });
 });

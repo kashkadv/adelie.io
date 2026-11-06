@@ -90,6 +90,13 @@ export interface AccountMetricsQuery {
   dimension?: string;
 }
 
+export interface PostMetricsQuery {
+  postExternalId: string;
+  /** Inclusive days, YYYY-MM-DD; `from` no earlier than `capabilities.historyDays` ago. */
+  from: string;
+  to: string;
+}
+
 export interface PlatformCapabilities {
   /** How far back the platform returns history, in days. */
   historyDays: number;
@@ -111,4 +118,6 @@ export interface PlatformAdapter {
   listBoards?(ctx: AdapterContext): AsyncIterable<BoardData[]>;
   listPosts(ctx: AdapterContext): AsyncIterable<PostsPage>;
   getAccountMetrics(ctx: AdapterContext, query: AccountMetricsQuery): Promise<MetricPoint[]>;
+  /** Daily metrics of one post (ADR-0013): POST-scope points, one per metric per day. */
+  getPostMetrics?(ctx: AdapterContext, query: PostMetricsQuery): Promise<MetricPoint[]>;
 }

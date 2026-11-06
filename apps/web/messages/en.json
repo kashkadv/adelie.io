@@ -280,18 +280,9 @@
     "untitled": "Untitled pin",
     "openOnPlatform": "Open on Pinterest",
     "account": "Account",
-    "allAccounts": "All accounts",
     "board": "Board",
-    "allBoards": "All boards",
     "searchBoards": "Search boards",
-    "sortBy": "Sort by",
-    "sort": {
-      "impressions": "Most impressions",
-      "saves": "Most saves",
-      "pinClicks": "Most pin clicks",
-      "outboundClicks": "Most outbound clicks",
-      "publishedAt": "Newest first"
-    },
+    "sortBy": "Sort",
     "metrics": {
       "impressions": "Impressions",
       "saves": "Saves",
@@ -329,23 +320,45 @@
       "own": "Own pin",
       "yes": "yes",
       "no": "no",
-      "asOf": "Metrics as of",
       "metrics": {
         "impressions": "Impressions",
         "saves": "Saves",
         "pinClicks": "Pin clicks",
         "outboundClicks": "Outbound clicks",
         "videoViews": "Video views"
-      }
+      },
+      "periodFrom": "Period from",
+      "periodTo": "Period to",
+      "lifetime": "all time"
     },
     "published": {
-      "label": "Publication date",
-      "all": "Published any time",
-      "30d": "Last 30 days",
-      "12m": "Last 12 months",
+      "label": "Published",
+      "7d": "last 7 days",
+      "30d": "last 30 days",
+      "12m": "last 12 months"
+    },
+    "platform": "Platform",
+    "platforms": {
+      "PINTEREST": "Pinterest",
+      "INSTAGRAM": "Instagram",
+      "TIKTOK": "TikTok"
+    },
+    "period": {
+      "label": "Metrics period",
+      "all": "All time",
+      "7d": "7 days",
+      "30d": "30 days",
+      "12m": "12 months",
       "custom": "Custom range",
       "previous": "Previous month",
       "next": "Next month"
-    }
+    },
+    "clearFilter": "Clear",
+    "search": "Search pins",
+    "noMatches": "No pins match these filters.",
+    "metricsForPeriod": "metrics for the period",
+    "metricsLifetime": "lifetime metrics",
+    "dataSince": "data since {date}",
+    "periodHint": "Daily pin metrics summed over the period. Pinterest gives pin history 90 days back; older days build up from the moment the account was connected. “—” means no data, not zero. Pins saved from other accounts have no metrics."
   }
 }

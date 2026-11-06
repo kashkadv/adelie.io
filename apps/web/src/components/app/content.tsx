@@ -1,18 +1,35 @@
 'use client';
 
-import { Download, ExternalLink, Images, Play, RefreshCw, X } from 'lucide-react';
+import {
+  ArrowDown,
+  Download,
+  ExternalLink,
+  Images,
+  Play,
+  RefreshCw,
+  Search,
+  X,
+} from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { Checkbox } from '../ui/checkbox';
-import { DateRangePicker, resolveRange, type DateRange } from '../ui/date-range';
+import {
+  DateRangeChip,
+  PeriodControl,
+  resolveRange,
+  type DateRange,
+  type RangeLabels,
+} from '../ui/date-range';
+import { FilterChip } from '../ui/filter-chip';
 import { InfoTip } from '../ui/info-tip';
-import { Select } from '../ui/select';
-import { useProjectAccounts } from './accounts-data';
+import { Segmented } from '../ui/segmented';
+import { useProjectAccounts, type SocialAccount } from './accounts-data';
 import { EmptyState, PageHeader } from './page-header';
 import { useWorkspace } from './workspace-context';
 
+type Platform = SocialAccount['platform'];
 type Metrics = {
   impressions: number | null;
   saves: number | null;
@@ -35,15 +52,22 @@ type Post = {
   dataStatus: string | null;
   asOf: string | null;
 };
-type Page = { total: number; page: number; pageSize: number; items: Post[] };
+type Page = {
+  total: number;
+  page: number;
+  pageSize: number;
+  /** Metrics period; null = lifetime totals. */
+  period: { from: string; to: string; dataFrom: string | null } | null;
+  items: Post[];
+};
 type Board = { id: string; name: string; accountId: string; pinCount: number | null };
 
-const SORTS = ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'publishedAt'] as const;
-type Sort = (typeof SORTS)[number];
 /** Sortable columns, in display order: metrics, then the publication date. */
 const COLUMNS = ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'publishedAt'] as const;
+type Sort = (typeof COLUMNS)[number];
 const OWNERSHIP = ['own', 'saved', 'all'] as const;
 type Ownership = (typeof OWNERSHIP)[number];
+const ROW_GRID = 'grid-cols-[repeat(4,minmax(0,1fr))_8rem]';
 
 function PostRow({
   post,
@@ -70,7 +94,9 @@ function PostRow({
     });
   };
   return (
-    <li className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 md:flex-nowrap">
+    <li
+      className={`flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 transition-colors md:flex-nowrap ${selected ? 'bg-hover' : ''}`}
+    >
       <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
         <Checkbox checked={selected} onChange={onSelect} label={t('select')} />
         <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-hover">
@@ -107,26 +133,24 @@ function PostRow({
         </div>
       </div>
 
-      <dl className="tabular grid shrink-0 grid-cols-[repeat(4,minmax(0,1fr))_8rem] gap-4 text-right md:w-[35rem]">
+      <dl className={`tabular grid shrink-0 ${ROW_GRID} gap-4 text-right md:w-[35rem]`}>
         {COLUMNS.map((key) => {
-          if (key === 'publishedAt') {
-            return (
-              <div key={key}>
-                <dt className="sr-only">{t('metrics.publishedAt')}</dt>
-                <dd
-                  className={`text-sm whitespace-nowrap ${sort === key ? 'font-semibold' : 'text-muted'}`}
-                >
-                  {post.publishedAt ? shortDate(post.publishedAt) : '—'}
-                </dd>
-              </div>
-            );
-          }
-          const value = post.metrics?.[key] ?? null;
+          const metric = key === 'publishedAt' ? null : (post.metrics?.[key] ?? null);
+          const text =
+            key === 'publishedAt'
+              ? post.publishedAt
+                ? shortDate(post.publishedAt)
+                : '—'
+              : metric === null
+                ? '—'
+                : format.number(metric);
           return (
             <div key={key}>
               <dt className="sr-only">{t(`metrics.${key}`)}</dt>
-              <dd className={`text-sm ${sort === key ? 'font-semibold' : 'text-muted'}`}>
-                {value === null ? '—' : format.number(value)}
+              <dd
+                className={`text-sm whitespace-nowrap ${sort === key ? 'font-semibold' : 'text-muted'}`}
+              >
+                {text}
               </dd>
             </div>
           );
@@ -151,24 +175,49 @@ function PostRow({
   );
 }
 
-/** Content page: the project's pins with lifetime metrics, sortable and filterable. */
+/**
+ * Content page (one platform at a time): posts with metrics for a period or lifetime, filter chips,
+ * sorting by column, selection and CSV export.
+ */
 export function Content() {
   const t = useTranslations('Content');
+  const format = useFormatter();
   const { workspace, project } = useWorkspace();
   const { accounts: allAccounts } = useProjectAccounts();
   // Disconnected accounts are hidden here (their history returns on reconnect).
-  const accounts = allAccounts?.filter((a) => a.status !== 'REVOKED');
+  const accounts = useMemo(
+    () => allAccounts?.filter((a) => a.status !== 'REVOKED') ?? null,
+    [allAccounts],
+  );
+  const platforms = useMemo(
+    () => [...new Set((accounts ?? []).map((a) => a.platform))],
+    [accounts],
+  );
+  const [chosenPlatform, setPlatform] = useState<Platform | null>(null);
+  const platform =
+    chosenPlatform && platforms.includes(chosenPlatform) ? chosenPlatform : platforms[0];
+
+  const [period, setPeriod] = useState<DateRange>({ preset: '7d' });
+  const [published, setPublished] = useState<DateRange>({ preset: 'all' });
   const [accountId, setAccountId] = useState('');
   const [boardId, setBoardId] = useState('');
-  const [sort, setSort] = useState<Sort>('impressions');
   const [ownership, setOwnership] = useState<Ownership>('own');
-  const [published, setPublished] = useState<DateRange>({ preset: 'all' });
+  const [sort, setSort] = useState<Sort>('impressions');
+  const [search, setSearch] = useState('');
+  const [debounced, setDebounced] = useState('');
   const [boards, setBoards] = useState<Board[]>([]);
   const [data, setData] = useState<Page | null>(null);
   const [extra, setExtra] = useState<Post[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const base = workspace && project ? `/workspaces/${workspace.id}/projects/${project.id}` : null;
+
+  const platformAccounts = (accounts ?? []).filter((a) => a.platform === platform);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(id);
+  }, [search]);
 
   useEffect(() => {
     if (!base) return;
@@ -183,18 +232,22 @@ export function Content() {
   }, [base]);
 
   const query = useMemo(() => {
-    const range = resolveRange(published);
+    const range = resolveRange(period);
+    const pub = resolveRange(published);
     return new URLSearchParams({
       sort,
       ownership,
+      ...(platform ? { platform } : {}),
       ...(range ?? {}),
+      ...(pub ? { publishedFrom: pub.from, publishedTo: pub.to } : {}),
       ...(accountId ? { accountId } : {}),
       ...(boardId ? { boardId } : {}),
+      ...(debounced ? { q: debounced } : {}),
     });
-  }, [sort, ownership, published, accountId, boardId]);
+  }, [sort, ownership, platform, period, published, accountId, boardId, debounced]);
 
   useEffect(() => {
-    if (!base) return;
+    if (!base || !platform) return;
     let cancelled = false;
     api<Page>(`${base}/content?${query}`).then(
       (p) => {
@@ -203,12 +256,12 @@ export function Content() {
         setExtra([]);
         setSelected(new Set());
       },
-      () => !cancelled && setData({ total: 0, page: 0, pageSize: 50, items: [] }),
+      () => !cancelled && setData({ total: 0, page: 0, pageSize: 50, period: null, items: [] }),
     );
     return () => {
       cancelled = true;
     };
-  }, [base, query]);
+  }, [base, platform, query]);
 
   async function loadMore() {
     if (!base || !data) return;
@@ -226,6 +279,26 @@ export function Content() {
   const selectedCount = items.filter((p) => selected.has(p.id)).length;
   const allChecked: boolean | 'mixed' =
     selectedCount === 0 ? false : selectedCount === items.length ? true : 'mixed';
+  const visibleBoards = boards.filter((b) =>
+    accountId ? b.accountId === accountId : platformAccounts.some((a) => a.id === b.accountId),
+  );
+
+  const rangeLabels: RangeLabels = {
+    all: t('period.all'),
+    '7d': t('period.7d'),
+    '30d': t('period.30d'),
+    '12m': t('period.12m'),
+    custom: t('period.custom'),
+    previous: t('period.previous'),
+    next: t('period.next'),
+    clear: t('clearFilter'),
+  };
+  const publishedLabels: RangeLabels = {
+    ...rangeLabels,
+    '7d': t('published.7d'),
+    '30d': t('published.30d'),
+    '12m': t('published.12m'),
+  };
 
   function toggle(id: string, on: boolean) {
     setSelected((prev) => {
@@ -256,7 +329,8 @@ export function Content() {
         t('csv.own'),
         t('metrics.publishedAt'),
         ...metricKeys.map((k) => t(`csv.metrics.${k}`)),
-        t('csv.asOf'),
+        t('csv.periodFrom'),
+        t('csv.periodTo'),
       ],
       ...rows.map((p) => [
         p.title?.trim(),
@@ -268,13 +342,29 @@ export function Content() {
         p.isOwn ? t('csv.yes') : t('csv.no'),
         p.publishedAt?.slice(0, 10),
         ...metricKeys.map((k) => p.metrics?.[k] ?? null),
-        p.asOf?.slice(0, 10),
+        data?.period?.from ?? t('csv.lifetime'),
+        data?.period?.to ?? p.asOf?.slice(0, 10),
       ]),
     ]);
-    downloadCsv(`adelie-pins-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    const name = (platform ?? 'content').toLowerCase();
+    downloadCsv(`adelie-${name}-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   }
 
-  const visibleBoards = accountId ? boards.filter((b) => b.accountId === accountId) : boards;
+  const dataFrom = data?.period?.dataFrom;
+  const limitedHistory = !!(data?.period && dataFrom && dataFrom > data.period.from);
+
+  if (accounts && platforms.length === 0) {
+    return (
+      <>
+        <PageHeader title={t('title')} />
+        <EmptyState
+          icon={<Images size={24} strokeWidth={1.75} aria-hidden="true" />}
+          title={t('emptyTitle')}
+          text={t('emptyText')}
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -282,116 +372,128 @@ export function Content() {
         title={t('title')}
         subtitle={
           data ? (
-            <span className="flex items-center gap-1.5">
+            <span className="flex flex-wrap items-center gap-x-1.5">
               {t('count', { count: data.total })}
-              <InfoTip text={t('lifetimeHint')} />
+              <span aria-hidden="true">·</span>
+              {data.period ? t('metricsForPeriod') : t('metricsLifetime')}
+              {limitedHistory && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  {t('dataSince', {
+                    date: format.dateTime(new Date(`${dataFrom}T00:00:00`), {
+                      day: 'numeric',
+                      month: 'short',
+                    }),
+                  })}
+                </>
+              )}
+              <InfoTip text={data.period ? t('periodHint') : t('lifetimeHint')} />
             </span>
           ) : (
             ' '
           )
         }
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            {accounts && accounts.length > 1 && (
-              <div className="w-52">
-                <Select
-                  value={accountId}
-                  onChange={(v) => {
-                    setAccountId(v);
-                    setBoardId('');
-                  }}
-                  options={[
-                    { value: '', label: t('allAccounts') },
-                    ...accounts.map((a) => ({
-                      value: a.id,
-                      label: a.displayName || a.username || a.externalId,
-                    })),
-                  ]}
-                  ariaLabel={t('account')}
-                />
-              </div>
-            )}
-            <div className="w-56">
-              <DateRangePicker
-                value={published}
-                onChange={setPublished}
-                labels={{
-                  all: t('published.all'),
-                  '30d': t('published.30d'),
-                  '12m': t('published.12m'),
-                  custom: t('published.custom'),
-                  previous: t('published.previous'),
-                  next: t('published.next'),
-                }}
-                ariaLabel={t('published.label')}
-              />
-            </div>
-            <div className="w-52">
-              <Select
-                value={ownership}
-                onChange={(v) => setOwnership(v as Ownership)}
-                options={OWNERSHIP.map((o) => ({ value: o, label: t(`ownership.${o}`) }))}
-                ariaLabel={t('ownershipLabel')}
-              />
-            </div>
-            <div className="w-52">
-              <Select
-                value={boardId}
-                onChange={setBoardId}
-                options={[
-                  { value: '', label: t('allBoards') },
-                  ...visibleBoards.map((b) => ({
-                    value: b.id,
-                    label: b.name,
-                    hint: b.pinCount === null ? undefined : String(b.pinCount),
-                  })),
-                ]}
-                searchable={visibleBoards.length > 8}
-                searchPlaceholder={t('searchBoards')}
-                ariaLabel={t('board')}
-              />
-            </div>
-            <div className="w-52">
-              <Select
-                value={sort}
-                onChange={(v) => setSort(v as Sort)}
-                options={SORTS.map((s) => ({ value: s, label: t(`sort.${s}`) }))}
-                ariaLabel={t('sortBy')}
-              />
-            </div>
-          </div>
+          platform && (
+            <Segmented
+              value={platform}
+              onChange={setPlatform}
+              options={platforms.map((p) => ({ value: p, label: t(`platforms.${p}`) }))}
+              ariaLabel={t('platform')}
+            />
+          )
         }
       />
 
-      {data && items.length === 0 ? (
-        <EmptyState
-          icon={<Images size={24} strokeWidth={1.75} aria-hidden="true" />}
-          title={t('emptyTitle')}
-          text={t('emptyText')}
+      {/* Toolbar: the data period first (it drives every number), then filter chips, then search. */}
+      <div className="animate-rise relative z-20 mb-4 flex flex-wrap items-center gap-2">
+        <PeriodControl
+          value={period}
+          onChange={setPeriod}
+          labels={rangeLabels}
+          ariaLabel={t('period.label')}
         />
+        <span className="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
+        {platformAccounts.length > 1 && (
+          <FilterChip
+            label={t('account')}
+            value={accountId}
+            onChange={(v) => {
+              setAccountId(v);
+              setBoardId('');
+            }}
+            options={platformAccounts.map((a) => ({
+              value: a.id,
+              label: a.displayName || a.username || a.externalId,
+            }))}
+            clearLabel={t('clearFilter')}
+          />
+        )}
+        {platform === 'PINTEREST' && (
+          <FilterChip
+            label={t('board')}
+            value={boardId}
+            onChange={setBoardId}
+            options={visibleBoards.map((b) => ({
+              value: b.id,
+              label: b.name,
+              hint: b.pinCount === null ? undefined : String(b.pinCount),
+            }))}
+            searchable={visibleBoards.length > 8}
+            searchPlaceholder={t('searchBoards')}
+            clearLabel={t('clearFilter')}
+          />
+        )}
+        <DateRangeChip
+          label={t('published.label')}
+          value={published}
+          onChange={setPublished}
+          labels={publishedLabels}
+        />
+        <FilterChip
+          label={t('ownershipLabel')}
+          value={ownership}
+          onChange={(v) => setOwnership(v as Ownership)}
+          options={OWNERSHIP.map((o) => ({ value: o, label: t(`ownership.${o}`) }))}
+          clearable={false}
+        />
+        <span className="md:hidden">
+          <FilterChip
+            label={t('sortBy')}
+            value={sort}
+            onChange={(v) => setSort(v as Sort)}
+            options={COLUMNS.map((c) => ({ value: c, label: t(`metrics.${c}`) }))}
+            clearable={false}
+          />
+        </span>
+        <label className="ml-auto flex h-9 w-full items-center gap-2 rounded-full border border-line px-3.5 text-sm focus-within:border-[var(--field-focus)] sm:w-56">
+          <Search size={15} className="shrink-0 text-muted" aria-hidden="true" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('search')}
+            aria-label={t('search')}
+            className="w-full min-w-0 bg-transparent outline-none placeholder:text-muted"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              aria-label={t('clearFilter')}
+              className="text-muted hover:text-foreground"
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          )}
+        </label>
+      </div>
+
+      {data && items.length === 0 ? (
+        <section className="card animate-rise rounded-[24px] px-6 py-14 text-center text-sm text-muted">
+          {t('noMatches')}
+        </section>
       ) : (
         <section className="card animate-rise rounded-[24px]">
-          {selectedCount > 0 && (
-            <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-2.5 text-sm">
-              <span className="font-medium">{t('selected', { count: selectedCount })}</span>
-              <button
-                type="button"
-                onClick={exportCsv}
-                className="inline-flex items-center gap-2 rounded-xl bg-accent px-3 py-1.5 text-accent-foreground"
-              >
-                <Download size={14} aria-hidden="true" />
-                {t('exportCsv')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelected(new Set())}
-                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-muted hover:bg-hover hover:text-foreground"
-              >
-                <X size={14} aria-hidden="true" />
-                {t('clearSelection')}
-              </button>
-            </div>
-          )}
           {/* Column headers (desktop) */}
           <div className="hidden items-center gap-6 border-b border-line p-5 text-xs text-muted md:flex">
             <span className="flex flex-1 items-center gap-3">
@@ -402,14 +504,16 @@ export function Content() {
               />
               <span className="pl-[68px]">{t('pin')}</span>
             </span>
-            <span className="grid w-[35rem] grid-cols-[repeat(4,minmax(0,1fr))_8rem] gap-4 text-right">
+            <span className={`grid w-[35rem] ${ROW_GRID} gap-4 text-right`}>
               {COLUMNS.map((key) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setSort(key)}
-                  className={`text-right whitespace-nowrap hover:text-foreground ${sort === key ? 'font-semibold text-foreground' : ''}`}
+                  aria-pressed={sort === key}
+                  className={`flex items-center justify-end gap-1 whitespace-nowrap hover:text-foreground ${sort === key ? 'font-semibold text-foreground' : ''}`}
                 >
+                  {sort === key && <ArrowDown size={12} aria-hidden="true" />}
                   {t(`metrics.${key}`)}
                 </button>
               ))}
@@ -445,6 +549,34 @@ export function Content() {
             </div>
           )}
         </section>
+      )}
+
+      {/* Selection actions float at the bottom of the content panel. */}
+      {selectedCount > 0 && (
+        <div className="pointer-events-none sticky bottom-4 z-30 mt-4 flex justify-center">
+          <div className="glass glass-strong animate-rise pointer-events-auto flex items-center gap-2 rounded-full py-1.5 pr-1.5 pl-5 text-sm shadow-[0_8px_30px_var(--shadow)]">
+            <span className="font-medium whitespace-nowrap">
+              {t('selected', { count: selectedCount })}
+            </span>
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="ml-2 inline-flex items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 whitespace-nowrap text-accent-foreground"
+            >
+              <Download size={14} aria-hidden="true" />
+              {t('exportCsv')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              aria-label={t('clearSelection')}
+              title={t('clearSelection')}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-hover hover:text-foreground"
+            >
+              <X size={15} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
       )}
     </>
   );

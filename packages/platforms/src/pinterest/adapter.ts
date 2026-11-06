@@ -8,6 +8,7 @@ import type {
   BoardData,
   MetricPoint,
   PlatformAdapter,
+  PostMetricsQuery,
   PostsPage,
   TokenSet,
 } from '../types.js';
@@ -16,6 +17,7 @@ import {
   mapAccountAnalytics,
   mapBoard,
   mapPin,
+  mapPinAnalytics,
   mapPinMetrics,
   type PinterestAnalyticsResponse,
   type PinterestBoard,
@@ -38,6 +40,14 @@ export const PINTEREST_ACCOUNT_METRICS = [
   'OUTBOUND_CLICK_RATE',
   'SAVE',
   'SAVE_RATE',
+] as const;
+
+/** Daily pin metrics we request (ADR-0013); the same provider keys as the lifetime pin metrics. */
+export const PINTEREST_PIN_DAILY_METRICS = [
+  'IMPRESSION',
+  'SAVE',
+  'PIN_CLICK',
+  'OUTBOUND_CLICK',
 ] as const;
 
 /** Rate-limit buckets as Pinterest reports them (PoC 1): reads 1000/min, analytics 60/min. */
@@ -229,5 +239,20 @@ export class PinterestAdapter implements PlatformAdapter {
       ANALYTICS,
     );
     return mapAccountAnalytics(raw, query.dimension);
+  }
+
+  async getPostMetrics(ctx: AdapterContext, query: PostMetricsQuery): Promise<MetricPoint[]> {
+    const raw = await this.get<PinterestAnalyticsResponse>(
+      ctx,
+      `/v5/pins/${encodeURIComponent(query.postExternalId)}/analytics`,
+      {
+        start_date: query.from,
+        end_date: query.to,
+        metric_types: PINTEREST_PIN_DAILY_METRICS.join(','),
+        app_types: 'ALL',
+      },
+      ANALYTICS,
+    );
+    return mapPinAnalytics(raw, query.postExternalId);
   }
 }
