@@ -1,9 +1,11 @@
 'use client';
 
-import { ExternalLink, Images, Play, RefreshCw } from 'lucide-react';
+import { Download, ExternalLink, Images, Play, RefreshCw, X } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
+import { downloadCsv, toCsv } from '@/lib/csv';
+import { Checkbox } from '../ui/checkbox';
 import { InfoTip } from '../ui/info-tip';
 import { Select } from '../ui/select';
 import { useProjectAccounts } from './accounts-data';
@@ -30,6 +32,7 @@ type Post = {
   account: { id: string; username: string | null };
   metrics: Metrics | null;
   dataStatus: string | null;
+  asOf: string | null;
 };
 type Page = { total: number; page: number; pageSize: number; items: Post[] };
 type Board = { id: string; name: string; accountId: string; pinCount: number | null };
@@ -41,7 +44,17 @@ const COLUMNS = ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'publish
 const OWNERSHIP = ['own', 'saved', 'all'] as const;
 type Ownership = (typeof OWNERSHIP)[number];
 
-function PostRow({ post, sort }: { post: Post; sort: Sort }) {
+function PostRow({
+  post,
+  sort,
+  selected,
+  onSelect,
+}: {
+  post: Post;
+  sort: Sort;
+  selected: boolean;
+  onSelect: (selected: boolean) => void;
+}) {
   const t = useTranslations('Content');
   const format = useFormatter();
   // Platforms may return whitespace-only titles: treat them as missing.
@@ -58,6 +71,7 @@ function PostRow({ post, sort }: { post: Post; sort: Sort }) {
   return (
     <li className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 md:flex-nowrap">
       <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
+        <Checkbox checked={selected} onChange={onSelect} label={t('select')} />
         <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-hover">
           {post.thumbnailUrl && (
             // External platform image: plain <img>, lazy.
@@ -151,6 +165,7 @@ export function Content() {
   const [data, setData] = useState<Page | null>(null);
   const [extra, setExtra] = useState<Post[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const base = workspace && project ? `/workspaces/${workspace.id}/projects/${project.id}` : null;
 
   useEffect(() => {
@@ -184,6 +199,7 @@ export function Content() {
         if (cancelled) return;
         setData(p);
         setExtra([]);
+        setSelected(new Set());
       },
       () => !cancelled && setData({ total: 0, page: 0, pageSize: 50, items: [] }),
     );
@@ -205,6 +221,57 @@ export function Content() {
   }
 
   const items = [...(data?.items ?? []), ...extra];
+  const selectedCount = items.filter((p) => selected.has(p.id)).length;
+  const allChecked: boolean | 'mixed' =
+    selectedCount === 0 ? false : selectedCount === items.length ? true : 'mixed';
+
+  function toggle(id: string, on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function exportCsv() {
+    const rows = items.filter((p) => selected.has(p.id));
+    const metricKeys = [
+      'impressions',
+      'saves',
+      'pinClicks',
+      'outboundClicks',
+      'videoViews',
+    ] as const;
+    const csv = toCsv([
+      [
+        t('csv.title'),
+        t('csv.description'),
+        t('csv.url'),
+        t('account'),
+        t('board'),
+        t('csv.type'),
+        t('csv.own'),
+        t('metrics.publishedAt'),
+        ...metricKeys.map((k) => t(`csv.metrics.${k}`)),
+        t('csv.asOf'),
+      ],
+      ...rows.map((p) => [
+        p.title?.trim(),
+        p.description?.trim(),
+        p.url,
+        p.account.username,
+        p.board?.name,
+        t(`types.${p.contentType}`),
+        p.isOwn ? t('csv.yes') : t('csv.no'),
+        p.publishedAt?.slice(0, 10),
+        ...metricKeys.map((k) => p.metrics?.[k] ?? null),
+        p.asOf?.slice(0, 10),
+      ]),
+    ]);
+    downloadCsv(`adelie-pins-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  }
+
   const visibleBoards = accountId ? boards.filter((b) => b.accountId === accountId) : boards;
 
   return (
@@ -287,9 +354,37 @@ export function Content() {
         />
       ) : (
         <section className="card animate-rise rounded-[24px]">
+          {selectedCount > 0 && (
+            <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-2.5 text-sm">
+              <span className="font-medium">{t('selected', { count: selectedCount })}</span>
+              <button
+                type="button"
+                onClick={exportCsv}
+                className="inline-flex items-center gap-2 rounded-xl bg-accent px-3 py-1.5 text-accent-foreground"
+              >
+                <Download size={14} aria-hidden="true" />
+                {t('exportCsv')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelected(new Set())}
+                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-muted hover:bg-hover hover:text-foreground"
+              >
+                <X size={14} aria-hidden="true" />
+                {t('clearSelection')}
+              </button>
+            </div>
+          )}
           {/* Column headers (desktop) */}
           <div className="hidden items-center gap-6 border-b border-line px-5 py-3 text-xs text-muted md:flex">
-            <span className="flex-1 pl-[68px]">{t('pin')}</span>
+            <span className="flex flex-1 items-center gap-3">
+              <Checkbox
+                checked={allChecked}
+                onChange={(on) => setSelected(on ? new Set(items.map((p) => p.id)) : new Set())}
+                label={t('selectAll')}
+              />
+              <span className="pl-[68px]">{t('pin')}</span>
+            </span>
             <span className="grid w-[35rem] grid-cols-[repeat(4,minmax(0,1fr))_8rem] gap-4 text-right">
               {COLUMNS.map((key) => (
                 <button
@@ -309,7 +404,13 @@ export function Content() {
           ) : (
             <ul className="divide-y divide-line">
               {items.map((post) => (
-                <PostRow key={post.id} post={post} sort={sort} />
+                <PostRow
+                  key={post.id}
+                  post={post}
+                  sort={sort}
+                  selected={selected.has(post.id)}
+                  onSelect={(on) => toggle(post.id, on)}
+                />
               ))}
             </ul>
           )}

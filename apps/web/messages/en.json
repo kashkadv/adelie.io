@@ -315,6 +315,28 @@
       "own": "Own pins",
       "saved": "Saved from others",
       "all": "All pins"
+    },
+    "select": "Select pin",
+    "selectAll": "Select all shown",
+    "selected": "{count, plural, one {# pin selected} other {# pins selected}}",
+    "exportCsv": "Export CSV",
+    "clearSelection": "Clear selection",
+    "csv": {
+      "title": "Title",
+      "description": "Description",
+      "url": "URL",
+      "type": "Type",
+      "own": "Own pin",
+      "yes": "yes",
+      "no": "no",
+      "asOf": "Metrics as of",
+      "metrics": {
+        "impressions": "Impressions",
+        "saves": "Saves",
+        "pinClicks": "Pin clicks",
+        "outboundClicks": "Outbound clicks",
+        "videoViews": "Video views"
+      }
     }
   }
 }

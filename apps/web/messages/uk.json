@@ -315,6 +315,28 @@
       "own": "Власні піни",
       "saved": "Збережені з інших",
       "all": "Усі піни"
+    },
+    "select": "Обрати пін",
+    "selectAll": "Обрати всі показані",
+    "selected": "{count, plural, one {Обрано # пін} few {Обрано # піни} other {Обрано # пінів}}",
+    "exportCsv": "Експорт у CSV",
+    "clearSelection": "Зняти виділення",
+    "csv": {
+      "title": "Назва",
+      "description": "Опис",
+      "url": "Посилання",
+      "type": "Тип",
+      "own": "Власний пін",
+      "yes": "так",
+      "no": "ні",
+      "asOf": "Метрики станом на",
+      "metrics": {
+        "impressions": "Покази",
+        "saves": "Збереження",
+        "pinClicks": "Кліки на пін",
+        "outboundClicks": "Переходи на сайт",
+        "videoViews": "Перегляди відео"
+      }
     }
   }
 }
