@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -91,12 +91,13 @@ export function InfoTip({
         onKeyDown={(e) => e.key === 'Escape' && close()}
         className={
           warning
-            ? 'inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/15 text-amber-700 transition-colors duration-200 hover:bg-amber-500/25 dark:text-amber-400'
+            ? 'inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/15 text-xs leading-none font-bold text-amber-700 transition-colors duration-200 hover:bg-amber-500/25 dark:text-amber-400'
             : 'inline-flex rounded-full text-muted transition-colors duration-200 hover:text-foreground focus-visible:text-foreground'
         }
       >
         {warning ? (
-          <AlertTriangle size={14} strokeWidth={2} aria-hidden="true" />
+          // Same height as a status badge (24px); a plain "!" reads lighter than a triangle icon.
+          <span aria-hidden="true">!</span>
         ) : (
           <Info size={14} strokeWidth={1.75} aria-hidden="true" />
         )}
