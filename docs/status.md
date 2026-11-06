@@ -48,6 +48,9 @@ _Оновлено: 2026-11-06_
 
 ## Наступні кроки
 
+0. **dev.adelie.space живий** (2026-11-06). Від власника: додати redirect URI
+   `https://dev-api.adelie.space/social/pinterest/callback` у кабінеті Pinterest; зареєструватися на dev
+   (пошти зі `SIGNUP_ALLOWLIST`) і підключити Pinterest заново (окрема база).
 1. **Етап 2:** ✅ адаптер (ADR-0011) → ✅ OAuth Pinterest → ✅ синхронізація у worker → **підключити акаунт
    Gushka** (PoC 2: перевірити ключі `pin_metrics`) → «Огляд» і «Контент» з реальними метриками. Модель: [plans/stage-2-data-model.md](plans/stage-2-data-model.md).
 2. «Огляд» з реальними цифрами (4 показники з порівнянням, графік показів, розбивка за пристроями, період і акаунт).
@@ -63,13 +66,9 @@ _Оновлено: 2026-11-06_
 
 ## Відкриті питання
 
-- **Оживити застосунок на піддоменах** (обговорення 2026-11-06, рішення ще не ухвалені): спершу `dev.adelie.space`
-  на VM `adelie` через Cloudflare Tunnel; API — `dev-api` / `staging-api` / `api.adelie.space` (безкоштовний
-  сертифікат Cloudflare — лише один рівень піддомену); dev і staging за Cloudflare Access (публічні сторінки
-  запрошень і OAuth-колбек відкриті); окрема БД `adelie_dev`; деплой скриптом `pnpm deploy:dev`. Потрібно:
-  cookie сесії Better Auth на домен `.adelie.space` (`crossSubDomainCookies`) — інакше `proxy.ts` вебу її не
-  побачить; redirect URI Pinterest для кожного оточення. `staging`/`app` — після рішення про хостинг production.
-
+- **Оточення `staging` і `app` (production)** — після рішення про хостинг production; `dev` уже працює
+  (див. [infra/server-setup.md](infra/server-setup.md)). Деплой у `dev` поки вручну (`pnpm deploy:dev`);
+  згодом — автоматично з `main`.
 - **Налаштування сповіщень** (пошта тощо, напр. «підключення потребує повторної авторизації») — пізніше; поки сповіщення
   лише в застосунку (ADR-0011). Місце — сторінка «Профіль».
 

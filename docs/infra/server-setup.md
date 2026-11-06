@@ -105,3 +105,22 @@ qm start 104
 ```
 
 Далі: apt upgrade, qemu-guest-agent, Docker (get.docker.com), Tailscale, ufw — як вище.
+
+## Застосунок на сервері: оточення `dev` (2026-11-06)
+
+https://dev.adelie.space (веб) і https://dev-api.adelie.space (API) — через той самий Cloudflare Tunnel.
+
+- **Код:** `infra/app/Dockerfile` (один образ: api, web, worker, міграції) і `infra/app/docker-compose.yml`
+  (проєкт `adelie-app-dev`). Портів назовні немає: веб і API доступні тунелю в мережі `adelie-edge_default`
+  (аліаси `dev-web`, `dev-api`), база й Redis — у мережі `adelie-dev_default`.
+- **Деплой:** `pnpm deploy:dev` — відправляє закомічений `HEAD` (`git archive`) у `~/adelie/app/dev/src`,
+  збирає образ на сервері (~2 хв), запускає міграції, потім api/web/worker. Незакомічені зміни — відмова.
+- **Секрети:** `~/adelie/env/dev.env` (0600) — окремі `BETTER_AUTH_SECRET` і `TOKEN_ENCRYPTION_KEY`, база
+  `adelie_dev`, Redis DB `1`, ключі Pinterest з `app.env`. Локальна розробка й далі працює з базою `adelie`.
+- **Доступ:** сайт публічний, але реєстрація лише для пошт із `SIGNUP_ALLOWLIST` (у `dev.env`); вхід обмежено
+  5 спробами за хвилину; `noindex`. Cookie сесії — `__Secure-adelie-dev.session_token` на `adelie.space`.
+- **Тунель:** маршрути в `infra/edge/cloudflared.yml`; DNS — `cloudflared tunnel route dns adelie <host>`.
+  Після зміни конфігу тунелю: `pnpm deploy:edge` і перезапуск `cloudflared`
+  (`docker compose restart cloudflared` у `~/adelie/infra/edge`).
+- **Журнали:** `docker logs adelie-app-dev-api-1` (так само `-web-1`, `-worker-1`, `-migrate-1`).
+
