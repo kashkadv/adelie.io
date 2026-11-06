@@ -138,6 +138,24 @@ body {
   :where(input, textarea, select):focus-visible {
     outline: none;
   }
+
+  /* Everything clickable shows the hand cursor (Tailwind 4 resets buttons to the default one);
+     disabled controls show "not allowed". */
+  :where(
+    button,
+    [role='button'],
+    [role='menuitem'],
+    [role='option'],
+    [role='combobox'],
+    summary,
+    label[for]
+  ) {
+    cursor: pointer;
+  }
+
+  :where(button:disabled, [aria-disabled='true']) {
+    cursor: not-allowed;
+  }
 }
 
 /* ---------- Scrollbars: the same thin rounded bar on every OS ---------- */
