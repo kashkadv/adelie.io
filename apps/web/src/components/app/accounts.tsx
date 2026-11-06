@@ -153,7 +153,10 @@ export function Accounts() {
 
         {/* Connect */}
         <section className="card animate-rise flex flex-col gap-3 rounded-[24px] p-5">
-          <h2 className="px-1 text-lg font-semibold">{t('connectTitle')}</h2>
+          <h2 className="flex items-center gap-2 px-1 text-lg font-semibold">
+            {t('connectTitle')}
+            <InfoTip text={t('anotherAccountHint')} />
+          </h2>
           <button
             type="button"
             disabled={!canConnect || connecting}

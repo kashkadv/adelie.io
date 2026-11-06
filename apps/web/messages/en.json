@@ -173,6 +173,7 @@
       "expired": "The connection link has expired. Please try again.",
       "alreadyConnected": "This Pinterest account is already connected to another project in this workspace.",
       "error": "Could not connect the account. Please try again later."
-    }
+    },
+    "anotherAccountHint": "Pinterest connects the account you are signed in to in this browser. To add another one, switch to it on pinterest.com first, then press Connect."
   }
 }
