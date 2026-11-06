@@ -20,6 +20,9 @@ import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { InfoTip } from '../ui/info-tip';
+import { Select } from '../ui/select';
+import { Switch } from '../ui/switch';
+import { useStoredFlag } from '@/lib/use-stored-flag';
 import { useProjectAccounts, useProjectInvitations, type SocialAccount } from './accounts-data';
 import { EmptyState, PageHeader } from './page-header';
 
@@ -345,6 +348,15 @@ function ConnectMenu({
 export function Accounts() {
   const t = useTranslations('Accounts');
   const { accounts, connect, canConnect, disconnect, remove } = useProjectAccounts();
+  const [platform, setPlatform] = useState('');
+  const [showDisconnected, setShowDisconnected] = useStoredFlag(
+    'adelie-accounts-show-disconnected',
+    true,
+  );
+  const platforms = [...new Set((accounts ?? []).map((a) => a.platform))];
+  const visible = (accounts ?? []).filter(
+    (a) => (!platform || a.platform === platform) && (showDisconnected || a.status !== 'REVOKED'),
+  );
   const [dialog, setDialog] = useState<{
     action: 'disconnect' | 'remove';
     account: SocialAccount;
@@ -487,8 +499,35 @@ export function Accounts() {
       )}
 
       {accounts && accounts.length > 0 && (
+        <div className="animate-rise mb-3 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="w-52">
+            <Select
+              value={platform}
+              onChange={setPlatform}
+              options={[
+                { value: '', label: t('allPlatforms') },
+                ...platforms.map((p) => ({ value: p, label: t(`platforms.${p}`) })),
+              ]}
+              ariaLabel={t('platform')}
+            />
+          </div>
+          <Switch
+            checked={showDisconnected}
+            onChange={setShowDisconnected}
+            label={t('showDisconnected')}
+          />
+        </div>
+      )}
+
+      {accounts && accounts.length > 0 && visible.length === 0 && (
+        <p className="card rounded-[24px] px-5 py-8 text-center text-sm text-muted">
+          {t('noMatches')}
+        </p>
+      )}
+
+      {visible.length > 0 && (
         <ul className="card animate-rise divide-y divide-line rounded-[24px]">
-          {accounts.map((account) => (
+          {visible.map((account) => (
             <AccountRow
               key={account.id}
               account={account}

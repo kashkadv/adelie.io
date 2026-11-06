@@ -224,7 +224,11 @@
       "text": "The account, its pins, boards, metrics and sync history are deleted permanently. History older than 90 days cannot be fetched from the platform again.",
       "typeToConfirm": "Type {handle} to confirm",
       "confirm": "Delete permanently"
-    }
+    },
+    "platform": "Platform",
+    "allPlatforms": "All platforms",
+    "showDisconnected": "Show disconnected",
+    "noMatches": "No accounts match the filters."
   },
   "Invite": {
     "title": "Connect {platform} to Adelie",
