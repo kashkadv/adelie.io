@@ -30,12 +30,18 @@ export function Avatar({
       />
     );
   }
+  const name = me?.name ?? fallback.name;
+  const email = me?.email ?? fallback.email;
+  if (!name && !email) {
+    // Session is still loading: a quiet placeholder instead of "?".
+    return <span style={style} className="block shrink-0 animate-pulse rounded-full bg-hover" />;
+  }
   return (
     <span
       style={{ ...style, fontSize: Math.round(size / 3) }}
       className="flex shrink-0 items-center justify-center rounded-full bg-accent font-semibold text-accent-foreground"
     >
-      {initials(me?.name ?? fallback.name, me?.email ?? fallback.email)}
+      {initials(name, email)}
     </span>
   );
 }

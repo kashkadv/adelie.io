@@ -20,11 +20,13 @@ import { WorkspaceProvider } from './workspace-context';
  * - base layer: top bar (brand left; theme, language, profile right) and the sidebar;
  * - raised layer: the content viewport — a single panel with its own scroll.
  * On small screens the sidebar becomes a drawer opened from the top bar.
- * Redirects to /login without a session.
+ *
+ * The frame and the page render right away, while the session is still being checked: pages load
+ * their own data and show "—" until it arrives. This keeps navigation instant (Next.js validates
+ * that no segment is dropped from rendering). Without a session the user is sent to /login.
  */
 export function AppFrame({ children }: { children: ReactNode }) {
   const t = useTranslations('Nav');
-  const tCommon = useTranslations('Common');
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -33,16 +35,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
     if (!isPending && !session) router.replace('/login');
   }, [isPending, session, router]);
 
-  if (isPending || !session) {
-    return (
-      <div className="flex h-dvh items-center justify-center text-muted">
-        <BrandMark className="h-10 w-9 animate-pulse" />
-        <span className="sr-only">{tCommon('loading')}</span>
-      </div>
-    );
-  }
-
-  const user = { name: session.user.name, email: session.user.email };
+  const user = { name: session?.user.name ?? '', email: session?.user.email ?? '' };
 
   return (
     <MeProvider>
