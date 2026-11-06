@@ -113,6 +113,13 @@ function AccountRow({ account }: { account: SocialAccount }) {
         {/* Status (+ a warning icon with an explanation, instead of a banner). Fixed width, so the
             columns of all rows line up whether or not a row has a warning. */}
         <div className="flex shrink-0 items-center justify-end gap-2 md:w-48">
+          {syncNote && (
+            <InfoTip
+              tone="warning"
+              title={t(`sync.${syncNote}`)}
+              text={t(`sync.${syncNote}Hint`)}
+            />
+          )}
           <span
             className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
               needsReauth
@@ -127,13 +134,6 @@ function AccountRow({ account }: { account: SocialAccount }) {
             )}
             {t(`status.${account.status}`)}
           </span>
-          {syncNote && (
-            <InfoTip
-              tone="warning"
-              title={t(`sync.${syncNote}`)}
-              text={t(`sync.${syncNote}Hint`)}
-            />
-          )}
         </div>
       </div>
     </li>
