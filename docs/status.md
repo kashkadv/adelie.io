@@ -55,8 +55,9 @@ SUCCESS — 10 дошок, 55 пінів із метриками, 90 днів а
 0. **dev.adelie.space живий** (2026-11-06). Від власника: додати redirect URI
    `https://dev-api.adelie.space/social/pinterest/callback` у кабінеті Pinterest; зареєструватися на dev
    (пошти зі `SIGNUP_ALLOWLIST`) і підключити Pinterest заново (окрема база).
-1. **Етап 2:** ✅ адаптер → ✅ OAuth → ✅ синхронізація → ✅ PoC 2 (Gushka) → ✅ «Огляд» → «Контент» (піни з метриками,
-   сортування й топи з `PostMetricsLatest`, фільтр за дошкою). Модель: [plans/stage-2-data-model.md](plans/stage-2-data-model.md).
+1. **Етап 2 завершено:** ✅ адаптер → ✅ OAuth → ✅ синхронізація → ✅ PoC 2 (Gushka) → ✅ «Огляд» → ✅ «Контент»
+   (піни з метриками за весь час, сортування, фільтри за акаунтом і дошкою). Далі — переглянути план MVP-1
+   ([plans/mvp-1.md](plans/mvp-1.md)): звіти за посиланням, сторінка команди, staging/production. Модель: [plans/stage-2-data-model.md](plans/stage-2-data-model.md).
 2. Сторінка команди з профілями колег (ADR-0010) і керування доступами до проєктів.
 3. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
 

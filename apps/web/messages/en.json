@@ -84,16 +84,6 @@
   },
   "Sections": {
     "soonTitle": "Coming soon",
-    "accounts": {
-      "title": "Accounts",
-      "subtitle": "Social accounts connected to this project",
-      "text": "Connected Pinterest, Instagram and TikTok accounts, their sync status and data history will be listed here."
-    },
-    "content": {
-      "title": "Content",
-      "subtitle": "Pins and posts with their metrics",
-      "text": "All published content with metrics, filters and top performers will appear here once an account is connected."
-    },
     "reports": {
       "title": "Reports",
       "subtitle": "Snapshots to share with clients",
@@ -277,5 +267,42 @@
         "text": "The account could not be connected. Please try again a bit later."
       }
     }
+  },
+  "Content": {
+    "title": "Content",
+    "count": "{count, plural, one {# pin} other {# pins}}",
+    "lifetimeHint": "Pin metrics are lifetime totals reported by Pinterest, updated daily. “—” means Pinterest has no data for that pin (for example, older pins), not zero.",
+    "pin": "Pin",
+    "untitled": "Untitled pin",
+    "openOnPlatform": "Open on Pinterest",
+    "account": "Account",
+    "allAccounts": "All accounts",
+    "board": "Board",
+    "allBoards": "All boards",
+    "searchBoards": "Search boards",
+    "sortBy": "Sort by",
+    "sort": {
+      "impressions": "Most impressions",
+      "saves": "Most saves",
+      "pinClicks": "Most pin clicks",
+      "outboundClicks": "Most outbound clicks",
+      "publishedAt": "Newest first"
+    },
+    "metrics": {
+      "impressions": "Impressions",
+      "saves": "Saves",
+      "pinClicks": "Pin clicks",
+      "outboundClicks": "Outbound"
+    },
+    "types": {
+      "IMAGE": "Image",
+      "VIDEO": "Video",
+      "CAROUSEL": "Carousel",
+      "PRODUCT": "Product",
+      "OTHER": "Pin"
+    },
+    "emptyTitle": "No pins yet",
+    "emptyText": "Pins appear here after the first sync of a business account. Personal Pinterest accounts don't share pins with apps.",
+    "loadMore": "Show more ({count} left)"
   }
 }

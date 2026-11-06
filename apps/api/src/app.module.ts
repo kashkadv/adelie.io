@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { auth } from './auth/auth.js';
+import { ContentController } from './content/content.controller.js';
 import { HealthController } from './health.controller.js';
 import { OverviewController } from './overview/overview.controller.js';
 import { PrismaService } from './prisma.service.js';
@@ -16,6 +17,7 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
   // unless marked with @AllowAnonymous().
   imports: [AuthModule.forRoot({ auth })],
   controllers: [
+    ContentController,
     HealthController,
     InvitationsController,
     OverviewController,

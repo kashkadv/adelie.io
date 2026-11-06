@@ -1,5 +1,5 @@
-import { SectionPlaceholder } from '@/components/app/section-placeholder';
+import { Content } from '@/components/app/content';
 
 export default function ContentPage() {
-  return <SectionPlaceholder section="content" />;
+  return <Content />;
 }
