@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { Checkbox } from '../ui/checkbox';
+import { DateRangePicker, resolveRange, type DateRange } from '../ui/date-range';
 import { InfoTip } from '../ui/info-tip';
 import { Select } from '../ui/select';
 import { useProjectAccounts } from './accounts-data';
@@ -161,6 +162,7 @@ export function Content() {
   const [boardId, setBoardId] = useState('');
   const [sort, setSort] = useState<Sort>('impressions');
   const [ownership, setOwnership] = useState<Ownership>('own');
+  const [published, setPublished] = useState<DateRange>({ preset: 'all' });
   const [boards, setBoards] = useState<Board[]>([]);
   const [data, setData] = useState<Page | null>(null);
   const [extra, setExtra] = useState<Post[]>([]);
@@ -180,16 +182,16 @@ export function Content() {
     };
   }, [base]);
 
-  const query = useMemo(
-    () =>
-      new URLSearchParams({
-        sort,
-        ownership,
-        ...(accountId ? { accountId } : {}),
-        ...(boardId ? { boardId } : {}),
-      }),
-    [sort, ownership, accountId, boardId],
-  );
+  const query = useMemo(() => {
+    const range = resolveRange(published);
+    return new URLSearchParams({
+      sort,
+      ownership,
+      ...(range ?? {}),
+      ...(accountId ? { accountId } : {}),
+      ...(boardId ? { boardId } : {}),
+    });
+  }, [sort, ownership, published, accountId, boardId]);
 
   useEffect(() => {
     if (!base) return;
@@ -309,6 +311,21 @@ export function Content() {
                 />
               </div>
             )}
+            <div className="w-56">
+              <DateRangePicker
+                value={published}
+                onChange={setPublished}
+                labels={{
+                  all: t('published.all'),
+                  '30d': t('published.30d'),
+                  '12m': t('published.12m'),
+                  custom: t('published.custom'),
+                  previous: t('published.previous'),
+                  next: t('published.next'),
+                }}
+                ariaLabel={t('published.label')}
+              />
+            </div>
             <div className="w-52">
               <Select
                 value={ownership}

@@ -62,8 +62,22 @@ export class ContentController {
     const ownership = query['ownership'] ?? 'own';
     if (!['own', 'saved', 'all'].includes(ownership))
       throw new BadRequestException('Unknown ownership');
+    // Publication date range, inclusive calendar days (UTC).
+    const day = /^\d{4}-\d{2}-\d{2}$/;
+    const from = query['from'];
+    const to = query['to'];
+    if ((from && !day.test(from)) || (to && !day.test(to)))
+      throw new BadRequestException('Dates must be YYYY-MM-DD');
+    const publishedAt =
+      from || to
+        ? {
+            ...(from ? { gte: new Date(`${from}T00:00:00Z`) } : {}),
+            ...(to ? { lt: new Date(new Date(`${to}T00:00:00Z`).getTime() + 86_400_000) } : {}),
+          }
+        : undefined;
     const where: Prisma.SocialPostWhereInput = {
       projectId,
+      ...(publishedAt ? { publishedAt } : {}),
       ...(ownership === 'all' ? {} : { isOwn: ownership === 'own' }),
       workspaceId: request.workspace.workspaceId,
       ...(query['accountId'] ? { accountId: query['accountId'] } : {}),

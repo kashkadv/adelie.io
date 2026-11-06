@@ -337,6 +337,15 @@
         "outboundClicks": "Outbound clicks",
         "videoViews": "Video views"
       }
+    },
+    "published": {
+      "label": "Publication date",
+      "all": "Published any time",
+      "30d": "Last 30 days",
+      "12m": "Last 12 months",
+      "custom": "Custom range",
+      "previous": "Previous month",
+      "next": "Next month"
     }
   }
 }
