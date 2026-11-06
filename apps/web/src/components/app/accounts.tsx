@@ -38,7 +38,8 @@ function useConnectResult(): [ConnectResult | null, () => void] {
   return [result, () => setResult(null)];
 }
 
-function AccountCard({ account }: { account: SocialAccount }) {
+/** One connected account as a full-width row: who · numbers · last sync · status. */
+function AccountRow({ account }: { account: SocialAccount }) {
   const t = useTranslations('Accounts');
   const format = useFormatter();
   const needsReauth = account.status !== 'ACTIVE';
@@ -60,23 +61,68 @@ function AccountCard({ account }: { account: SocialAccount }) {
   const name = account.displayName || account.username || account.externalId;
 
   return (
-    <article className="card animate-rise flex flex-col gap-4 rounded-[24px] p-5">
-      <div className="flex items-center gap-3">
-        {account.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={account.avatarUrl} alt="" className="h-12 w-12 rounded-full object-cover" />
-        ) : (
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
-            <Pin size={20} strokeWidth={1.75} aria-hidden="true" />
-          </span>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{name}</p>
-          <p className="truncate text-sm text-muted">
-            {t(`platforms.${account.platform}`)}
-            {account.username ? ` · @${account.username}` : ''}
-          </p>
+    <li className="px-5 py-4">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 md:flex-nowrap">
+        {/* Who */}
+        <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
+          {account.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={account.avatarUrl}
+              alt=""
+              className="h-11 w-11 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+              <Pin size={18} strokeWidth={1.75} aria-hidden="true" />
+            </span>
+          )}
+          <div className="min-w-0">
+            <p className="truncate font-medium">{name}</p>
+            <p className="truncate text-sm text-muted">
+              {t(`platforms.${account.platform}`)}
+              {account.username ? ` · @${account.username}` : ''}
+            </p>
+          </div>
         </div>
+
+        {/* Numbers */}
+        <dl className="tabular flex shrink-0 gap-8 text-sm">
+          <div className="w-20">
+            <dt className="text-xs text-muted">{t('followers')}</dt>
+            <dd className="font-display text-lg font-semibold">
+              {account.followersCount === null ? '—' : format.number(account.followersCount)}
+            </dd>
+          </div>
+          <div className="w-20">
+            <dt className="text-xs text-muted">{t('pins')}</dt>
+            <dd className="font-display text-lg font-semibold">
+              {account.postsCount === null ? '—' : format.number(account.postsCount)}
+            </dd>
+          </div>
+        </dl>
+
+        {/* Sync */}
+        <p className="flex shrink-0 items-center gap-1.5 text-xs text-muted md:w-64">
+          {syncing ? (
+            <>
+              <RefreshCw size={12} className="animate-spin" aria-hidden="true" />
+              {t('syncing')}
+            </>
+          ) : account.lastSuccessfulSyncAt ? (
+            t('lastSync', {
+              date: format.dateTime(new Date(account.lastSuccessfulSyncAt), {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              }),
+            })
+          ) : (
+            t('notSyncedYet')
+          )}
+          <InfoTip text={t('collectingHint')} />
+        </p>
+
+        {/* Status */}
         <span
           className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
             needsReauth
@@ -92,46 +138,15 @@ function AccountCard({ account }: { account: SocialAccount }) {
           {t(`status.${account.status}`)}
         </span>
       </div>
-      <dl className="tabular grid grid-cols-2 gap-3 text-sm">
-        <div className="px-1">
-          <dt className="text-muted">{t('followers')}</dt>
-          <dd className="font-display text-xl font-semibold">
-            {account.followersCount === null ? '—' : format.number(account.followersCount)}
-          </dd>
-        </div>
-        <div className="px-1">
-          <dt className="text-muted">{t('pins')}</dt>
-          <dd className="font-display text-xl font-semibold">
-            {account.postsCount === null ? '—' : format.number(account.postsCount)}
-          </dd>
-        </div>
-      </dl>
+
       {syncNote && (
-        <p className="flex items-center gap-1.5 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+        <p className="mt-3 flex items-center gap-1.5 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-800 md:ml-14 dark:text-amber-300">
           <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
           <span className="flex-1">{t(`sync.${syncNote}`)}</span>
           {syncNote === 'personal' && <InfoTip text={t('sync.personalHint')} />}
         </p>
       )}
-      <p className="flex items-center gap-1.5 px-1 text-xs text-muted">
-        {syncing ? (
-          <>
-            <RefreshCw size={12} className="animate-spin" aria-hidden="true" />
-            {t('syncing')}
-          </>
-        ) : account.lastSuccessfulSyncAt ? (
-          t('lastSync', {
-            date: format.dateTime(new Date(account.lastSuccessfulSyncAt), {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-            }),
-          })
-        ) : (
-          t('notSyncedYet')
-        )}
-        <InfoTip text={t('collectingHint')} />
-      </p>
-    </article>
+    </li>
   );
 }
 
@@ -361,11 +376,13 @@ export function Accounts() {
         />
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {accounts?.map((account) => (
-          <AccountCard key={account.id} account={account} />
-        ))}
-      </div>
+      {accounts && accounts.length > 0 && (
+        <ul className="card animate-rise divide-y divide-line rounded-[24px]">
+          {accounts.map((account) => (
+            <AccountRow key={account.id} account={account} />
+          ))}
+        </ul>
+      )}
 
       {invitations.length > 0 && (
         <section className="animate-rise mt-8">
