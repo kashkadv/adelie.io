@@ -8,14 +8,17 @@ import {
   ChevronDown,
   Copy,
   Link2,
+  MoreHorizontal,
   Pin,
   Plug,
   Plus,
   RefreshCw,
+  Unplug,
   X,
 } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 import { InfoTip } from '../ui/info-tip';
 import { useProjectAccounts, useProjectInvitations, type SocialAccount } from './accounts-data';
 import { EmptyState, PageHeader } from './page-header';
@@ -38,20 +41,103 @@ function useConnectResult(): [ConnectResult | null, () => void] {
   return [result, () => setResult(null)];
 }
 
-/** One connected account as a full-width row: who · numbers · last sync · status. */
-function AccountRow({ account }: { account: SocialAccount }) {
+type RowAction = 'disconnect' | 'remove' | 'reconnect';
+
+const accountName = (a: SocialAccount) => a.displayName || a.username || a.externalId;
+/** What the user types to confirm deletion (the API checks the same value). */
+const accountHandle = (a: SocialAccount) => a.username ?? a.displayName ?? a.externalId;
+
+/** "⋯" menu of an account row: disconnect / reconnect / delete with data. */
+function RowMenu({
+  disconnected,
+  onAction,
+}: {
+  disconnected: boolean;
+  onAction: (action: RowAction) => void;
+}) {
+  const t = useTranslations('Accounts');
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const item = (action: RowAction, label: string, danger = false) => (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={() => {
+        setOpen(false);
+        onAction(action);
+      }}
+      className={`flex w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-hover ${
+        danger ? 'text-red-600 dark:text-red-400' : ''
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={t('actions')}
+        className="icon-btn h-8 w-8"
+      >
+        <MoreHorizontal size={18} aria-hidden="true" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="glass glass-strong animate-rise absolute top-full right-0 z-50 mt-2 w-60 rounded-2xl p-2"
+        >
+          {disconnected ? item('reconnect', t('reconnect')) : item('disconnect', t('disconnect'))}
+          <div className="my-1 h-px bg-line" />
+          {item('remove', t('remove'), true)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One connected account as a full-width row: who · last sync · status · actions. */
+function AccountRow({
+  account,
+  onAction,
+}: {
+  account: SocialAccount;
+  /** Absent for roles that may not manage accounts. */
+  onAction?: (action: RowAction) => void;
+}) {
   const t = useTranslations('Accounts');
   const format = useFormatter();
-  const needsReauth = account.status !== 'ACTIVE';
+  const needsReauth = account.status === 'REAUTHORIZATION_REQUIRED';
+  const disconnected = account.status === 'REVOKED';
   const last = account.lastSync;
   const syncing =
-    !needsReauth &&
+    account.status === 'ACTIVE' &&
     (last?.status === 'RUNNING' ||
       last?.status === 'PENDING' ||
       (!last && account.status === 'ACTIVE'));
   // Pinterest gives apps no pin/board data of personal (PINNER) accounts — only business ones.
-  const syncNote: 'personal' | 'partial' | 'failed' | null =
-    last?.status === 'PARTIAL'
+  const syncNote: 'personal' | 'partial' | 'failed' | null = disconnected
+    ? null
+    : last?.status === 'PARTIAL'
       ? account.accountType === 'PINNER'
         ? 'personal'
         : 'partial'
@@ -112,7 +198,7 @@ function AccountRow({ account }: { account: SocialAccount }) {
 
         {/* Status (+ a warning icon with an explanation, instead of a banner). Fixed width, so the
             columns of all rows line up whether or not a row has a warning. */}
-        <div className="flex shrink-0 items-center justify-end gap-2 md:w-48">
+        <div className="flex shrink-0 items-center justify-end gap-2 md:w-60">
           {syncNote && (
             <InfoTip
               tone="warning"
@@ -129,11 +215,18 @@ function AccountRow({ account }: { account: SocialAccount }) {
           >
             {needsReauth ? (
               <AlertTriangle size={14} aria-hidden="true" />
+            ) : disconnected ? (
+              <Unplug size={14} aria-hidden="true" />
             ) : (
               <CheckCircle2 size={14} aria-hidden="true" />
             )}
             {t(`status.${account.status}`)}
           </span>
+          {onAction ? (
+            <RowMenu disconnected={disconnected} onAction={onAction} />
+          ) : (
+            <span className="w-8" aria-hidden="true" />
+          )}
         </div>
       </div>
     </li>
@@ -251,7 +344,34 @@ function ConnectMenu({
 /** Accounts page: connected accounts of the project and connecting new ones (ADR-0011). */
 export function Accounts() {
   const t = useTranslations('Accounts');
-  const { accounts, connect, canConnect } = useProjectAccounts();
+  const { accounts, connect, canConnect, disconnect, remove } = useProjectAccounts();
+  const [dialog, setDialog] = useState<{
+    action: 'disconnect' | 'remove';
+    account: SocialAccount;
+  } | null>(null);
+  const [dialogBusy, setDialogBusy] = useState(false);
+  const [dialogError, setDialogError] = useState<string | undefined>();
+
+  function onRowAction(account: SocialAccount, action: RowAction) {
+    if (action === 'reconnect') return void onConnect();
+    setDialogError(undefined);
+    setDialog({ action, account });
+  }
+
+  async function confirmDialog(typed: string) {
+    if (!dialog) return;
+    setDialogBusy(true);
+    setDialogError(undefined);
+    try {
+      if (dialog.action === 'disconnect') await disconnect(dialog.account.id);
+      else await remove(dialog.account.id, typed);
+      setDialog(null);
+    } catch {
+      setDialogError(t('actionFailed'));
+    } finally {
+      setDialogBusy(false);
+    }
+  }
   const { invitations, create: createInvitation, revoke } = useProjectInvitations();
   const [notice, setNotice] = useState<'inviteCopied' | 'inviteFailed' | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -369,7 +489,11 @@ export function Accounts() {
       {accounts && accounts.length > 0 && (
         <ul className="card animate-rise divide-y divide-line rounded-[24px]">
           {accounts.map((account) => (
-            <AccountRow key={account.id} account={account} />
+            <AccountRow
+              key={account.id}
+              account={account}
+              onAction={canConnect ? (action) => onRowAction(account, action) : undefined}
+            />
           ))}
         </ul>
       )}
@@ -427,6 +551,23 @@ export function Accounts() {
             ))}
           </ul>
         </section>
+      )}
+      {dialog && (
+        <ConfirmDialog
+          title={t(`${dialog.action}Dialog.title`, { name: accountName(dialog.account) })}
+          confirmLabel={t(`${dialog.action}Dialog.confirm`)}
+          cancelLabel={t('cancel')}
+          danger={dialog.action === 'remove'}
+          confirmText={dialog.action === 'remove' ? accountHandle(dialog.account) : undefined}
+          inputLabel={t('removeDialog.typeToConfirm', { handle: accountHandle(dialog.account) })}
+          busy={dialogBusy}
+          error={dialogError}
+          onConfirm={confirmDialog}
+          onCancel={() => setDialog(null)}
+        >
+          <p>{t(`${dialog.action}Dialog.text`)}</p>
+          {dialog.action === 'disconnect' && <p>{t('disconnectDialog.platformHint')}</p>}
+        </ConfirmDialog>
       )}
     </>
   );

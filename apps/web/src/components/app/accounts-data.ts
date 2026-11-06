@@ -67,10 +67,32 @@ export function useProjectAccounts() {
     [base],
   );
 
+  /** Stops syncing and erases the tokens; the collected history stays. */
+  const disconnect = useCallback(
+    async (accountId: string) => {
+      if (!base) return;
+      await api(`${base}/accounts/${accountId}/disconnect`, { method: 'POST' });
+      await reload();
+    },
+    [base, reload],
+  );
+
+  /** Deletes the account with all its data; `confirm` must repeat the account name. */
+  const remove = useCallback(
+    async (accountId: string, confirm: string) => {
+      if (!base) return;
+      await api(`${base}/accounts/${accountId}`, { method: 'DELETE', json: { confirm } });
+      await reload();
+    },
+    [base, reload],
+  );
+
   return {
     accounts,
     reload,
     connect,
+    disconnect,
+    remove,
     canConnect: !!workspace && CONNECT_ROLES.includes(workspace.role),
   };
 }

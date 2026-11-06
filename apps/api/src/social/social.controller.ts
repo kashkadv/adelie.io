@@ -1,5 +1,8 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
@@ -82,6 +85,65 @@ export class SocialController {
       status: connection.status,
       lastSync: syncRuns[0] ?? null,
     }));
+  }
+
+  private async projectAccount(ctx: WorkspaceRequestContext, projectId: string, accountId: string) {
+    await this.visibleProject(ctx, projectId);
+    const account = await this.prisma.client.socialAccount.findFirst({
+      where: { id: accountId, projectId, workspaceId: ctx.workspaceId },
+      select: { id: true, connectionId: true, username: true, displayName: true, externalId: true },
+    });
+    if (!account) throw new NotFoundException();
+    return account;
+  }
+
+  /**
+   * Disconnects an account: tokens are erased immediately (privacy policy), syncing stops, the
+   * collected history stays. Connecting the same account again makes it active and continues it.
+   */
+  @Post('workspaces/:workspaceId/projects/:projectId/accounts/:accountId/disconnect')
+  @UseGuards(WorkspaceAccessGuard)
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async disconnect(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const account = await this.projectAccount(request.workspace, projectId, accountId);
+    await this.prisma.client.socialConnection.update({
+      where: { id: account.connectionId },
+      data: {
+        status: 'REVOKED',
+        accessTokenEncrypted: '',
+        refreshTokenEncrypted: null,
+        accessTokenExpiresAt: null,
+        refreshTokenExpiresAt: null,
+      },
+    });
+    return { ok: true };
+  }
+
+  /**
+   * Deletes an account with everything collected for it (posts, boards, metrics, sync history,
+   * raw payloads) — irreversible. The caller must repeat the account's name as a confirmation.
+   */
+  @Delete('workspaces/:workspaceId/projects/:projectId/accounts/:accountId')
+  @UseGuards(WorkspaceAccessGuard)
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async remove(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Body() body: { confirm?: string },
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const account = await this.projectAccount(request.workspace, projectId, accountId);
+    const expected = account.username ?? account.displayName ?? account.externalId;
+    if ((body?.confirm ?? '').trim().replace(/^@/, '').toLowerCase() !== expected.toLowerCase()) {
+      throw new BadRequestException({ errors: { confirm: 'mismatch' } });
+    }
+    // Cascades: accounts → boards, posts, metric values, latest rows; sync runs → raw payloads.
+    await this.prisma.client.socialConnection.delete({ where: { id: account.connectionId } });
+    return { ok: true };
   }
 
   /** Starts OAuth for the signed-in member: returns the platform consent URL. */

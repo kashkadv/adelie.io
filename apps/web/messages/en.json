@@ -179,7 +179,7 @@
     "status": {
       "ACTIVE": "Connected",
       "REAUTHORIZATION_REQUIRED": "Reconnect needed",
-      "REVOKED": "Access revoked"
+      "REVOKED": "Disconnected"
     },
     "notSyncedYet": "Not synced yet",
     "collectingHint": "Adelie collects data daily from the moment of connection; the platform also returns up to 90 days of history.",
@@ -216,7 +216,25 @@
     "copied": "Copied",
     "revoke": "Revoke",
     "invitationsHint": "Send the link to whoever owns the account — a client, or yourself in another browser. They connect it without an Adelie account; the link works once and expires in 7 days.",
-    "lastSyncLabel": "Last sync:"
+    "lastSyncLabel": "Last sync:",
+    "actions": "Account actions",
+    "disconnect": "Disconnect",
+    "reconnect": "Connect again",
+    "remove": "Delete with all data",
+    "cancel": "Cancel",
+    "actionFailed": "Something went wrong. Please try again.",
+    "disconnectDialog": {
+      "title": "Disconnect {name}?",
+      "text": "Adelie deletes the access tokens right away and stops syncing. The data collected so far stays — connect the same account again later and its history continues without a gap.",
+      "platformHint": "To also remove Adelie from the account's connected apps, do it in Pinterest: Settings → Connected apps.",
+      "confirm": "Disconnect"
+    },
+    "removeDialog": {
+      "title": "Delete {name} with all data?",
+      "text": "The account, its pins, boards, metrics and sync history are deleted permanently. History older than 90 days cannot be fetched from the platform again.",
+      "typeToConfirm": "Type {handle} to confirm",
+      "confirm": "Delete permanently"
+    }
   },
   "Invite": {
     "title": "Connect {platform} to Adelie",

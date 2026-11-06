@@ -97,7 +97,7 @@ export function Overview() {
   const [days, setDays] = useState(30);
   const [accountId, setAccountId] = useState('');
   const [data, setData] = useState<OverviewData | null>(null);
-  const needsReauth = accounts?.filter((a) => a.status !== 'ACTIVE') ?? [];
+  const needsReauth = accounts?.filter((a) => a.status === 'REAUTHORIZATION_REQUIRED') ?? [];
   const hasAccounts = !!accounts && accounts.length > 0;
 
   useEffect(() => {
