@@ -9,6 +9,7 @@
 | [product-requirements.md](product-requirements.md) | Вимоги до продукту та технічне завдання (v1.1) |
 | [decisions/](decisions/) | Архітектурні рішення (ADR) |
 | [plans/](plans/) | Плани реалізації |
+| [specs/tracker.md](specs/tracker.md) | Adelie Tracker: події на сайті, джерела трафіку, атрибуція (концепція) |
 | [plans/mvp-1.md](plans/mvp-1.md) | План MVP-1: Pinterest end-to-end (в роботі) |
 | [plans/stage-2-data-model.md](plans/stage-2-data-model.md) | Етап 2: модель даних соцмереж і метрик (узгоджено) |
 | [plans/mvp-discussion.md](plans/mvp-discussion.md) | Обговорення обсягу MVP і стеку (завершено) |
