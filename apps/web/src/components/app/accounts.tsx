@@ -86,36 +86,24 @@ function AccountRow({ account }: { account: SocialAccount }) {
           </div>
         </div>
 
-        {/* Numbers */}
-        <dl className="tabular flex shrink-0 gap-8 text-sm">
-          <div className="w-20">
-            <dt className="text-xs text-muted">{t('followers')}</dt>
-            <dd className="font-display text-lg font-semibold">
-              {account.followersCount === null ? '—' : format.number(account.followersCount)}
-            </dd>
-          </div>
-          <div className="w-20">
-            <dt className="text-xs text-muted">{t('pins')}</dt>
-            <dd className="font-display text-lg font-semibold">
-              {account.postsCount === null ? '—' : format.number(account.postsCount)}
-            </dd>
-          </div>
-        </dl>
-
-        {/* Sync */}
-        <p className="flex shrink-0 items-center gap-1.5 text-xs text-muted md:w-64">
+        {/* Sync: icon + date (the icon spins while syncing); the label is for screen readers. */}
+        <p className="flex shrink-0 items-center gap-1.5 text-xs text-muted md:w-56">
+          <RefreshCw
+            size={13}
+            strokeWidth={1.75}
+            className={syncing ? 'animate-spin' : undefined}
+            aria-hidden="true"
+          />
           {syncing ? (
-            <>
-              <RefreshCw size={12} className="animate-spin" aria-hidden="true" />
-              {t('syncing')}
-            </>
+            t('syncing')
           ) : account.lastSuccessfulSyncAt ? (
-            t('lastSync', {
-              date: format.dateTime(new Date(account.lastSuccessfulSyncAt), {
+            <>
+              <span className="sr-only">{t('lastSyncLabel')}</span>
+              {format.dateTime(new Date(account.lastSuccessfulSyncAt), {
                 dateStyle: 'medium',
                 timeStyle: 'short',
-              }),
-            })
+              })}
+            </>
           ) : (
             t('notSyncedYet')
           )}
