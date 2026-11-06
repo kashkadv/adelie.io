@@ -376,7 +376,7 @@ export function Content() {
             </div>
           )}
           {/* Column headers (desktop) */}
-          <div className="hidden items-center gap-6 border-b border-line px-5 pt-5 pb-3 text-xs text-muted md:flex">
+          <div className="hidden items-center gap-6 border-b border-line p-5 text-xs text-muted md:flex">
             <span className="flex flex-1 items-center gap-3">
               <Checkbox
                 checked={allChecked}
