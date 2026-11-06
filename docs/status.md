@@ -44,17 +44,18 @@ _Оновлено: 2026-11-06_
 
 **PoC 2 пройдено** (2026-11-06): бізнес-акаунт Gushka `gushkawool` підключено на dev.adelie.space, синхронізація
 SUCCESS — 10 дошок, 55 пінів із метриками, 90 днів аналітики з розбивкою за пристроями (деталі —
-[integrations/pinterest.md](integrations/pinterest.md)). Далі — «Огляд» з реальними цифрами.
+[integrations/pinterest.md](integrations/pinterest.md)). **«Огляд» з реальними цифрами** готовий: 4 показники з
+порівнянням із попереднім періодом, графік показів по днях, розбивка за пристроями, період 7/30/90 і вибір акаунта.
 
 ## Наступні кроки
 
 0. **dev.adelie.space живий** (2026-11-06). Від власника: додати redirect URI
    `https://dev-api.adelie.space/social/pinterest/callback` у кабінеті Pinterest; зареєструватися на dev
    (пошти зі `SIGNUP_ALLOWLIST`) і підключити Pinterest заново (окрема база).
-1. **Етап 2:** ✅ адаптер → ✅ OAuth → ✅ синхронізація → ✅ PoC 2 (Gushka) → «Огляд» і «Контент» з реальними метриками. Модель: [plans/stage-2-data-model.md](plans/stage-2-data-model.md).
-2. «Огляд» з реальними цифрами (4 показники з порівнянням, графік показів, розбивка за пристроями, період і акаунт).
-3. Сторінка команди з профілями колег (ADR-0010) і керування доступами до проєктів.
-4. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
+1. **Етап 2:** ✅ адаптер → ✅ OAuth → ✅ синхронізація → ✅ PoC 2 (Gushka) → ✅ «Огляд» → «Контент» (піни з метриками,
+   сортування й топи з `PostMetricsLatest`, фільтр за дошкою). Модель: [plans/stage-2-data-model.md](plans/stage-2-data-model.md).
+2. Сторінка команди з профілями колег (ADR-0010) і керування доступами до проєктів.
+3. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
 
 Підказки для локального запуску:
 - `pnpm` є лише в Node 24: у новій вкладці `nvm use` (або раз `nvm alias default 24`).

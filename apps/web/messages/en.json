@@ -57,9 +57,30 @@
     "connectText": "Adelie collects analytics from your social accounts every day. Pinterest comes first — Instagram and TikTok are next.",
     "connectPinterest": "Connect Pinterest",
     "reauthBanner": "{count, plural, one {# account needs} other {# accounts need}} to be reconnected",
-    "connectedTitle": "{count, plural, one {# account connected} other {# accounts connected}}",
-    "connectedText": "Metrics will appear here after the first sync.",
-    "openAccounts": "Open accounts"
+    "period": "Period",
+    "days": "{count} days",
+    "account": "Account",
+    "allAccounts": "All accounts",
+    "now": "now",
+    "vsPrevious": "vs previous {count} days",
+    "deltaNew": "new",
+    "deltaHint": "Change vs the previous period of the same length",
+    "deltaUp": "up",
+    "deltaDown": "down",
+    "preliminaryHint": "Includes recent days that the platform is still finalizing — the number may change slightly.",
+    "noDataDay": "No data",
+    "preliminaryDay": "Preliminary",
+    "chart": {
+      "title": "Impressions by day",
+      "hint": "Dashed: days the platform is still finalizing. Gaps: days without data — not zero.",
+      "aria": "Daily impressions chart"
+    },
+    "devices": {
+      "title": "Impressions by device",
+      "MOBILE": "Mobile",
+      "WEB": "Web",
+      "TABLET": "Tablet"
+    }
   },
   "Sections": {
     "soonTitle": "Coming soon",

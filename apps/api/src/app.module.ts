@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { auth } from './auth/auth.js';
 import { HealthController } from './health.controller.js';
+import { OverviewController } from './overview/overview.controller.js';
 import { PrismaService } from './prisma.service.js';
 import { ProfileController } from './profile/profile.controller.js';
 import { ConnectService } from './social/connect.service.js';
@@ -17,6 +18,7 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
   controllers: [
     HealthController,
     InvitationsController,
+    OverviewController,
     ProfileController,
     SocialController,
     WorkspacesController,
