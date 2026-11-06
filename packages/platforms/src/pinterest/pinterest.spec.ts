@@ -284,6 +284,22 @@ describe('mapping', () => {
     expect(contentType({ id: '1' })).toBe('OTHER');
   });
 
+  it('non-numeric pin_metrics fields (last_updated) are not metrics', () => {
+    const points = mapPinMetrics(
+      {
+        id: '1',
+        pin_metrics: {
+          lifetime_metrics: { impression: 7, comment: 0, last_updated: '2026-11-06T10:00:00' },
+        },
+      },
+      TODAY,
+    );
+    expect(points.map((p) => [p.providerKey, p.value])).toEqual([
+      ['IMPRESSION', 7],
+      ['COMMENT', 0],
+    ]);
+  });
+
   it('pins without lifetime metrics yield no points', () => {
     expect(mapPinMetrics({ id: '1', pin_metrics: { '90d': { impression: 1 } } }, TODAY)).toEqual(
       [],

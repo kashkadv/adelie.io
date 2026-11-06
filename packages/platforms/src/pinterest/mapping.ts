@@ -1,7 +1,8 @@
 // Pure mapping from Pinterest API v5 responses to the adapter contract (ADR-0011).
 // Shapes follow the official OpenAPI spec and PoC 1 (docs/integrations/pinterest.md).
-// ⚠️ Not yet confirmed on real data — verify on PoC 2 (Gushka): `pin_metrics` key names,
-// the response layout with `split_field=APP_TYPE`.
+// Confirmed on real data in PoC 2 (Gushka, 2026-11-06): `pin_metrics` has `90d` and `lifetime_metrics`
+// with lowercase keys (impression, save, pin_click, outbound_click, comment, reaction, video_views…)
+// plus non-metric fields such as `last_updated`; `split_field=APP_TYPE` returns `web`/`mobile`/`tablet`.
 import type {
   AccountData,
   BoardData,
@@ -45,7 +46,7 @@ export interface PinterestPin {
     images?: Record<string, { url?: string }>;
     cover_image_url?: string;
   } | null;
-  pin_metrics?: Record<string, Record<string, number | null> | null> | null;
+  pin_metrics?: Record<string, Record<string, number | string | null> | null> | null;
 }
 
 export interface PinterestDailyMetric {
@@ -160,18 +161,26 @@ const PIN_METRIC_ALIASES: Record<string, string> = {
 export function mapPinMetrics(raw: PinterestPin, today: string): MetricPoint[] {
   const lifetime = raw.pin_metrics?.['lifetime_metrics'];
   if (!lifetime) return [];
-  return Object.entries(lifetime).map(([key, value]) => {
-    const upper = key.toUpperCase();
-    const v = count(value);
-    return {
-      providerKey: PIN_METRIC_ALIASES[upper] ?? upper,
-      scope: 'POST',
-      postExternalId: raw.id,
-      date: today,
-      value: v,
-      dataStatus: v === null ? 'UNAVAILABLE' : 'READY',
-    } satisfies MetricPoint;
-  });
+  return (
+    Object.entries(lifetime)
+      // Metrics are numbers (or null); fields like `last_updated` (a timestamp) are not metrics.
+      .filter(
+        (entry): entry is [string, number | null] =>
+          entry[1] === null || typeof entry[1] === 'number',
+      )
+      .map(([key, value]) => {
+        const upper = key.toUpperCase();
+        const v = count(value);
+        return {
+          providerKey: PIN_METRIC_ALIASES[upper] ?? upper,
+          scope: 'POST',
+          postExternalId: raw.id,
+          date: today,
+          value: v,
+          dataStatus: v === null ? 'UNAVAILABLE' : 'READY',
+        } satisfies MetricPoint;
+      })
+  );
 }
 
 /**
