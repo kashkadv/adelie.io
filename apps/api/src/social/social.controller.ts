@@ -109,9 +109,18 @@ export class SocialController {
         historyAvailableFrom: true,
         lastSuccessfulSyncAt: true,
         connection: { select: { status: true } },
+        syncRuns: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { status: true, kind: true, errorCode: true, finishedAt: true },
+        },
       },
     });
-    return accounts.map(({ connection, ...a }) => ({ ...a, status: connection.status }));
+    return accounts.map(({ connection, syncRuns, ...a }) => ({
+      ...a,
+      status: connection.status,
+      lastSync: syncRuns[0] ?? null,
+    }));
   }
 
   /** Starts OAuth: returns the platform consent URL to send the browser to. */

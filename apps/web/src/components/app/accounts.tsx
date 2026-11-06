@@ -29,6 +29,21 @@ function AccountCard({ account }: { account: SocialAccount }) {
   const t = useTranslations('Accounts');
   const format = useFormatter();
   const needsReauth = account.status !== 'ACTIVE';
+  const last = account.lastSync;
+  const syncing =
+    !needsReauth &&
+    (last?.status === 'RUNNING' ||
+      last?.status === 'PENDING' ||
+      (!last && account.status === 'ACTIVE'));
+  // Pinterest gives apps no pin/board data of personal (PINNER) accounts — only business ones.
+  const syncNote: 'personal' | 'partial' | 'failed' | null =
+    last?.status === 'PARTIAL'
+      ? account.accountType === 'PINNER'
+        ? 'personal'
+        : 'partial'
+      : last?.status === 'FAILED'
+        ? 'failed'
+        : null;
   const name = account.displayName || account.username || account.externalId;
 
   return (
@@ -78,15 +93,29 @@ function AccountCard({ account }: { account: SocialAccount }) {
           </dd>
         </div>
       </dl>
+      {syncNote && (
+        <p className="flex items-center gap-1.5 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
+          <span className="flex-1">{t(`sync.${syncNote}`)}</span>
+          {syncNote === 'personal' && <InfoTip text={t('sync.personalHint')} />}
+        </p>
+      )}
       <p className="flex items-center gap-1.5 px-1 text-xs text-muted">
-        {account.lastSuccessfulSyncAt
-          ? t('lastSync', {
-              date: format.dateTime(new Date(account.lastSuccessfulSyncAt), {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              }),
-            })
-          : t('notSyncedYet')}
+        {syncing ? (
+          <>
+            <RefreshCw size={12} className="animate-spin" aria-hidden="true" />
+            {t('syncing')}
+          </>
+        ) : account.lastSuccessfulSyncAt ? (
+          t('lastSync', {
+            date: format.dateTime(new Date(account.lastSuccessfulSyncAt), {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            }),
+          })
+        ) : (
+          t('notSyncedYet')
+        )}
         <InfoTip text={t('collectingHint')} />
       </p>
     </article>

@@ -174,6 +174,13 @@
       "alreadyConnected": "This Pinterest account is already connected to another project in this workspace.",
       "error": "Could not connect the account. Please try again later."
     },
-    "anotherAccountHint": "Pinterest connects the account you are signed in to in this browser. To add another one, switch to it on pinterest.com first, then press Connect."
+    "anotherAccountHint": "Pinterest connects the account you are signed in to in this browser. To add another one, switch to it on pinterest.com first, then press Connect.",
+    "syncing": "Syncing…",
+    "sync": {
+      "personal": "Personal account: boards and pins are not available.",
+      "personalHint": "Pinterest shares pins and boards only of business accounts with apps. Switching to a free business account in Pinterest settings unlocks them; profile and account analytics already work.",
+      "partial": "Part of the data was not available during the last sync.",
+      "failed": "The last sync failed. Adelie will retry within an hour."
+    }
   }
 }

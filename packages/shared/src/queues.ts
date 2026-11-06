@@ -5,6 +5,7 @@
  */
 export const QUEUES = {
   system: 'system',
+  sync: 'sync',
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
@@ -15,4 +16,24 @@ export const SYSTEM_JOBS = {
 
 export interface HeartbeatJob {
   requestedAt: string;
+}
+
+export const SYNC_JOBS = {
+  /** Repeatable: finds accounts that are due and enqueues `account` jobs. */
+  tick: 'tick',
+  /** Synchronizes one social account. */
+  account: 'account',
+} as const;
+
+export type SyncKind = 'INITIAL' | 'DAILY' | 'MANUAL' | 'RETRY';
+
+export interface SyncAccountJob {
+  workspaceId: string;
+  accountId: string;
+  kind: SyncKind;
+}
+
+/** One queued or running sync per account: BullMQ ignores an add with an existing job id. */
+export function syncJobId(accountId: string): string {
+  return `sync-${accountId}`;
 }

@@ -20,6 +20,13 @@ export type SocialAccount = {
   historyAvailableFrom: string | null;
   lastSuccessfulSyncAt: string | null;
   status: ConnectionStatus;
+  /** The latest sync run, or null before the first one starts. */
+  lastSync: {
+    status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'REAUTHORIZATION_REQUIRED';
+    kind: 'INITIAL' | 'DAILY' | 'MANUAL' | 'RETRY';
+    errorCode: string | null;
+    finishedAt: string | null;
+  } | null;
 };
 
 /** Roles that may connect accounts (ADR-0007). */
