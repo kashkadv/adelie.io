@@ -8,5 +8,10 @@ ingress:
     service: http://site:80
   - hostname: www.adelie.space
     service: http://site:80
-  # Later: app.adelie.space -> web, api.adelie.space -> api
+  # Application, dev environment (infra/app, aliases on the edge network).
+  - hostname: dev.adelie.space
+    service: http://dev-web:3000
+  - hostname: dev-api.adelie.space
+    service: http://dev-api:4000
+  # Later: staging / staging-api, app / api (production).
   - service: http_status:404

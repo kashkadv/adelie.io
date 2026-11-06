@@ -1,0 +1,9 @@
+# The image is built from a clean `git archive`, but keep local builds clean too.
+.git
+**/node_modules
+**/.next
+**/dist
+**/generated
+**/.turbo
+.env
+**/*.env

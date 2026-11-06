@@ -32,6 +32,9 @@ const playwrite = localFont({
 export const metadata: Metadata = {
   title: 'Adelie — Marketing Intelligence',
   description: 'See the signals. Understand the market. Make better moves.',
+  // Only production is indexed; dev/staging stay out of search engines.
+  robots:
+    process.env.NEXT_PUBLIC_APP_ENV === 'production' ? undefined : { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

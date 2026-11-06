@@ -1,0 +1,67 @@
+# Adelie application for one environment (dev now; staging/prod later).
+# Deploy with `pnpm deploy:dev` (scripts/deploy-app.sh), which sets APP_ENV and ENV_FILE.
+#
+# No ports are published: the web and API are reached only through the Cloudflare Tunnel
+# (edge network, aliases <env>-web / <env>-api); Postgres and Redis through the data network.
+# Secrets live on the server in ENV_FILE (~/adelie/env/<env>.env), never in the repo.
+name: adelie-app-${APP_ENV:?set APP_ENV}
+
+x-app: &app
+  image: adelie-app:${APP_ENV}
+  restart: unless-stopped
+  env_file: ${ENV_FILE:?set ENV_FILE}
+
+services:
+  migrate:
+    <<: *app
+    restart: 'no'
+    command: ['pnpm', '--filter', '@adelie/db', 'exec', 'prisma', 'migrate', 'deploy']
+    networks: [data]
+
+  api:
+    <<: *app
+    command: ['node', 'apps/api/dist/main.js']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      data: {}
+      edge:
+        aliases: ['${APP_ENV}-api']
+
+  web:
+    <<: *app
+    command: ['pnpm', '--filter', '@adelie/web', 'start']
+    depends_on: [api]
+    networks:
+      edge:
+        aliases: ['${APP_ENV}-web']
+
+  worker:
+    <<: *app
+    command: ['node', 'apps/worker/dist/main.js']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [data]
+
+networks:
+  # Postgres + Redis (infra/dev).
+  data:
+    external: true
+    name: adelie-dev_default
+  # Cloudflare Tunnel (infra/edge).
+  edge:
+    external: true
+    name: adelie-edge_default

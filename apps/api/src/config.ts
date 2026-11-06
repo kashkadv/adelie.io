@@ -24,5 +24,16 @@ export const config = {
   auth: {
     secret: required('BETTER_AUTH_SECRET'),
     url: process.env['BETTER_AUTH_URL'] ?? 'http://localhost:4000',
+    /**
+     * Deployed environments: the session cookie is set for the parent domain (e.g. `adelie.space`)
+     * so the web app's server sees it; the prefix keeps environments apart (dev vs prod cookies).
+     */
+    cookieDomain: process.env['AUTH_COOKIE_DOMAIN'] || undefined,
+    cookiePrefix: process.env['AUTH_COOKIE_PREFIX'] || 'better-auth',
+    /** Comma-separated emails allowed to sign up; empty = open sign-up (local development). */
+    signupAllowlist: (process.env['SIGNUP_ALLOWLIST'] ?? '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
   },
 } as const;

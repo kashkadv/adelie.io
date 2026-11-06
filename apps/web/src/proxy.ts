@@ -8,7 +8,10 @@ import { NextResponse, type NextRequest } from 'next/server';
  * The cookie is set by the API (Better Auth). Locally both run on localhost, which shares cookies
  * across ports; on deployed environments the API must set it for the parent domain.
  */
-const SESSION_COOKIES = ['better-auth.session_token', '__Secure-better-auth.session_token'];
+// The prefix differs per environment (AUTH_COOKIE_PREFIX, same value as the API's) so dev and
+// production sessions on the shared parent domain never mix.
+const PREFIX = process.env['AUTH_COOKIE_PREFIX'] || 'better-auth';
+const SESSION_COOKIES = [`${PREFIX}.session_token`, `__Secure-${PREFIX}.session_token`];
 
 /** Pages that work without signing in. */
 const PUBLIC_PATHS = ['/login', '/register', '/connect'];
