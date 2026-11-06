@@ -19,7 +19,8 @@
 - Authorize: `https://www.pinterest.com/oauth/`
 - Token: `POST https://api.pinterest.com/v5/oauth/token`
 - Flow: authorization code.
-- Тривалість життя access/refresh token — ⚠️ з'ясувати на PoC.
+- Тривалість життя ✅ (2026-11-06): **access token — 30 днів, refresh token — 60 днів**. Оновлювати токени
+  заздалегідь, інакше після ~2 місяців без синхронізації потрібне перепідключення.
 
 ### Scopes для Adelie (лише читання)
 
@@ -80,7 +81,7 @@ Rates (`*_RATE`) — похідні значення, не сумуються (�
   (сторінками), а не окремим запитом на кожен пін.
 - ⚠️ Trial: піни/борди, **створені** через API, — sandbox. Чи віддає trial реальну аналітику
   існуючого акаунта — перевірити на PoC.
-- ⚠️ Чи може в trial підключатись акаунт, що не є власником застосунку, — перевірити.
+- ✅ У trial **може** підключатись акаунт, що не є власником застосунку (перевірено 2026-11-06).
 
 ## Рівні доступу ⚠️
 
@@ -166,3 +167,23 @@ Adelie → підключені програми → Adelie → «Заборон
 - `POST /v5/oauth/token/revoke` для звичайних (не system user) токенів не спрацював:
   `401 {"code":1201,"message":"Two-factor authentication required."}` — потребує 2FA на акаунті-власнику.
 - Тестовий маркер має ширші scopes (`ads:read`, `catalogs:read`), ніж ми запитуватимемо в OAuth.
+
+### Перше справжнє OAuth-підключення — 2026-11-06
+
+Через застосунок Adelie (OAuth, scopes `user_accounts:read pins:read boards:read`) підключено два акаунти:
+`adeliespace` (BUSINESS, власник застосунку) і `dmitrykashka` (PINNER, особистий, **не** власник). Токени
+збережено зашифрованими, розшифровуються й працюють.
+
+✅ Підтверджено:
+
+- Trial пускає акаунти, що не є власником застосунку.
+- Access token — 30 днів, refresh token — 60 днів.
+- `user_account.id` для особистого акаунта — числовий (`4538…`), для бізнес-акаунта Adelie віддано `username` —
+  зовнішній ID акаунта береться як `id ?? username`.
+- Новий бізнес-акаунт: аналітика повертає дні зі статусом `BEFORE_BUSINESS_CREATED` — зберігаємо як «немає даних».
+- **Особисті (PINNER) акаунти: профіль і аналітика доступні, а дошки й піни — ні:**
+  `403 {"code":6410,"message":"Your application does not have access to read pinner data. Your application must be
+  approved for pinner data access…"}`. Для бізнес-акаунтів (сценарій Gushka) доступ повний.
+  → Синхронізація особистого акаунта — PARTIAL; в UI підказати перейти на бізнес-акаунт (безкоштовно).
+  Доступ до pinner data можна запросити в Pinterest окремо, якщо знадобиться.
+
