@@ -115,3 +115,16 @@ export function tokenCipherFromEnv(env: NodeJS.ProcessEnv = process.env): TokenC
 
   return createTokenCipher({ keys, currentVersion });
 }
+
+/**
+ * Encryption context (AAD) of a social connection token: binds the ciphertext to its workspace,
+ * platform, platform user and field, so a value copied to another row or field fails to decrypt.
+ */
+export function socialTokenAad(
+  workspaceId: string,
+  platform: string,
+  externalUserId: string,
+  field: 'access' | 'refresh',
+): string {
+  return `${workspaceId}:${platform}:${externalUserId}:${field}`;
+}

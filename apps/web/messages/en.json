@@ -56,7 +56,10 @@
     "connectTitle": "Connect your first account",
     "connectText": "Adelie collects analytics from your social accounts every day. Pinterest comes first — Instagram and TikTok are next.",
     "connectPinterest": "Connect Pinterest",
-    "soon": "Soon"
+    "reauthBanner": "{count, plural, one {# account needs} other {# accounts need}} to be reconnected",
+    "connectedTitle": "{count, plural, one {# account connected} other {# accounts connected}}",
+    "connectedText": "Metrics will appear here after the first sync.",
+    "openAccounts": "Open accounts"
   },
   "Sections": {
     "soonTitle": "Coming soon",
@@ -141,5 +144,35 @@
       "tooLarge": "The image is too large"
     },
     "nothingFound": "Nothing found"
+  },
+  "Accounts": {
+    "title": "Accounts",
+    "subtitle": "Social accounts connected to this project",
+    "connectTitle": "Connect an account",
+    "soon": "Soon",
+    "platforms": {
+      "PINTEREST": "Pinterest",
+      "INSTAGRAM": "Instagram",
+      "TIKTOK": "TikTok"
+    },
+    "status": {
+      "ACTIVE": "Connected",
+      "REAUTHORIZATION_REQUIRED": "Reconnect needed",
+      "REVOKED": "Access revoked"
+    },
+    "followers": "Followers",
+    "pins": "Pins",
+    "lastSync": "Last sync: {date}",
+    "notSyncedYet": "Not synced yet",
+    "collectingHint": "Adelie collects data daily from the moment of connection; the platform also returns up to 90 days of history.",
+    "noPermission": "Only the owner, an admin or a manager can connect accounts.",
+    "dismiss": "Dismiss",
+    "result": {
+      "connected": "Pinterest connected. Data will appear after the first sync.",
+      "denied": "Connection cancelled — access was not granted in Pinterest.",
+      "expired": "The connection link has expired. Please try again.",
+      "alreadyConnected": "This Pinterest account is already connected to another project in this workspace.",
+      "error": "Could not connect the account. Please try again later."
+    }
   }
 }

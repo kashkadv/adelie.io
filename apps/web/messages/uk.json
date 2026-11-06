@@ -56,7 +56,10 @@
     "connectTitle": "Підключіть перший акаунт",
     "connectText": "Adelie щодня збирає аналітику з ваших соцмереж. Першим буде Pinterest, далі — Instagram і TikTok.",
     "connectPinterest": "Підключити Pinterest",
-    "soon": "Скоро"
+    "reauthBanner": "{count, plural, one {# акаунт потребує} few {# акаунти потребують} other {# акаунтів потребують}} перепідключення",
+    "connectedTitle": "{count, plural, one {Підключено # акаунт} few {Підключено # акаунти} other {Підключено # акаунтів}}",
+    "connectedText": "Метрики з'являться тут після першої синхронізації.",
+    "openAccounts": "Перейти до акаунтів"
   },
   "Sections": {
     "soonTitle": "Незабаром",
@@ -141,5 +144,35 @@
       "tooLarge": "Зображення завелике"
     },
     "nothingFound": "Нічого не знайдено"
+  },
+  "Accounts": {
+    "title": "Акаунти",
+    "subtitle": "Соцмережі, підключені до проєкту",
+    "connectTitle": "Підключити акаунт",
+    "soon": "Скоро",
+    "platforms": {
+      "PINTEREST": "Pinterest",
+      "INSTAGRAM": "Instagram",
+      "TIKTOK": "TikTok"
+    },
+    "status": {
+      "ACTIVE": "Підключено",
+      "REAUTHORIZATION_REQUIRED": "Потрібне перепідключення",
+      "REVOKED": "Доступ відкликано"
+    },
+    "followers": "Підписники",
+    "pins": "Піни",
+    "lastSync": "Остання синхронізація: {date}",
+    "notSyncedYet": "Ще не синхронізовано",
+    "collectingHint": "Adelie щодня збирає дані з моменту підключення; платформа також віддає до 90 днів історії.",
+    "noPermission": "Підключати акаунти може власник, адміністратор або менеджер.",
+    "dismiss": "Закрити",
+    "result": {
+      "connected": "Pinterest підключено. Дані з'являться після першої синхронізації.",
+      "denied": "Підключення скасовано — доступ у Pinterest не надано.",
+      "expired": "Посилання для підключення застаріло. Спробуйте ще раз.",
+      "alreadyConnected": "Цей акаунт Pinterest уже підключено до іншого проєкту в цьому робочому просторі.",
+      "error": "Не вдалося підключити акаунт. Спробуйте пізніше."
+    }
   }
 }
