@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { AuthFrame } from './auth-frame';
@@ -15,7 +14,6 @@ const input = 'field';
 export function AuthForm({ mode }: { mode: Mode }) {
   const t = useTranslations('Auth');
   const tCommon = useTranslations('Common');
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -38,7 +36,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
       setError(error.message ?? tCommon('genericError'));
       return;
     }
-    router.push('/');
+    // Full navigation, not router.push: the auth client may still hold the cached "no session"
+    // answer, and the app frame would bounce back to /login (the "works only on the second try" bug).
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- intentional reload
+    window.location.assign('/');
   }
 
   return (
