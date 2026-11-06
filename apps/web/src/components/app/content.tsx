@@ -46,6 +46,15 @@ function PostRow({ post, sort }: { post: Post; sort: Sort }) {
   const format = useFormatter();
   // Platforms may return whitespace-only titles: treat them as missing.
   const title = post.title?.trim() || post.description?.trim() || t('untitled');
+  // Compact date for the column: the year only when it is not the current one.
+  const shortDate = (iso: string) => {
+    const d = new Date(iso);
+    return format.dateTime(d, {
+      day: 'numeric',
+      month: 'short',
+      ...(d.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }),
+    });
+  };
   return (
     <li className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 md:flex-nowrap">
       <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
@@ -83,16 +92,16 @@ function PostRow({ post, sort }: { post: Post; sort: Sort }) {
         </div>
       </div>
 
-      <dl className="tabular grid shrink-0 grid-cols-[repeat(4,minmax(0,1fr))_7rem] gap-4 text-right md:w-[34rem]">
+      <dl className="tabular grid shrink-0 grid-cols-[repeat(4,minmax(0,1fr))_8rem] gap-4 text-right md:w-[35rem]">
         {COLUMNS.map((key) => {
           if (key === 'publishedAt') {
             return (
               <div key={key}>
                 <dt className="sr-only">{t('metrics.publishedAt')}</dt>
-                <dd className={`text-sm ${sort === key ? 'font-semibold' : 'text-muted'}`}>
-                  {post.publishedAt
-                    ? format.dateTime(new Date(post.publishedAt), { dateStyle: 'medium' })
-                    : '—'}
+                <dd
+                  className={`text-sm whitespace-nowrap ${sort === key ? 'font-semibold' : 'text-muted'}`}
+                >
+                  {post.publishedAt ? shortDate(post.publishedAt) : '—'}
                 </dd>
               </div>
             );
@@ -281,7 +290,7 @@ export function Content() {
           {/* Column headers (desktop) */}
           <div className="hidden items-center gap-6 border-b border-line px-5 py-3 text-xs text-muted md:flex">
             <span className="flex-1 pl-[68px]">{t('pin')}</span>
-            <span className="grid w-[34rem] grid-cols-[repeat(4,minmax(0,1fr))_7rem] gap-4 text-right">
+            <span className="grid w-[35rem] grid-cols-[repeat(4,minmax(0,1fr))_8rem] gap-4 text-right">
               {COLUMNS.map((key) => (
                 <button
                   key={key}
