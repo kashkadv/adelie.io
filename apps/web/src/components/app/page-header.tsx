@@ -1,10 +1,23 @@
 import type { ReactNode } from 'react';
 
-export function PageHeader({ title, subtitle }: { title: string; subtitle?: ReactNode }) {
+/** Page title and subtitle; `action` sits in the top-right corner (e.g. a primary button or menu). */
+export function PageHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  action?: ReactNode;
+}) {
   return (
-    <header className="animate-rise mb-6 md:mb-8">
-      <h1 className="text-3xl font-semibold md:text-[40px] md:leading-[1.1]">{title}</h1>
-      {subtitle && <p className="mt-2 text-muted">{subtitle}</p>}
+    // z-10: popovers opened from `action` stay above the cards below.
+    <header className="animate-rise relative z-10 mb-6 flex flex-wrap items-start justify-between gap-4 md:mb-8">
+      <div className="min-w-0">
+        <h1 className="text-3xl font-semibold md:text-[40px] md:leading-[1.1]">{title}</h1>
+        {subtitle && <p className="mt-2 text-muted">{subtitle}</p>}
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
     </header>
   );
 }

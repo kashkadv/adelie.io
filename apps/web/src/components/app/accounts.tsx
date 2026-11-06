@@ -1,11 +1,21 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, Pin, Plus, RefreshCw, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  ChevronDown,
+  Pin,
+  Plug,
+  Plus,
+  RefreshCw,
+  X,
+} from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { InfoTip } from '../ui/info-tip';
 import { useProjectAccounts, type SocialAccount } from './accounts-data';
-import { PageHeader } from './page-header';
+import { EmptyState, PageHeader } from './page-header';
 
 type ConnectResult = 'connected' | 'denied' | 'expired' | 'alreadyConnected' | 'error';
 const RESULTS: ConnectResult[] = ['connected', 'denied', 'expired', 'alreadyConnected', 'error'];
@@ -122,6 +132,98 @@ function AccountCard({ account }: { account: SocialAccount }) {
   );
 }
 
+/** "+ Connect account" button with a glass menu of platforms (top-right of the Accounts page). */
+function ConnectMenu({
+  canConnect,
+  connecting,
+  onConnect,
+}: {
+  canConnect: boolean;
+  connecting: boolean;
+  onConnect: () => void;
+}) {
+  const t = useTranslations('Accounts');
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={!canConnect || connecting}
+        title={canConnect ? undefined : t('noPermission')}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="btn-primary flex w-auto items-center gap-2 px-4"
+      >
+        {connecting ? (
+          <RefreshCw size={16} className="animate-spin" aria-hidden="true" />
+        ) : (
+          <Plus size={16} aria-hidden="true" />
+        )}
+        {t('connectTitle')}
+        <ChevronDown
+          size={16}
+          aria-hidden="true"
+          className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="glass glass-strong animate-rise absolute top-full right-0 z-50 mt-2 w-72 rounded-2xl p-2"
+        >
+          <p className="flex items-center gap-1.5 px-3 pt-1 pb-2 text-xs tracking-wide text-muted uppercase">
+            {t('platformsTitle')}
+            <InfoTip text={t('anotherAccountHint')} />
+          </p>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onConnect();
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-hover"
+          >
+            <Pin size={18} strokeWidth={1.75} aria-hidden="true" />
+            <span className="flex-1">{t('platforms.PINTEREST')}</span>
+            <ArrowRight size={14} className="text-muted" aria-hidden="true" />
+          </button>
+          {(['INSTAGRAM', 'TIKTOK'] as const).map((p) => (
+            <div
+              key={p}
+              role="menuitem"
+              aria-disabled="true"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted"
+            >
+              <span className="w-[18px]" aria-hidden="true" />
+              <span className="flex-1">{t(`platforms.${p}`)}</span>
+              <span className="rounded-full border border-line px-2 text-xs">{t('soon')}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Accounts page: connected accounts of the project and connecting new ones (ADR-0011). */
 export function Accounts() {
   const t = useTranslations('Accounts');
@@ -144,7 +246,13 @@ export function Accounts() {
   const ok = result === 'connected';
   return (
     <>
-      <PageHeader title={t('title')} subtitle={t('subtitle')} />
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        action={
+          <ConnectMenu canConnect={canConnect} connecting={connecting} onConnect={onConnect} />
+        }
+      />
 
       {(result || startError) && (
         <div
@@ -175,44 +283,18 @@ export function Accounts() {
         </div>
       )}
 
+      {accounts && accounts.length === 0 && (
+        <EmptyState
+          icon={<Plug size={24} strokeWidth={1.75} aria-hidden="true" />}
+          title={t('emptyTitle')}
+          text={t(canConnect ? 'emptyText' : 'noPermission')}
+        />
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {accounts?.map((account) => (
           <AccountCard key={account.id} account={account} />
         ))}
-
-        {/* Connect */}
-        <section className="card animate-rise flex flex-col gap-3 rounded-[24px] p-5">
-          <h2 className="flex items-center gap-2 px-1 text-lg font-semibold">
-            {t('connectTitle')}
-            <InfoTip text={t('anotherAccountHint')} />
-          </h2>
-          <button
-            type="button"
-            disabled={!canConnect || connecting}
-            onClick={onConnect}
-            className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3 text-left transition-colors duration-200 hover:bg-hover disabled:opacity-50"
-          >
-            <span className="flex items-center gap-3">
-              <Pin size={20} strokeWidth={1.75} aria-hidden="true" />
-              {t('platforms.PINTEREST')}
-            </span>
-            {connecting ? (
-              <RefreshCw size={16} className="animate-spin" aria-hidden="true" />
-            ) : (
-              <Plus size={16} aria-hidden="true" />
-            )}
-          </button>
-          {(['INSTAGRAM', 'TIKTOK'] as const).map((p) => (
-            <div
-              key={p}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3 text-muted"
-            >
-              <span>{t(`platforms.${p}`)}</span>
-              <span className="rounded-full border border-line px-2 text-xs">{t('soon')}</span>
-            </div>
-          ))}
-          {!canConnect && <p className="px-1 text-xs text-muted">{t('noPermission')}</p>}
-        </section>
       </div>
     </>
   );

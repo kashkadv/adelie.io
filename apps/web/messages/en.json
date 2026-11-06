@@ -148,7 +148,7 @@
   "Accounts": {
     "title": "Accounts",
     "subtitle": "Social accounts connected to this project",
-    "connectTitle": "Connect an account",
+    "connectTitle": "Connect account",
     "soon": "Soon",
     "platforms": {
       "PINTEREST": "Pinterest",
@@ -181,6 +181,9 @@
       "personalHint": "Pinterest shares pins and boards only of business accounts with apps. Switching to a free business account in Pinterest settings unlocks them; profile and account analytics already work.",
       "partial": "Part of the data was not available during the last sync.",
       "failed": "The last sync failed. Adelie will retry within an hour."
-    }
+    },
+    "platformsTitle": "Platforms",
+    "emptyTitle": "No accounts yet",
+    "emptyText": "Connect a social account with the button in the top-right corner — Adelie starts collecting its data right away."
   }
 }
