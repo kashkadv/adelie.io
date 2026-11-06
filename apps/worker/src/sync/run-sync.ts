@@ -297,6 +297,7 @@ export async function runSync(
             boardId: p.boardExternalId ? (boardIds.get(p.boardExternalId) ?? null) : null,
             url: p.url ?? null,
             contentType: p.contentType,
+            isOwn: p.isOwn ?? true,
             title: p.title ?? null,
             description: p.description ?? null,
             thumbnailUrl: p.thumbnailUrl ?? null,

@@ -58,10 +58,17 @@ export class ContentController {
     if (!SORTS.includes(sort)) throw new BadRequestException('Unknown sort');
     const page = Math.max(0, Number(query['page'] ?? 0) || 0);
 
+    // Own posts by default: posts saved from other accounts carry no metrics (Pinterest repins).
+    const ownership = query['ownership'] ?? 'own';
+    if (!['own', 'saved', 'all'].includes(ownership))
+      throw new BadRequestException('Unknown ownership');
     const where: Prisma.SocialPostWhereInput = {
       projectId,
+      ...(ownership === 'all' ? {} : { isOwn: ownership === 'own' }),
       workspaceId: request.workspace.workspaceId,
       ...(query['accountId'] ? { accountId: query['accountId'] } : {}),
+      // Disconnected accounts are hidden: their history is kept and returns on reconnect.
+      account: { connection: { status: { not: 'REVOKED' } } },
       ...(query['boardId'] ? { boardId: query['boardId'] } : {}),
     };
     const orderBy: Prisma.SocialPostOrderByWithRelationInput[] =
@@ -88,6 +95,7 @@ export class ContentController {
           description: true,
           thumbnailUrl: true,
           contentType: true,
+          isOwn: true,
           publishedAt: true,
           board: { select: { id: true, name: true } },
           account: { select: { id: true, username: true, platform: true } },
@@ -135,7 +143,11 @@ export class ContentController {
   ) {
     await this.visibleProject(request.workspace, projectId);
     return this.prisma.client.socialBoard.findMany({
-      where: { projectId, workspaceId: request.workspace.workspaceId },
+      where: {
+        projectId,
+        workspaceId: request.workspace.workspaceId,
+        account: { connection: { status: { not: 'REVOKED' } } },
+      },
       orderBy: { name: 'asc' },
       select: { id: true, name: true, accountId: true, pinCount: true },
     });

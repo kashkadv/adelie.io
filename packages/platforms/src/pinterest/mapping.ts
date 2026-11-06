@@ -40,6 +40,8 @@ export interface PinterestPin {
   title?: string | null;
   description?: string | null;
   board_id?: string;
+  /** false for pins saved from other accounts (they also carry parent_pin_id and have no metrics). */
+  is_owner?: boolean;
   creative_type?: string | null;
   media?: {
     media_type?: string;
@@ -146,6 +148,7 @@ export function mapPin(raw: PinterestPin): PostData {
     thumbnailUrl: thumbnail(raw),
     publishedAt: raw.created_at ? new Date(raw.created_at) : undefined,
     boardExternalId: raw.board_id,
+    isOwn: raw.is_owner !== false,
   };
 }
 

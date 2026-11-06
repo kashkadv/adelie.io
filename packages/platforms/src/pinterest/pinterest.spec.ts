@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { HttpClient } from '../http.js';
 import type { PostsPage } from '../types.js';
 import { PinterestAdapter } from './adapter.js';
-import { contentType, mapAccountAnalytics, mapPinMetrics, type PinterestPin } from './mapping.js';
+import {
+  contentType,
+  mapAccountAnalytics,
+  mapPin,
+  mapPinMetrics,
+  type PinterestPin,
+} from './mapping.js';
 
 const TODAY = '2026-11-06';
 
@@ -274,6 +280,12 @@ describe('mapping', () => {
       [{ app_type: 'MOBILE' }, 7],
       [{ app_type: 'WEB' }, 2],
     ]);
+  });
+
+  it('pins saved from other accounts are not own', () => {
+    expect(mapPin({ id: '1', is_owner: false }).isOwn).toBe(false);
+    expect(mapPin({ id: '2', is_owner: true }).isOwn).toBe(true);
+    expect(mapPin({ id: '3' }).isOwn).toBe(true);
   });
 
   it('content type from creative_type and media_type', () => {

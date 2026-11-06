@@ -49,6 +49,8 @@ export interface PostData {
   thumbnailUrl?: string;
   publishedAt?: Date;
   boardExternalId?: string;
+  /** false = someone else's post saved by this account (e.g. a Pinterest repin); default true. */
+  isOwn?: boolean;
 }
 
 /** One value of one metric. Names are the platform's own (`IMPRESSION`); the orchestrator maps them. */

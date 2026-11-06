@@ -92,7 +92,9 @@ export function Overview() {
   const t = useTranslations('Overview');
   const format = useFormatter();
   const { workspace, project } = useWorkspace();
-  const { accounts, connect, canConnect } = useProjectAccounts();
+  const { accounts: allAccounts, connect, canConnect } = useProjectAccounts();
+  // Disconnected accounts are hidden here (their history returns on reconnect).
+  const accounts = allAccounts?.filter((a) => a.status !== 'REVOKED');
   const [connecting, setConnecting] = useState(false);
   const [days, setDays] = useState(30);
   const [accountId, setAccountId] = useState('');

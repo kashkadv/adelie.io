@@ -275,7 +275,7 @@
   "Content": {
     "title": "Content",
     "count": "{count, plural, one {# pin} other {# pins}}",
-    "lifetimeHint": "Pin metrics are lifetime totals reported by Pinterest, updated daily. “—” means Pinterest has no data for that pin (for example, older pins), not zero.",
+    "lifetimeHint": "Pin metrics are lifetime totals reported by Pinterest, updated daily. Pins saved from other accounts have no metrics — Pinterest reports them only to the pin's owner. “—” means no data, not zero.",
     "pin": "Pin",
     "untitled": "Untitled pin",
     "openOnPlatform": "Open on Pinterest",
@@ -296,7 +296,8 @@
       "impressions": "Impressions",
       "saves": "Saves",
       "pinClicks": "Pin clicks",
-      "outboundClicks": "Outbound"
+      "outboundClicks": "Outbound",
+      "publishedAt": "Published"
     },
     "types": {
       "IMAGE": "Image",
@@ -307,6 +308,13 @@
     },
     "emptyTitle": "No pins yet",
     "emptyText": "Pins appear here after the first sync of a business account. Personal Pinterest accounts don't share pins with apps.",
-    "loadMore": "Show more ({count} left)"
+    "loadMore": "Show more ({count} left)",
+    "savedBadge": "Saved",
+    "ownershipLabel": "Whose pins",
+    "ownership": {
+      "own": "Own pins",
+      "saved": "Saved from others",
+      "all": "All pins"
+    }
   }
 }

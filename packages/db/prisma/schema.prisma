@@ -347,6 +347,8 @@ model SocialPost {
   externalId   String
   url          String?
   contentType  PostContentType @default(OTHER)
+  /// The account's own post (true) or someone else's saved to its boards (Pinterest repin: no metrics).
+  isOwn        Boolean         @default(true)
   title        String?
   description  String?
   thumbnailUrl String?

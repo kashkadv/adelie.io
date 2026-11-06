@@ -24,6 +24,7 @@ type Post = {
   description: string | null;
   thumbnailUrl: string | null;
   contentType: 'IMAGE' | 'VIDEO' | 'CAROUSEL' | 'PRODUCT' | 'OTHER';
+  isOwn: boolean;
   publishedAt: string | null;
   board: { id: string; name: string } | null;
   account: { id: string; username: string | null };
@@ -35,8 +36,10 @@ type Board = { id: string; name: string; accountId: string; pinCount: number | n
 
 const SORTS = ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'publishedAt'] as const;
 type Sort = (typeof SORTS)[number];
-/** Metric columns, in display order. */
-const COLUMNS = ['impressions', 'saves', 'pinClicks', 'outboundClicks'] as const;
+/** Sortable columns, in display order: metrics, then the publication date. */
+const COLUMNS = ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'publishedAt'] as const;
+const OWNERSHIP = ['own', 'saved', 'all'] as const;
+type Ownership = (typeof OWNERSHIP)[number];
 
 function PostRow({ post, sort }: { post: Post; sort: Sort }) {
   const t = useTranslations('Content');
@@ -67,21 +70,33 @@ function PostRow({ post, sort }: { post: Post; sort: Sort }) {
           <p className="truncate text-sm font-medium" title={title}>
             {title}
           </p>
-          <p className="truncate text-xs text-muted">
-            {[
-              post.board?.name,
-              post.publishedAt &&
-                format.dateTime(new Date(post.publishedAt), { dateStyle: 'medium' }),
-              t(`types.${post.contentType}`),
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+          <p className="flex min-w-0 items-center gap-2 text-xs text-muted">
+            {!post.isOwn && (
+              <span className="shrink-0 rounded-full border border-line px-1.5 leading-4">
+                {t('savedBadge')}
+              </span>
+            )}
+            <span className="truncate">
+              {[post.board?.name, t(`types.${post.contentType}`)].filter(Boolean).join(' · ')}
+            </span>
           </p>
         </div>
       </div>
 
-      <dl className="tabular grid shrink-0 grid-cols-4 gap-4 text-right md:w-[26rem]">
+      <dl className="tabular grid shrink-0 grid-cols-[repeat(4,minmax(0,1fr))_7rem] gap-4 text-right md:w-[34rem]">
         {COLUMNS.map((key) => {
+          if (key === 'publishedAt') {
+            return (
+              <div key={key}>
+                <dt className="sr-only">{t('metrics.publishedAt')}</dt>
+                <dd className={`text-sm ${sort === key ? 'font-semibold' : 'text-muted'}`}>
+                  {post.publishedAt
+                    ? format.dateTime(new Date(post.publishedAt), { dateStyle: 'medium' })
+                    : '—'}
+                </dd>
+              </div>
+            );
+          }
           const value = post.metrics?.[key] ?? null;
           return (
             <div key={key}>
@@ -116,10 +131,13 @@ function PostRow({ post, sort }: { post: Post; sort: Sort }) {
 export function Content() {
   const t = useTranslations('Content');
   const { workspace, project } = useWorkspace();
-  const { accounts } = useProjectAccounts();
+  const { accounts: allAccounts } = useProjectAccounts();
+  // Disconnected accounts are hidden here (their history returns on reconnect).
+  const accounts = allAccounts?.filter((a) => a.status !== 'REVOKED');
   const [accountId, setAccountId] = useState('');
   const [boardId, setBoardId] = useState('');
   const [sort, setSort] = useState<Sort>('impressions');
+  const [ownership, setOwnership] = useState<Ownership>('own');
   const [boards, setBoards] = useState<Board[]>([]);
   const [data, setData] = useState<Page | null>(null);
   const [extra, setExtra] = useState<Post[]>([]);
@@ -142,10 +160,11 @@ export function Content() {
     () =>
       new URLSearchParams({
         sort,
+        ownership,
         ...(accountId ? { accountId } : {}),
         ...(boardId ? { boardId } : {}),
       }),
-    [sort, accountId, boardId],
+    [sort, ownership, accountId, boardId],
   );
 
   useEffect(() => {
@@ -216,6 +235,14 @@ export function Content() {
             )}
             <div className="w-52">
               <Select
+                value={ownership}
+                onChange={(v) => setOwnership(v as Ownership)}
+                options={OWNERSHIP.map((o) => ({ value: o, label: t(`ownership.${o}`) }))}
+                ariaLabel={t('ownershipLabel')}
+              />
+            </div>
+            <div className="w-52">
+              <Select
                 value={boardId}
                 onChange={setBoardId}
                 options={[
@@ -254,7 +281,7 @@ export function Content() {
           {/* Column headers (desktop) */}
           <div className="hidden items-center gap-6 border-b border-line px-5 py-3 text-xs text-muted md:flex">
             <span className="flex-1 pl-[68px]">{t('pin')}</span>
-            <span className="grid w-[26rem] grid-cols-4 gap-4 text-right">
+            <span className="grid w-[34rem] grid-cols-[repeat(4,minmax(0,1fr))_7rem] gap-4 text-right">
               {COLUMNS.map((key) => (
                 <button
                   key={key}
