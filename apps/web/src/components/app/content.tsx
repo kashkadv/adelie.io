@@ -95,7 +95,7 @@ function PostRow({
   };
   return (
     <li
-      className={`flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 transition-colors md:flex-nowrap ${selected ? 'bg-hover' : ''}`}
+      className={`flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 transition-colors xl:flex-nowrap ${selected ? 'bg-hover' : ''}`}
     >
       <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
         <Checkbox checked={selected} onChange={onSelect} label={t('select')} />
@@ -133,7 +133,7 @@ function PostRow({
         </div>
       </div>
 
-      <dl className={`tabular grid shrink-0 ${ROW_GRID} gap-4 text-right md:w-[35rem]`}>
+      <dl className={`tabular grid shrink-0 ${ROW_GRID} gap-6 text-right xl:w-[44rem]`}>
         {COLUMNS.map((key) => {
           const metric = key === 'publishedAt' ? null : (post.metrics?.[key] ?? null);
           const text =
@@ -146,7 +146,7 @@ function PostRow({
                 : format.number(metric);
           return (
             <div key={key}>
-              <dt className="sr-only">{t(`metrics.${key}`)}</dt>
+              <dt className="text-[11px] text-muted xl:sr-only">{t(`metrics.${key}`)}</dt>
               <dd
                 className={`text-sm whitespace-nowrap ${sort === key ? 'font-semibold' : 'text-muted'}`}
               >
@@ -458,7 +458,7 @@ export function Content() {
           options={OWNERSHIP.map((o) => ({ value: o, label: t(`ownership.${o}`) }))}
           clearable={false}
         />
-        <span className="md:hidden">
+        <span className="xl:hidden">
           <FilterChip
             label={t('sortBy')}
             value={sort}
@@ -496,7 +496,7 @@ export function Content() {
       ) : (
         <section className="card animate-rise rounded-[24px]">
           {/* Column headers (desktop) */}
-          <div className="hidden items-center gap-6 border-b border-line p-5 text-xs text-muted md:flex">
+          <div className="hidden items-center gap-6 border-b border-line p-5 text-xs text-muted xl:flex">
             <span className="flex flex-1 items-center gap-3">
               <Checkbox
                 checked={allChecked}
@@ -505,7 +505,7 @@ export function Content() {
               />
               <span className="pl-[68px]">{t('pin')}</span>
             </span>
-            <span className={`grid w-[35rem] ${ROW_GRID} gap-4 text-right`}>
+            <span className={`grid w-[44rem] ${ROW_GRID} gap-6 text-right`}>
               {COLUMNS.map((key) => (
                 <span key={key} className="flex items-center justify-end gap-1.5">
                   <button
