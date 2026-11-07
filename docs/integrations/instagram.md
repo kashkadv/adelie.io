@@ -1,9 +1,50 @@
 # Інтеграція Instagram
 
-- **Статус:** дослідження документації (2026-11-07); PoC — після створення застосунку в Meta
+- **Статус:** PoC пройдено на акаунті кав'ярні `adelie.if` (2026-11-07); далі — Gushka тестувальником, інтеграція
 - **Порядок платформ:** друга після Pinterest ([ADR-0004](../decisions/0004-platform-order.md)), лише читання
 - **Джерело:** офіційна документація Meta, `developers.facebook.com/docs/instagram-platform` (версія API v27.0).
   Пункти з позначкою ⚠ у документації суперечливі або не підтверджені — перевірити в PoC.
+
+## PoC (2026-11-07) — що підтверджено насправді
+
+Документація розходиться з кабінетом Meta; **діє цей розділ**, решта нижче — довідково.
+
+- **Кабінет Meta (листопад 2026):** «Instagram login» замінено на **«API setup with Unified login»** — він вимагає
+  **бізнес-портфоліо** (створено «Adelie», без верифікації) і працює через **Facebook Login for Business** з
+  конфігураціями. Шаблонна конфігурація просить рекламу, публікацію, повідомлення й коментарі — створено власну
+  **`Adelie read-only`** (ID 3320485304823445): асет — лише Instagram accounts (Asset Required), дозволи —
+  `instagram_basic`, `instagram_manage_insights` (спершу додати їх у «Permissions and features» сценарію).
+- **Токен:** system-user access token (`EAA…`), **без терміну дії**; працює на **`graph.facebook.com`** (не
+  `graph.instagram.com` — там «Cannot parse access token»). Надані дозволи: `instagram_basic`,
+  `instagram_manage_insights`, `public_profile`. Запити — до Instagram business ID (`17841445843555583` для
+  adelie.if), `/me` повертає порожнього system user.
+- **Тестувальник:** App roles → Roles → Add People → **Instagram Tester** → прийняти в Instagram (Apps and
+  websites → Tester invites) → у кроці «Generate access tokens» додати акаунт → Generate token.
+- **Redirect URI:** `https://dev-api.adelie.space/social/instagram/callback` (збережено).
+- **Профіль:** `GET /{ig-id}?fields=username,name,biography,followers_count,follows_count,media_count,profile_picture_url`
+  — працює (adelie.if: 415 підписників, 21 допис).
+- **Публікації:** `/{ig-id}/media` — працює, **`media_product_type` доступний** (FEED / REELS / STORY), тож Reels
+  відрізняємо. Дописи 2021–2022 років віддаються.
+- **Статистика публікацій** — lifetime, працює **навіть для дописів 2021–2022** (reach, likes, comments, saved,
+  shares; `views` для старих = 0, метрики ще не було). Карусель — на рівні контейнера.
+- **Статистика акаунта:**
+  - **не більше 30 днів в одному запиті** (`There cannot be more than 30 days between since and until`);
+  - **історія — 2 роки** (не 90 днів, як у документації): `reach` віддається за 400 днів тому, за 730 — «Metrics
+    data is available for the last 2 years»;
+  - `time_series` (по днях) — **лише `reach` і `follower_count`**; `views`, `accounts_engaged`,
+    `total_interactions`, `follows_and_unfollows`, `profile_links_taps` — тільки `total_value` за проміжок →
+    щоденні значення = окремий запит на кожен день (усі `total_value`-метрики одним запитом);
+  - розбивка `views` за `media_product_type`: POST / CAROUSEL_CONTAINER / STORY / REEL;
+  - демографія (`follower_demographics`, breakdown country/city/age/gender) — працює (≥100 підписників).
+- **Назви й описи метрик** API повертає локалізовано (українською — за мовою користувача токена).
+- **Ліміти:** заголовок `x-business-use-case-usage` (тип `instagram`, `call_count` у %); за PoC (~20 запитів) —
+  0–1 %.
+- **Сторіс:** `/{ig-id}/stories` — працює (зараз 0 активних).
+
+**Наслідки для синхронізації:** первинна — профіль, усі публікації з lifetime-статистикою, `reach` і
+`follower_count` по днях за 2 роки (24 запити по 30 днів), `total_value`-метрики по днях — за 90 днів (90 запитів,
+далі щодня 1); щоденна — знімки lifetime-статистики публікацій (щоденна динаміка — різницею знімків), сторіс —
+частіше за добу.
 
 ## Який API
 
@@ -95,9 +136,11 @@
 
 ## Кроки
 
-- [ ] Застосунок Meta (тип Business), продукт Instagram → «API setup with Instagram login» _(власник)_
-- [ ] Акаунт Gushka (професійний, публічний) — тестувальник; прийняти запрошення в Instagram _(власник)_
-- [ ] Токен із кабінету («Generate token») — ввести на сервері, не в чат _(власник)_
-- [ ] PoC: профіль, медіа, insights акаунта (90 днів), insights публікацій різних типів, ліміти; закрити ⚠
-- [ ] Redirect URI `https://dev-api.adelie.space/social/instagram/callback`, deauthorize і data deletion URL
+- [x] Застосунок Meta «Adelie» (тип Business), бізнес-портфоліо, «API setup with Unified login», конфігурація `Adelie read-only`
+- [x] Тестувальник `adelie.if` (кав'ярня) — для PoC
+- [ ] Акаунт Gushka (професійний, публічний) — тестувальник _(власник)_
+- [x] Токен із кабінету — на сервері `~/adelie/env/instagram-poc.token` (лише для PoC)
+- [x] PoC: профіль, медіа, insights акаунта й публікацій, глибина історії, ліміти (на adelie.if; Reels/сторіс — на Gushka)
+- [x] Redirect URI `https://dev-api.adelie.space/social/instagram/callback`
+- [ ] Deauthorize і data deletion URL
 - [ ] Адаптер, OAuth, синхронізація, екрани

@@ -72,7 +72,9 @@ SUCCESS — 10 дошок, 55 пінів із метриками, 90 днів а
    ([plans/mvp-1.md](plans/mvp-1.md)): звіти за посиланням, сторінка команди, staging/production. Модель: [plans/stage-2-data-model.md](plans/stage-2-data-model.md).
 2. **Instagram** (друга платформа, ADR-0004): документацію досліджено — [integrations/instagram.md](integrations/instagram.md).
    Для Gushka вистачає Standard access (без App Review); для клієнтів — App Review + Business Verification (юрособа).
-   Далі: власник створює застосунок Meta й додає Gushka тестувальником → PoC.
+   **PoC пройдено** на акаунті кав'ярні `adelie.if` (2026-11-07): Unified login + бізнес-портфоліо, власна
+   конфігурація лише на читання, безстроковий токен, історія статистики акаунта — 2 роки. Далі: Gushka тестувальником
+   (Reels, сторіс, ліміти на активному акаунті) → адаптер і OAuth.
 3. Сторінка команди з профілями колег (ADR-0010) і керування доступами до проєктів.
 4. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
 
