@@ -14,7 +14,14 @@ import {
 } from '@adelie/platforms';
 import type { SyncKind } from '@adelie/shared';
 import { socialTokenAad, type TokenCipher } from '@adelie/shared/crypto';
-import { dailyFetchWindow, dimensionKey, latestRow, snapshotChanged } from './metrics.js';
+import {
+  dailyFetchWindow,
+  deltaDay,
+  dimensionKey,
+  latestRow,
+  snapshotChanged,
+  snapshotDelta,
+} from './metrics.js';
 import { analyticsRange } from './schedule.js';
 
 export interface SyncDeps {
@@ -386,15 +393,37 @@ export async function runSync(
       string,
       { value: number | null; dataStatus: MetricPoint['dataStatus'] }
     >();
+    /** Per post: the day of its latest snapshot, or of the covered range's end (ADR-0017). */
+    const floorDay = new Map<string, string>();
+    const later = (a: string | undefined, b: string) => (a && a > b ? a : b);
     for (const v of await prisma.postMetricValue.findMany({
       where: { accountId: account.id, dimensionKey: '' },
       distinct: ['postId', 'metricId'],
       orderBy: [{ postId: 'asc' }, { metricId: 'asc' }, { date: 'desc' }],
-      select: { postId: true, metricId: true, value: true, dataStatus: true },
+      select: { postId: true, metricId: true, value: true, dataStatus: true, date: true },
     })) {
       previous.set(`${v.postId}:${v.metricId}`, { value: v.value, dataStatus: v.dataStatus });
+      floorDay.set(v.postId, later(floorDay.get(v.postId), day(v.date)));
     }
     const changedPosts = new Set<string>();
+
+    // Daily post values from the change of lifetime totals (ADR-0017): posts with a baseline, and
+    // posts published since the previous successful sync (all their activity is new).
+    const fromSnapshots = !!adapter.capabilities.postDailyFromSnapshots;
+    const today = day(now());
+    const baselined = new Set(floorDay.keys());
+    if (fromSnapshots) {
+      for (const p of await prisma.socialPost.findMany({
+        where: { accountId: account.id, dailyTo: { not: null } },
+        select: { id: true, dailyTo: true },
+      })) {
+        floorDay.set(p.id, later(floorDay.get(p.id), day(p.dailyTo!)));
+      }
+    }
+    const lastSync = account.lastSuccessfulSyncAt;
+    const newPosts = new Set<string>();
+    /** Posts whose covered range moves to the given day. */
+    const coverDay = new Map<string, string>();
     await step('posts', async () => {
       for await (const page of adapter.listPosts(ctx())) {
         const postIds = new Map<string, string>();
@@ -423,6 +452,17 @@ export async function runSync(
           });
           postIds.set(p.externalId, post.id);
           count('posts');
+          if (fromSnapshots) {
+            const isNew =
+              !baselined.has(post.id) && !!lastSync && !!p.publishedAt && p.publishedAt >= lastSync;
+            if (isNew) {
+              newPosts.add(post.id);
+              floorDay.set(post.id, day(p.publishedAt!));
+            }
+            if (isNew || baselined.has(post.id)) {
+              coverDay.set(post.id, deltaDay(today, floorDay.get(post.id) ?? null));
+            }
+          }
         }
         for (const m of page.metrics) {
           const def = resolve(m);
@@ -450,12 +490,51 @@ export async function runSync(
             create: { workspaceId: account.workspaceId, accountId: account.id, ...key, ...values },
             update: values,
           });
+          const delta = fromSnapshots
+            ? snapshotDelta(previous.get(prevKey)?.value, m.value, newPosts.has(postId))
+            : null;
+          const deltaDate = coverDay.get(postId);
+          if (delta && deltaDate) {
+            // Several syncs on one day add up.
+            const dailyKey = { postId, metricId: def.id, date: asDate(deltaDate) };
+            await prisma.postMetricDaily.upsert({
+              where: { postId_metricId_date: dailyKey },
+              create: {
+                ...dailyKey,
+                workspaceId: account.workspaceId,
+                accountId: account.id,
+                value: delta,
+                dataStatus: 'READY',
+                fetchedAt: now(),
+              },
+              update: { value: { increment: delta }, fetchedAt: now() },
+            });
+            count('postDailyValues');
+          }
           previous.set(prevKey, { value: m.value, dataStatus: m.dataStatus });
           changedPosts.add(postId);
           count('postValues');
         }
       }
     });
+
+    // 3a. Covered ranges of snapshot-derived daily values: a covered day without a row had no
+    // activity (ADR-0013), so the range grows even for posts that did not change.
+    if (fromSnapshots && coverDay.size) {
+      const byDay = new Map<string, string[]>();
+      for (const [postId, d] of coverDay) byDay.set(d, [...(byDay.get(d) ?? []), postId]);
+      for (const [d, ids] of byDay) {
+        await prisma.socialPost.updateMany({
+          where: { id: { in: ids }, dailyFrom: null },
+          data: { dailyFrom: asDate(d), dailyTo: asDate(d) },
+        });
+        await prisma.socialPost.updateMany({
+          where: { id: { in: ids }, dailyFrom: { not: null } },
+          data: { dailyTo: asDate(d) },
+        });
+      }
+      count('postDailyCovered', coverDay.size);
+    }
 
     // 3b. Daily metrics per own post (ADR-0013): only posts with new activity or unsettled days.
     if (adapter.getPostMetrics) {

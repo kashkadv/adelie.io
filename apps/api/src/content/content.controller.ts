@@ -11,13 +11,7 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@adelie/db';
 import { PrismaService } from '../prisma.service.js';
-import {
-  PERIOD_METRICS as PERIOD_SORTS,
-  periodMetrics,
-  sortByPeriod,
-  type PeriodMetric,
-  type PeriodValues,
-} from './period.js';
+import { PERIOD_METRICS, periodMetrics, sortByPeriod, type PeriodValues } from './period.js';
 import { visibleProjectsWhere } from '../workspaces/project-visibility.js';
 import {
   WorkspaceAccessGuard,
@@ -47,13 +41,6 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
 const asDate = (d: string) => new Date(`${d}T00:00:00Z`);
 const day = (d: Date) => d.toISOString().slice(0, 10);
-/** Our post metric keys (metric_definition.key) → response field. */
-const METRIC_KEYS: Record<string, PeriodMetric> = {
-  impressions: 'impressions',
-  saves: 'saves',
-  pin_clicks: 'pinClicks',
-  outbound_clicks: 'outboundClicks',
-};
 
 const POST_SELECT = {
   id: true,
@@ -163,9 +150,10 @@ export class ContentController {
         : {}),
     };
 
-    // Period sums need daily post values (ADR-0013) — Instagram has lifetime totals only.
-    if (from && to && platform !== 'INSTAGRAM') {
-      return this.listForPeriod(where, { from, to, sort, page });
+    // Period sums from daily post values (ADR-0013, ADR-0017).
+    const periodKeys = PERIOD_METRICS[platform];
+    if (from && to && periodKeys) {
+      return this.listForPeriod(where, { from, to, sort, page, platform, keys: periodKeys });
     }
 
     const orderBy: Prisma.SocialPostOrderByWithRelationInput[] =
@@ -223,7 +211,15 @@ export class ContentController {
    */
   private async listForPeriod(
     where: Prisma.SocialPostWhereInput,
-    opts: { from: string; to: string; sort: Sort; page: number },
+    opts: {
+      from: string;
+      to: string;
+      sort: Sort;
+      page: number;
+      platform: string;
+      /** metric_definition.key → response field. */
+      keys: Record<string, string>;
+    },
   ) {
     const db = this.prisma.client;
     const all = await db.socialPost.findMany({
@@ -238,10 +234,15 @@ export class ContentController {
     }));
 
     const definitions = await db.metricDefinition.findMany({
-      where: { scope: 'POST', key: { in: Object.keys(METRIC_KEYS) } },
+      where: {
+        platform: opts.platform as Platform,
+        scope: 'POST',
+        key: { in: Object.keys(opts.keys) },
+      },
       select: { id: true, key: true },
     });
-    const metricOf = new Map(definitions.map((d) => [d.id, METRIC_KEYS[d.key]!]));
+    const fields = Object.values(opts.keys);
+    const metricOf = new Map(definitions.map((d) => [d.id, opts.keys[d.key]!]));
     const grouped = all.length
       ? await db.postMetricDaily.groupBy({
           by: ['postId', 'metricId'],
@@ -253,7 +254,7 @@ export class ContentController {
           _sum: { value: true },
         })
       : [];
-    const sums = new Map<string, Partial<PeriodValues>>();
+    const sums = new Map<string, PeriodValues>();
     for (const g of grouped) {
       const metric = metricOf.get(g.metricId);
       if (!metric) continue;
@@ -261,11 +262,11 @@ export class ContentController {
       entry[metric] = Math.round(g._sum.value ?? 0);
       sums.set(g.postId, entry);
     }
-    const values = periodMetrics(posts, sums, opts.from);
+    const values = periodMetrics(posts, sums, opts.from, fields);
 
-    const ordered = (PERIOD_SORTS as readonly string[]).includes(opts.sort)
-      ? sortByPeriod(posts, values, opts.sort as PeriodMetric)
-      : sortByPeriod(posts, new Map(), 'impressions');
+    const ordered = fields.includes(opts.sort)
+      ? sortByPeriod(posts, values, opts.sort)
+      : sortByPeriod(posts, new Map(), fields[0]!);
     const pageIds = ordered
       .slice(opts.page * PAGE_SIZE, (opts.page + 1) * PAGE_SIZE)
       .map((p) => p.id);
@@ -294,7 +295,8 @@ export class ContentController {
         return [
           {
             ...p,
-            metrics: v?.metrics ? { ...v.metrics, videoViews: null } : null,
+            // Lifetime-only metrics have no period value.
+            metrics: v?.metrics ?? null,
             partial: v?.partial ?? false,
             dataStatus: latest?.dataStatus ?? null,
             asOf: row.dailyTo,

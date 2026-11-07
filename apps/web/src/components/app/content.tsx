@@ -88,9 +88,14 @@ const DEFAULT_COLUMNS: Record<Platform, Column[]> = {
   TIKTOK: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'publishedAt'],
 };
 /** Daily post values exist only for these (ADR-0013): others show "—" for a period. */
-const PERIOD_METRICS: Column[] = ['impressions', 'saves', 'pinClicks', 'outboundClicks'];
-/** Platforms whose posts have daily values (ADR-0013); others show lifetime totals only. */
-const HAS_PERIODS: Platform[] = ['PINTEREST'];
+const PERIOD_METRICS: Record<Platform, Column[]> = {
+  PINTEREST: ['impressions', 'saves', 'pinClicks', 'outboundClicks'],
+  // From the day-to-day change of lifetime totals (ADR-0017).
+  INSTAGRAM: ['views', 'reach', 'likes', 'comments', 'saves', 'shares'],
+  TIKTOK: [],
+};
+/** Platforms whose posts have daily values; others show lifetime totals only. */
+const HAS_PERIODS: Platform[] = ['PINTEREST', 'INSTAGRAM'];
 type Sort = Column;
 const OWNERSHIP = ['own', 'saved', 'all'] as const;
 type Ownership = (typeof OWNERSHIP)[number];
@@ -327,7 +332,7 @@ export function Content() {
   const periodActive = hasPeriods && resolveRange(period) !== null;
   /** Lifetime-only metrics cannot rank posts by a period. */
   const sortable = (c: Column) =>
-    !periodActive || c === 'publishedAt' || PERIOD_METRICS.includes(c);
+    !periodActive || c === 'publishedAt' || PERIOD_METRICS[columnsPlatform].includes(c);
   // A sort column that is hidden, of another platform or not sortable now falls back to the first
   // sortable column shown (or the publication date).
   const sort: Sort =
@@ -512,7 +517,9 @@ export function Content() {
               <InfoTip
                 text={
                   data.period
-                    ? t('periodHint')
+                    ? platform === 'INSTAGRAM'
+                      ? t('periodHintInstagram')
+                      : t('periodHint')
                     : platform === 'INSTAGRAM'
                       ? t('lifetimeHintInstagram')
                       : t('lifetimeHint')

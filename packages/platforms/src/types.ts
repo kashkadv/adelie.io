@@ -110,6 +110,11 @@ export interface PlatformCapabilities {
   /** Dimensions supported for account metrics. */
   accountDimensions: string[];
   hasBoards: boolean;
+  /**
+   * No daily post values from the platform: the sync derives them from the day-to-day change of the
+   * lifetime totals (ADR-0017). Platforms with `getPostMetrics` never need this.
+   */
+  postDailyFromSnapshots?: boolean;
 }
 
 export interface PlatformAdapter {

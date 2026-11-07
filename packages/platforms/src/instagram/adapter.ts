@@ -123,7 +123,13 @@ interface DebugTokenResponse {
 
 export class InstagramAdapter implements PlatformAdapter {
   readonly platform = 'INSTAGRAM' as const;
-  readonly capabilities = { historyDays: 90, accountDimensions: [], hasBoards: false };
+  readonly capabilities = {
+    historyDays: 90,
+    accountDimensions: [],
+    hasBoards: false,
+    // Meta reports post insights as lifetime totals only (ADR-0017).
+    postDailyFromSnapshots: true,
+  };
 
   constructor(private readonly app: { appId: string; appSecret: string; configId: string }) {}
 

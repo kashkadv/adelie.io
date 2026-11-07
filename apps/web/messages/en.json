@@ -470,7 +470,7 @@
     "metricsLifetime": "lifetime metrics",
     "dataSince": "data since {date}",
     "periodHint": "Daily pin metrics summed over the period. Pinterest gives pin history 90 days back; older days build up from the moment the account was connected. “—” means no data, not zero. Pins saved from other accounts have no metrics.",
-    "lifetimeHintInstagram": "Instagram post statistics are lifetime totals: Meta does not provide them by day, so there are no period metrics here yet. “—” means no data, not zero.",
+    "lifetimeHintInstagram": "Instagram post statistics are lifetime totals as reported by Meta, updated daily. “—” means no data, not zero.",
     "lifetimeOnly": "Pinterest does not report this metric per day — it shows “—” for a period.",
     "csvAll": "All metrics",
     "csvAllHint": "Unchecked, the CSV has the columns shown, in their order; checked, every metric of the platform.",
@@ -480,7 +480,8 @@
       "hint": "Your columns and their order are saved for you — the same on every device and in every project, separately for each platform. Drag a handle or use ↑/↓ to reorder.",
       "move": "Move “{column}”",
       "reset": "Reset to default"
-    }
+    },
+    "periodHintInstagram": "Instagram does not report post statistics per day, so Adelie records the totals daily and takes the change from the previous day. Days accumulate from when Adelie started doing so (no history before that); a day ends at the daily sync. Reach for a period is how many new accounts saw the post. “—” means no data, not zero."
   },
   "Post": {
     "close": "Close",
@@ -493,7 +494,7 @@
     "metricsHint": "Totals the platform reported as of {date}. “—” means no data, not zero.",
     "metricsHintNoDate": "Totals the platform reported. “—” means no data, not zero.",
     "noMetrics": "The platform reported no statistics for this post.",
-    "instagramNoDaily": "Instagram gives no daily post statistics — daily dynamics will come from Adelie’s own daily snapshots.",
+    "instagramNoDaily": "Instagram does not report post statistics per day — Adelie derives them from daily totals; this post has no days yet.",
     "dailyTitle": "Daily dynamics",
     "dailyHint": "Daily values from {from} to {to}. Dashed: days the platform is still finalizing.",
     "dailyTotal": "Total for these days: {value}",

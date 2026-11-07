@@ -1,8 +1,26 @@
 // Post metrics over a period from sparse daily values (ADR-0013). Pure — unit-tested.
 
-export const PERIOD_METRICS = ['impressions', 'saves', 'pinClicks', 'outboundClicks'] as const;
-export type PeriodMetric = (typeof PERIOD_METRICS)[number];
-export type PeriodValues = Record<PeriodMetric, number>;
+/**
+ * Metrics with daily post values per platform: our metric key (metric_definition.key) → response
+ * field. Pinterest reports them per day (ADR-0013); Instagram's come from snapshots (ADR-0017).
+ */
+export const PERIOD_METRICS: Record<string, Record<string, string>> = {
+  PINTEREST: {
+    impressions: 'impressions',
+    saves: 'saves',
+    pin_clicks: 'pinClicks',
+    outbound_clicks: 'outboundClicks',
+  },
+  INSTAGRAM: {
+    views: 'views',
+    reach: 'reach',
+    likes: 'likes',
+    comments: 'comments',
+    saves: 'saves',
+    shares: 'shares',
+  },
+};
+export type PeriodValues = Record<string, number>;
 
 export interface PeriodPost {
   id: string;
@@ -25,8 +43,9 @@ export interface PeriodResult {
  */
 export function periodMetrics(
   posts: PeriodPost[],
-  sums: Map<string, Partial<PeriodValues>>,
+  sums: Map<string, PeriodValues>,
   from: string,
+  fields: readonly string[],
 ): Map<string, PeriodResult> {
   const result = new Map<string, PeriodResult>();
   for (const p of posts) {
@@ -37,12 +56,7 @@ export function periodMetrics(
     const s = sums.get(p.id) ?? {};
     const existedBefore = p.publishedAt === null || p.publishedAt < p.dailyFrom;
     result.set(p.id, {
-      metrics: {
-        impressions: s.impressions ?? 0,
-        saves: s.saves ?? 0,
-        pinClicks: s.pinClicks ?? 0,
-        outboundClicks: s.outboundClicks ?? 0,
-      },
+      metrics: Object.fromEntries(fields.map((f) => [f, s[f] ?? 0])),
       partial: from < p.dailyFrom && existedBefore,
     });
   }
@@ -53,7 +67,7 @@ export function periodMetrics(
 export function sortByPeriod(
   posts: PeriodPost[],
   values: Map<string, PeriodResult>,
-  metric: PeriodMetric,
+  metric: string,
 ): PeriodPost[] {
   const value = (p: PeriodPost) => values.get(p.id)?.metrics?.[metric] ?? null;
   return [...posts].sort((a, b) => {

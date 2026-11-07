@@ -44,8 +44,12 @@ const METRIC_ORDER: Record<Platform, string[]> = {
   INSTAGRAM: ['views', 'reach', 'likes', 'comments', 'saves', 'shares', 'engagements'],
   TIKTOK: [],
 };
-/** Metrics with a daily chart (ADR-0013: Pinterest pins only for now). */
-const DAILY_METRICS = ['impressions', 'saves', 'pin_clicks', 'outbound_clicks'] as const;
+/** Metrics with a daily chart: Pinterest per day (ADR-0013), Instagram from snapshots (ADR-0017). */
+const DAILY_METRICS: Record<Platform, string[]> = {
+  PINTEREST: ['impressions', 'saves', 'pin_clicks', 'outbound_clicks'],
+  INSTAGRAM: ['views', 'reach', 'likes', 'saves'],
+  TIKTOK: [],
+};
 const KNOWN = new Set(Object.values(METRIC_ORDER).flat());
 const PLATFORM_NAMES: Record<Platform, string> = {
   PINTEREST: 'Pinterest',
@@ -80,7 +84,7 @@ export function PostDialog({
   const panel = useRef<HTMLDivElement>(null);
   // The loaded post is kept with its id: while the next one loads, the old one is not shown.
   const [loaded, setLoaded] = useState<{ id: string; detail: Detail | null } | null>(null);
-  const [chartMetric, setChartMetric] = useState<(typeof DAILY_METRICS)[number]>('impressions');
+  const [chosenChartMetric, setChartMetric] = useState<string | null>(null);
   const detail = loaded?.id === postId ? loaded.detail : null;
   const failed = loaded?.id === postId && loaded.detail === null;
 
@@ -124,7 +128,13 @@ export function PostDialog({
   const description = detail?.description?.trim();
   const showDescription = !!description && description !== detail?.title?.trim();
   const daily = detail?.daily;
-  const chartKeys = DAILY_METRICS.filter((k) => daily && k in daily.series);
+  const dailyMetrics = DAILY_METRICS[platform];
+  const chartMetric =
+    chosenChartMetric && dailyMetrics.includes(chosenChartMetric)
+      ? chosenChartMetric
+      : (dailyMetrics[0] ?? '');
+  // Covered days without any row are all zero: the chart still shows them.
+  const chartKeys = daily ? dailyMetrics : [];
   const points: SeriesPoint[] | null = daily
     ? (daily.series[chartMetric] ?? []).length
       ? daily.series[chartMetric]!.map((p, i) => ({ date: addDays(daily.from, i), ...p }))
@@ -274,7 +284,7 @@ export function PostDialog({
                       detail.asOf
                         ? t('metricsHint', { date: dateOf(detail.asOf) })
                         : t('metricsHintNoDate'),
-                      platform === 'INSTAGRAM' ? t('instagramNoDaily') : '',
+                      platform === 'INSTAGRAM' && !daily ? t('instagramNoDaily') : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
@@ -317,9 +327,9 @@ export function PostDialog({
                     <Segmented
                       value={chartMetric}
                       onChange={setChartMetric}
-                      options={DAILY_METRICS.map((k) => ({
+                      options={dailyMetrics.map((k) => ({
                         value: k,
-                        label: t(`metrics.${k}`),
+                        label: t(`metrics.${k}` as 'metrics.impressions'),
                       }))}
                       ariaLabel={t('dailyTitle')}
                     />
@@ -329,7 +339,7 @@ export function PostDialog({
                   </p>
                   <ImpressionsChart
                     points={points}
-                    ariaLabel={`${t('dailyTitle')}: ${t(`metrics.${chartMetric}`)}`}
+                    ariaLabel={`${t('dailyTitle')}: ${t(`metrics.${chartMetric}` as 'metrics.impressions')}`}
                   />
                 </section>
               )}

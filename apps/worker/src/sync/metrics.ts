@@ -113,3 +113,29 @@ export function dailyFetchWindow(
   if (!opts.changed && !opts.pending) return null;
   return { from: clamp(addDays(post.dailyTo, -(DAILY_REFRESH_DAYS - 1))), to: opts.today };
 }
+
+/**
+ * Activity since the previous snapshot (ADR-0017), or null when there is nothing to compare with:
+ * no earlier value (a post seen for the first time is only a baseline — unless it was published
+ * after the previous sync, when all its activity is new) or a value that is not a number.
+ */
+export function snapshotDelta(
+  previous: number | null | undefined,
+  next: number | null,
+  newPost: boolean,
+): number | null {
+  if (next === null) return null;
+  if (previous === undefined) return newPost ? next : null;
+  if (previous === null) return null;
+  return next - previous;
+}
+
+/**
+ * The day a delta between two syncs belongs to: the daily sync runs after midnight UTC, so its
+ * change is mostly yesterday's activity — but never a day before what the post already covers or
+ * its baseline (a second sync on the same day continues that day).
+ */
+export function deltaDay(today: string, floor: string | null): string {
+  const yesterday = addDays(today, -1);
+  return floor && floor > yesterday ? floor : yesterday;
+}

@@ -37,3 +37,4 @@
 - [ADR-0014](decisions/0014-project-management.md) — Керування проєктами й налаштування проєкту (прийнято)
 - [ADR-0015](decisions/0015-instagram-integration.md) — Інтеграція Instagram (прийнято)
 - [ADR-0016](decisions/0016-user-preferences.md) — Налаштування інтерфейсу користувача (прийнято)
+- [ADR-0017](decisions/0017-instagram-post-daily.md) — Щоденні метрики публікацій Instagram із різниці знімків (прийнято)

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   dailyFetchWindow,
+  deltaDay,
+  snapshotDelta,
   dimensionKey,
   latestRow,
   snapshotChanged,
@@ -168,5 +170,28 @@ describe('dailyFetchWindow', () => {
     expect(
       dailyFetchWindow({ publishedAt: null, dailyTo: '2026-10-01' }, { ...base, changed: true }),
     ).toEqual({ from: '2026-09-25', to: '2026-11-06' });
+  });
+});
+
+describe('daily values from snapshots (ADR-0017)', () => {
+  it('the change since the previous snapshot is the activity', () => {
+    expect(snapshotDelta(100, 130, false)).toBe(30);
+    expect(snapshotDelta(100, 95, false)).toBe(-5); // Meta recounts: kept, sums stay consistent
+  });
+
+  it('a first-seen post is a baseline unless published after the previous sync', () => {
+    expect(snapshotDelta(undefined, 50, false)).toBeNull();
+    expect(snapshotDelta(undefined, 50, true)).toBe(50);
+  });
+
+  it('missing values never become activity', () => {
+    expect(snapshotDelta(null, 10, false)).toBeNull();
+    expect(snapshotDelta(10, null, false)).toBeNull();
+  });
+
+  it('the daily sync records yesterday; a same-day sync continues the covered day', () => {
+    expect(deltaDay('2026-11-08', null)).toBe('2026-11-07');
+    expect(deltaDay('2026-11-08', '2026-10-01')).toBe('2026-11-07');
+    expect(deltaDay('2026-11-08', '2026-11-08')).toBe('2026-11-08');
   });
 });

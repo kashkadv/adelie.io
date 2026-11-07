@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { periodMetrics, sortByPeriod, type PeriodPost } from './period.js';
 
+const PIN_FIELDS = ['impressions', 'saves', 'pinClicks', 'outboundClicks'];
+
 const post = (p: Partial<PeriodPost> & { id: string }): PeriodPost => ({
   publishedAt: '2026-01-01',
   dailyFrom: '2026-08-09',
@@ -14,6 +16,7 @@ describe('periodMetrics', () => {
       [post({ id: 'a' }), post({ id: 'b' }), post({ id: 'c', dailyFrom: null, dailyTo: null })],
       new Map([['a', { impressions: 12, saves: 1 }]]),
       '2026-10-31',
+      PIN_FIELDS,
     );
     expect(r.get('a')).toEqual({
       metrics: { impressions: 12, saves: 1, pinClicks: 0, outboundClicks: 0 },
@@ -31,6 +34,7 @@ describe('periodMetrics', () => {
       ],
       new Map(),
       '2025-11-07',
+      PIN_FIELDS,
     );
     expect(r.get('old')?.partial).toBe(true);
     expect(r.get('new')?.partial).toBe(false);
@@ -53,6 +57,7 @@ describe('sortByPeriod', () => {
         ['low-new', { impressions: 1 }],
       ]),
       '2026-10-31',
+      PIN_FIELDS,
     );
     expect(sortByPeriod(posts, values, 'impressions').map((p) => p.id)).toEqual([
       'high',
