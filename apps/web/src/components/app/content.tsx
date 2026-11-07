@@ -94,6 +94,25 @@ const HAS_PERIODS: Platform[] = ['PINTEREST'];
 type Sort = Column;
 const OWNERSHIP = ['own', 'saved', 'all'] as const;
 type Ownership = (typeof OWNERSHIP)[number];
+type Filters = {
+  period: DateRange;
+  published: DateRange;
+  accountId: string;
+  boardId: string;
+  ownership: Ownership;
+  sort: Sort;
+  search: string;
+};
+const DEFAULT_FILTERS: Filters = {
+  period: { preset: '7d' },
+  published: { preset: 'all' },
+  accountId: '',
+  boardId: '',
+  ownership: 'own',
+  // Newest first by default: the freshest posts are what people check most.
+  sort: 'publishedAt',
+  search: '',
+};
 const columnsKey = (platform: Platform) => `content.columns.${platform}`;
 
 /** The saved choice, if it is still valid for the platform (columns may change between versions). */
@@ -266,16 +285,30 @@ export function Content() {
   const platform =
     chosenPlatform && platforms.includes(chosenPlatform) ? chosenPlatform : platforms[0];
 
-  const [period, setPeriod] = useState<DateRange>({ preset: '7d' });
-  const [published, setPublished] = useState<DateRange>({ preset: 'all' });
-  const [accountId, setAccountId] = useState('');
-  const [boardId, setBoardId] = useState('');
-  const [ownership, setOwnership] = useState<Ownership>('own');
-  // Newest first by default: the freshest posts are what people check most.
-  const [chosenSort, setSort] = useState<Sort>('publishedAt');
+  // Each platform keeps its own filters: switching tabs neither carries a Pinterest account or
+  // board over to Instagram nor loses them on the way back. Not remembered across reloads.
+  const [filtersBy, setFiltersBy] = useState<Partial<Record<Platform, Filters>>>({});
+  const filters = (platform && filtersBy[platform]) || DEFAULT_FILTERS;
+  const { period, published, accountId, boardId, ownership, search } = filters;
+  const chosenSort = filters.sort;
+  const setFilter = <F extends keyof Filters>(key: F, value: Filters[F]) => {
+    if (!platform) return;
+    setFiltersBy((all) => ({
+      ...all,
+      [platform]: { ...(all[platform] ?? DEFAULT_FILTERS), [key]: value },
+    }));
+  };
+  const setPeriod = (v: DateRange) => setFilter('period', v);
+  const setPublished = (v: DateRange) => setFilter('published', v);
+  const setAccountId = (v: string) => setFilter('accountId', v);
+  const setBoardId = (v: string) => setFilter('boardId', v);
+  const setOwnership = (v: Ownership) => setFilter('ownership', v);
+  const setSort = (v: Sort) => setFilter('sort', v);
+  const setSearch = (v: string) => setFilter('search', v);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [debounced, setDebounced] = useState('');
+  // The search sent to the API, a moment after typing stops; another platform's is never used.
+  const [typed, setTyped] = useState<{ platform?: Platform; q: string }>({ q: '' });
+  const debounced = typed.platform === platform ? typed.q : search.trim();
   const [boards, setBoards] = useState<Board[]>([]);
   const [data, setData] = useState<Page | null>(null);
   const [extra, setExtra] = useState<Post[]>([]);
@@ -305,9 +338,9 @@ export function Content() {
   const kind = platform === 'PINTEREST' ? 'pin' : 'post';
 
   useEffect(() => {
-    const id = setTimeout(() => setDebounced(search.trim()), 300);
+    const id = setTimeout(() => setTyped({ platform, q: search.trim() }), 300);
     return () => clearTimeout(id);
-  }, [search]);
+  }, [search, platform]);
 
   useEffect(() => {
     if (!base) return;
