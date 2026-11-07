@@ -120,7 +120,7 @@ export function PostDialog({
   const title =
     detail?.title?.trim() ||
     detail?.description?.trim().split('\n')[0] ||
-    (detail ? tContent('untitled') : '');
+    (detail ? tContent('untitled', { kind: platform === 'PINTEREST' ? 'pin' : 'post' }) : '');
   const description = detail?.description?.trim();
   const showDescription = !!description && description !== detail?.title?.trim();
   const daily = detail?.daily;

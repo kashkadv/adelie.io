@@ -55,7 +55,7 @@ type Post = {
   isOwn: boolean;
   publishedAt: string | null;
   board: { id: string; name: string } | null;
-  account: { id: string; username: string | null };
+  account: { id: string; username: string | null; platform: Platform };
   metrics: Metrics | null;
   dataStatus: string | null;
   asOf: string | null;
@@ -104,10 +104,11 @@ function PostRow({
   onSelect: (selected: boolean) => void;
   onOpen: () => void;
 }) {
+  const kind = post.account.platform === 'PINTEREST' ? 'pin' : 'post';
   const t = useTranslations('Content');
   const format = useFormatter();
   // Platforms may return whitespace-only titles: treat them as missing.
-  const title = post.title?.trim() || post.description?.trim() || t('untitled');
+  const title = post.title?.trim() || post.description?.trim() || t('untitled', { kind });
   // Compact date for the column: the year only when it is not the current one.
   const shortDate = (iso: string) => {
     const d = new Date(iso);
@@ -122,7 +123,7 @@ function PostRow({
       className={`flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 transition-colors xl:flex-nowrap ${selected ? 'bg-hover' : ''}`}
     >
       <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
-        <Checkbox checked={selected} onChange={onSelect} label={t('select')} />
+        <Checkbox checked={selected} onChange={onSelect} label={t('select', { kind })} />
         {/* The post itself opens its card (all metrics, daily dynamics). */}
         <button
           type="button"
@@ -199,8 +200,8 @@ function PostRow({
             target="_blank"
             rel="noreferrer"
             className="icon-btn h-8 w-8"
-            aria-label={t('openOnPlatform')}
-            title={t('openOnPlatform')}
+            aria-label={t('openOnPlatform', { platform: t(`platforms.${post.account.platform}`) })}
+            title={t('openOnPlatform', { platform: t(`platforms.${post.account.platform}`) })}
           >
             <ExternalLink size={15} aria-hidden="true" />
           </a>
@@ -256,6 +257,8 @@ export function Content() {
   // A sort column of another platform falls back to this platform's first metric.
   const sort: Sort = columns.includes(chosenSort) ? chosenSort : metricColumns[0]!;
   const hasPeriods = !!platform && HAS_PERIODS.includes(platform);
+  /** Pinterest calls its posts pins; every other platform — posts. */
+  const kind = platform === 'PINTEREST' ? 'pin' : 'post';
 
   useEffect(() => {
     const id = setTimeout(() => setDebounced(search.trim()), 300);
@@ -412,7 +415,7 @@ export function Content() {
         subtitle={
           data ? (
             <span className="flex flex-wrap items-center gap-x-1.5">
-              {t('count', { count: data.total })}
+              {t('count', { count: data.total, kind })}
               <span aria-hidden="true">·</span>
               {data.period ? t('metricsForPeriod') : t('metricsLifetime')}
               {limitedHistory && (
@@ -524,8 +527,8 @@ export function Content() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('search')}
-            aria-label={t('search')}
+            placeholder={t('search', { kind })}
+            aria-label={t('search', { kind })}
             className="w-full min-w-0 bg-transparent outline-none placeholder:text-muted"
           />
           {search && (
@@ -543,7 +546,7 @@ export function Content() {
 
       {data && items.length === 0 ? (
         <section className="card animate-rise rounded-[24px] px-6 py-14 text-center text-sm text-muted">
-          {t('noMatches')}
+          {t('noMatches', { kind })}
         </section>
       ) : (
         <section className="card animate-rise rounded-[24px]">
@@ -555,7 +558,7 @@ export function Content() {
                 onChange={(on) => setSelected(on ? new Set(items.map((p) => p.id)) : new Set())}
                 label={t('selectAll')}
               />
-              <span className="pl-[68px]">{t('pin')}</span>
+              <span className="pl-[68px]">{t('pin', { kind })}</span>
             </span>
             <span className={`grid w-[44rem] ${ROW_GRID} gap-6 text-right`}>
               {columns.map((key) => (
@@ -613,7 +616,7 @@ export function Content() {
         <div className="pointer-events-none sticky bottom-4 z-30 mt-4 flex justify-center">
           <div className="glass glass-strong animate-rise pointer-events-auto flex items-center gap-2 rounded-full py-1.5 pr-1.5 pl-5 text-sm shadow-[0_8px_30px_var(--shadow)]">
             <span className="font-medium whitespace-nowrap">
-              {t('selected', { count: selectedCount })}
+              {t('selected', { count: selectedCount, kind })}
             </span>
             <button
               type="button"
