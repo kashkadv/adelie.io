@@ -91,17 +91,25 @@ Cloudflare Email Routing (лише прийом, переадресація): `h
 - Увімкнено Cloudflare Email Routing (власник): `hello@`, `privacy@` → Gmail. MX, SPF, DKIM на місці;
   DMARC поки немає — додати, коли почнемо надсилати пошту від домену.
 
+- 2026-11-07: збірка образу (Next.js) на VM з 1,8 ГБ і без swap вичерпала пам'ять — VM зависла на кілька хвилин.
+  Пам'ять закріплено: `qm set 104 --balloon 4096` (мінімум = максимум = 4 ГБ); у VM — swap 4 ГБ
+  (`/swapfile` у `/etc/fstab`, `vm.swappiness=10`). Згодом — збирати образи поза сервером (CI).
+
 ## Відтворення VM з нуля (на хості Proxmox)
 
 ```bash
 qm create 104 --name adelie --ostype l26 --machine q35 --cpu host --cores 4 \
-  --memory 4096 --balloon 2048 --net0 virtio,bridge=vmbr0 \
+  --memory 4096 --balloon 4096 --net0 virtio,bridge=vmbr0 \
   --scsihw virtio-scsi-single --agent enabled=1 --onboot 1
 qm set 104 --scsi0 local-lvm:0,import-from=/var/lib/vz/import/noble-server-cloudimg-amd64.img,discard=on,iothread=1,ssd=1
 qm resize 104 scsi0 60G
 qm set 104 --ide2 local-lvm:cloudinit --boot order=scsi0 --serial0 socket --vga serial0
 qm set 104 --ciuser adelie --sshkeys <keys.pub> --ipconfig0 ip=dhcp
 qm start 104
+# у VM: swap 4 ГБ
+# sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+# echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+# echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-swappiness.conf
 ```
 
 Далі: apt upgrade, qemu-guest-agent, Docker (get.docker.com), Tailscale, ufw — як вище.
