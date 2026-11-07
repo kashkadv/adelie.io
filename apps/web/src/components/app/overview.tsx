@@ -93,8 +93,8 @@ export function Overview() {
   const format = useFormatter();
   const { workspace, project } = useWorkspace();
   const { accounts: allAccounts, connect, canConnect } = useProjectAccounts();
-  // Disconnected accounts are hidden here (their history returns on reconnect).
-  const accounts = allAccounts?.filter((a) => a.status !== 'REVOKED');
+  // Disconnected and hidden accounts are left out (their history is kept).
+  const accounts = allAccounts?.filter((a) => a.status !== 'REVOKED' && !a.hidden);
   const [connecting, setConnecting] = useState(false);
   const [days, setDays] = useState(30);
   const [accountId, setAccountId] = useState('');

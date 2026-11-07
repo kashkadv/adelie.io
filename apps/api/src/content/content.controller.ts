@@ -129,9 +129,10 @@ export class ContentController {
       ...(publishedAt ? { publishedAt } : {}),
       ...(ownership === 'all' ? {} : { isOwn: ownership === 'own' }),
       ...(query['accountId'] ? { accountId: query['accountId'] } : {}),
-      // Disconnected accounts are hidden: their history is kept and returns on reconnect.
+      // Disconnected and hidden accounts are left out: their history is kept.
       account: {
         platform: platform as Platform,
+        hiddenAt: null,
         connection: { status: { not: 'REVOKED' } },
       },
       ...(query['boardId'] ? { boardId: query['boardId'] } : {}),
@@ -290,7 +291,7 @@ export class ContentController {
       where: {
         projectId,
         workspaceId: request.workspace.workspaceId,
-        account: { connection: { status: { not: 'REVOKED' } } },
+        account: { hiddenAt: null, connection: { status: { not: 'REVOKED' } } },
       },
       orderBy: { name: 'asc' },
       select: { id: true, name: true, accountId: true, pinCount: true },

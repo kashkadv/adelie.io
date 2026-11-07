@@ -210,6 +210,9 @@
     "actions": "Account actions",
     "disconnect": "Disconnect",
     "reconnect": "Connect again",
+    "hide": "Hide",
+    "unhide": "Unhide",
+    "hiddenBadge": "Hidden",
     "remove": "Delete with all data",
     "cancel": "Cancel",
     "actionFailed": "Something went wrong. Please try again.",
@@ -228,6 +231,8 @@
     "platform": "Platform",
     "allPlatforms": "All platforms",
     "showDisconnected": "Show disconnected",
+    "showHidden": "Show hidden",
+    "hideHidden": "Don't show hidden",
     "noMatches": "No accounts match the filters."
   },
   "Invite": {

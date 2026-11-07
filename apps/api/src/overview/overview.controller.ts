@@ -55,7 +55,8 @@ export class OverviewController {
         projectId,
         workspaceId: request.workspace.workspaceId,
         ...(accountId ? { id: accountId } : {}),
-        // Disconnected accounts are hidden: their history is kept and returns on reconnect.
+        // Disconnected and hidden accounts are left out: their history is kept.
+        hiddenAt: null,
         connection: { status: { not: 'REVOKED' } },
       },
       select: {

@@ -184,9 +184,9 @@ export function Content() {
   const format = useFormatter();
   const { workspace, project } = useWorkspace();
   const { accounts: allAccounts } = useProjectAccounts();
-  // Disconnected accounts are hidden here (their history returns on reconnect).
+  // Disconnected and hidden accounts are left out (their history is kept).
   const accounts = useMemo(
-    () => allAccounts?.filter((a) => a.status !== 'REVOKED') ?? null,
+    () => allAccounts?.filter((a) => a.status !== 'REVOKED' && !a.hidden) ?? null,
     [allAccounts],
   );
   const platforms = useMemo(

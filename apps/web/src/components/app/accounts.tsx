@@ -7,6 +7,8 @@ import {
   CheckCircle2,
   ChevronDown,
   Copy,
+  Eye,
+  EyeOff,
   Link2,
   MoreHorizontal,
   Pin,
@@ -44,18 +46,20 @@ function useConnectResult(): [ConnectResult | null, () => void] {
   return [result, () => setResult(null)];
 }
 
-type RowAction = 'disconnect' | 'remove' | 'reconnect';
+type RowAction = 'disconnect' | 'remove' | 'reconnect' | 'hide' | 'unhide';
 
 const accountName = (a: SocialAccount) => a.displayName || a.username || a.externalId;
 /** What the user types to confirm deletion (the API checks the same value). */
 const accountHandle = (a: SocialAccount) => a.username ?? a.displayName ?? a.externalId;
 
-/** "⋯" menu of an account row: disconnect / reconnect / delete with data. */
+/** "⋯" menu of an account row: disconnect / reconnect / hide / delete with data. */
 function RowMenu({
   disconnected,
+  hidden,
   onAction,
 }: {
   disconnected: boolean;
+  hidden: boolean;
   onAction: (action: RowAction) => void;
 }) {
   const t = useTranslations('Accounts');
@@ -110,6 +114,7 @@ function RowMenu({
           className="glass glass-strong animate-rise absolute top-full right-0 z-50 mt-2 w-60 rounded-2xl p-2"
         >
           {disconnected ? item('reconnect', t('reconnect')) : item('disconnect', t('disconnect'))}
+          {hidden ? item('unhide', t('unhide')) : item('hide', t('hide'))}
           <div className="my-1 h-px bg-line" />
           {item('remove', t('remove'), true)}
         </div>
@@ -166,8 +171,13 @@ function AccountRow({
               <Pin size={18} strokeWidth={1.75} aria-hidden="true" />
             </span>
           )}
-          <div className="min-w-0">
-            <p className="truncate font-medium">{name}</p>
+          <div className={`min-w-0 ${account.hidden ? 'opacity-60' : ''}`}>
+            <p className="flex items-center gap-1.5 font-medium">
+              <span className="truncate">{name}</span>
+              {account.hidden && (
+                <EyeOff size={14} className="shrink-0 text-muted" aria-label={t('hiddenBadge')} />
+              )}
+            </p>
             <p className="truncate text-sm text-muted">
               {t(`platforms.${account.platform}`)}
               {account.username ? ` · @${account.username}` : ''}
@@ -226,7 +236,7 @@ function AccountRow({
             {t(`status.${account.status}`)}
           </span>
           {onAction ? (
-            <RowMenu disconnected={disconnected} onAction={onAction} />
+            <RowMenu disconnected={disconnected} hidden={account.hidden} onAction={onAction} />
           ) : (
             <span className="w-8" aria-hidden="true" />
           )}
@@ -347,15 +357,21 @@ function ConnectMenu({
 /** Accounts page: connected accounts of the project and connecting new ones (ADR-0011). */
 export function Accounts() {
   const t = useTranslations('Accounts');
-  const { accounts, connect, canConnect, disconnect, remove } = useProjectAccounts();
+  const { accounts, connect, canConnect, disconnect, setHidden, remove } = useProjectAccounts();
   const [platform, setPlatform] = useState('');
   const [showDisconnected, setShowDisconnected] = useStoredFlag(
     'adelie-accounts-show-disconnected',
     true,
   );
+  // Deliberately not remembered: hidden accounts are out of sight again after a reload.
+  const [showHidden, setShowHidden] = useState(false);
   const platforms = [...new Set((accounts ?? []).map((a) => a.platform))];
+  const hasHidden = (accounts ?? []).some((a) => a.hidden);
   const visible = (accounts ?? []).filter(
-    (a) => (!platform || a.platform === platform) && (showDisconnected || a.status !== 'REVOKED'),
+    (a) =>
+      (!platform || a.platform === platform) &&
+      (showDisconnected || a.status !== 'REVOKED') &&
+      (showHidden || !a.hidden),
   );
   const [dialog, setDialog] = useState<{
     action: 'disconnect' | 'remove';
@@ -366,6 +382,10 @@ export function Accounts() {
 
   function onRowAction(account: SocialAccount, action: RowAction) {
     if (action === 'reconnect') return void onConnect();
+    if (action === 'hide' || action === 'unhide') {
+      setHidden(account.id, action === 'hide').catch(() => setNotice('actionFailed'));
+      return;
+    }
     setDialogError(undefined);
     setDialog({ action, account });
   }
@@ -385,7 +405,9 @@ export function Accounts() {
     }
   }
   const { invitations, create: createInvitation, revoke } = useProjectInvitations();
-  const [notice, setNotice] = useState<'inviteCopied' | 'inviteFailed' | null>(null);
+  const [notice, setNotice] = useState<'inviteCopied' | 'inviteFailed' | 'actionFailed' | null>(
+    null,
+  );
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const format = useFormatter();
 
@@ -516,6 +538,22 @@ export function Accounts() {
             onChange={setShowDisconnected}
             label={t('showDisconnected')}
           />
+          {hasHidden && (
+            <button
+              type="button"
+              onClick={() => setShowHidden((v) => !v)}
+              aria-pressed={showHidden}
+              aria-label={t(showHidden ? 'hideHidden' : 'showHidden')}
+              title={t(showHidden ? 'hideHidden' : 'showHidden')}
+              className={`icon-btn ml-auto h-10 w-10 ${showHidden ? 'bg-hover text-foreground' : ''}`}
+            >
+              {showHidden ? (
+                <Eye size={18} aria-hidden="true" />
+              ) : (
+                <EyeOff size={18} aria-hidden="true" />
+              )}
+            </button>
+          )}
         </div>
       )}
 

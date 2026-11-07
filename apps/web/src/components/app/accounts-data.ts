@@ -20,6 +20,8 @@ export type SocialAccount = {
   historyAvailableFrom: string | null;
   lastSuccessfulSyncAt: string | null;
   status: ConnectionStatus;
+  /** Hidden from Overview/Content by a member; syncing goes on. */
+  hidden: boolean;
   /** The latest sync run, or null before the first one starts. */
   lastSync: {
     status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'REAUTHORIZATION_REQUIRED';
@@ -77,6 +79,16 @@ export function useProjectAccounts() {
     [base, reload],
   );
 
+  /** Hides the account from Overview/Content, or shows it again. */
+  const setHidden = useCallback(
+    async (accountId: string, hidden: boolean) => {
+      if (!base) return;
+      await api(`${base}/accounts/${accountId}`, { method: 'PATCH', json: { hidden } });
+      await reload();
+    },
+    [base, reload],
+  );
+
   /** Deletes the account with all its data; `confirm` must repeat the account name. */
   const remove = useCallback(
     async (accountId: string, confirm: string) => {
@@ -92,6 +104,7 @@ export function useProjectAccounts() {
     reload,
     connect,
     disconnect,
+    setHidden,
     remove,
     canConnect: !!workspace && CONNECT_ROLES.includes(workspace.role),
   };

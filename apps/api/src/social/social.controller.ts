@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -72,6 +73,7 @@ export class SocialController {
         collectingSince: true,
         historyAvailableFrom: true,
         lastSuccessfulSyncAt: true,
+        hiddenAt: true,
         connection: { select: { status: true } },
         syncRuns: {
           orderBy: { createdAt: 'desc' },
@@ -80,8 +82,9 @@ export class SocialController {
         },
       },
     });
-    return accounts.map(({ connection, syncRuns, ...a }) => ({
+    return accounts.map(({ connection, syncRuns, hiddenAt, ...a }) => ({
       ...a,
+      hidden: hiddenAt !== null,
       status: connection.status,
       lastSync: syncRuns[0] ?? null,
     }));
@@ -119,6 +122,30 @@ export class SocialController {
         accessTokenExpiresAt: null,
         refreshTokenExpiresAt: null,
       },
+    });
+    return { ok: true };
+  }
+
+  /**
+   * Hides an account from Overview/Content (or shows it again). Purely presentational: syncing
+   * and the collected data are unaffected.
+   */
+  @Patch('workspaces/:workspaceId/projects/:projectId/accounts/:accountId')
+  @UseGuards(WorkspaceAccessGuard)
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async update(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Body() body: { hidden?: unknown },
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    if (typeof body?.hidden !== 'boolean') {
+      throw new BadRequestException({ errors: { hidden: 'invalid' } });
+    }
+    const account = await this.projectAccount(request.workspace, projectId, accountId);
+    await this.prisma.client.socialAccount.update({
+      where: { id: account.id },
+      data: { hiddenAt: body.hidden ? new Date() : null },
     });
     return { ok: true };
   }
