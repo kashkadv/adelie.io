@@ -185,7 +185,36 @@ export class InstagramAdapter implements PlatformAdapter {
       for (const a of body.data ?? []) ids.add(a.id);
       after = body.paging?.next ? body.paging.cursors?.after : undefined;
     } while (after);
+    if (ids.size === 0) await this.diagnose(accessToken, http, debug);
     return { accessToken, scopes: debug.data?.scopes ?? [], accountIds: [...ids] };
+  }
+
+  /** TEMPORARY (2026-11-07): logs where a login token's Instagram accounts live — ids only, no token. */
+  private async diagnose(accessToken: string, http: HttpClient, debug: DebugTokenResponse) {
+    const d = debug.data as Record<string, unknown> | undefined;
+    console.log('IG diag debug_token', JSON.stringify({ ...d, scopes: undefined }));
+    const probes: [string, Record<string, string>][] = [
+      ['/me', { fields: 'id,name' }],
+      ['/me/assigned_instagram_accounts', {}],
+      ['/me/accounts', { fields: 'id,name,instagram_business_account' }],
+      ['/me/assigned_business_asset_groups', {}],
+      ['/me/businesses', {}],
+      ['/me/assigned_pages', { fields: 'id,name,instagram_business_account' }],
+    ];
+    for (const [path, query] of probes) {
+      try {
+        const { body } = await http.request<unknown>({
+          path: v(path),
+          query,
+          headers: { Authorization: `Bearer ${accessToken}` },
+          sensitive: true,
+        });
+        console.log('IG diag', path, JSON.stringify(body).slice(0, 400));
+      } catch (error) {
+        const body = error instanceof HttpStatusError ? error.body : String(error);
+        console.log('IG diag', path, 'error', JSON.stringify(body).slice(0, 300));
+      }
+    }
   }
 
   refreshToken(): Promise<TokenSet> {
