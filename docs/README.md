@@ -36,3 +36,4 @@
 - [ADR-0013](decisions/0013-post-daily-metrics.md) — Щоденні метрики публікацій і метрики за період (прийнято)
 - [ADR-0014](decisions/0014-project-management.md) — Керування проєктами й налаштування проєкту (прийнято)
 - [ADR-0015](decisions/0015-instagram-integration.md) — Інтеграція Instagram (прийнято)
+- [ADR-0016](decisions/0016-user-preferences.md) — Налаштування інтерфейсу користувача (прийнято)

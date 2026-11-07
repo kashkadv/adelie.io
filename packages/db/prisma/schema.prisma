@@ -29,6 +29,7 @@ model User {
   socialConnections  SocialConnection[]
   profile            UserProfile?
   connectInvitations ConnectInvitation[]
+  preferences        UserPreference[]
 
   @@map("user")
 }
@@ -114,6 +115,19 @@ model UserProfile {
   updatedAt DateTime @updatedAt
 
   @@map("user_profile")
+}
+
+/// Per-user interface settings that follow the person across devices and projects (e.g. the
+/// Content table columns per platform). `key` names the setting; `value` is validated by the API.
+model UserPreference {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, key])
+  @@map("user_preference")
 }
 
 // ---------- Workspaces ----------

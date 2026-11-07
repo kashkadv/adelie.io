@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { api } from '@/lib/api';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { Checkbox } from '../ui/checkbox';
@@ -27,7 +27,9 @@ import { InfoTip } from '../ui/info-tip';
 import { Segmented } from '../ui/segmented';
 import { useProjectAccounts, type SocialAccount } from './accounts-data';
 import { EmptyState, PageHeader } from './page-header';
+import { ColumnPicker } from './column-picker';
 import { PostDialog } from './post-dialog';
+import { usePreferences } from './preferences';
 import { useWorkspace } from './workspace-context';
 
 type Platform = SocialAccount['platform'];
@@ -43,8 +45,8 @@ type MetricKey =
   | 'comments'
   | 'shares';
 type Metrics = Partial<Record<MetricKey, number | null>>;
-/** Metrics that can be a table column (video views go to the CSV only). */
-type ColumnKey = Exclude<MetricKey, 'videoViews'>;
+/** A table column: a metric or the publication date. */
+type Column = MetricKey | 'publishedAt';
 type Post = {
   id: string;
   url: string | null;
@@ -70,24 +72,51 @@ type Page = {
 };
 type Board = { id: string; name: string; accountId: string; pinCount: number | null };
 
-/** Metric columns per platform (four fit the table); the publication date always comes last. */
-const PLATFORM_METRICS: Record<Platform, ColumnKey[]> = {
-  PINTEREST: ['impressions', 'saves', 'pinClicks', 'outboundClicks'],
-  INSTAGRAM: ['views', 'reach', 'likes', 'saves'],
-  TIKTOK: ['impressions', 'saves', 'pinClicks', 'outboundClicks'],
+/**
+ * Every column a platform offers, in the default order (the same lists the API validates,
+ * apps/api/src/preferences/preferences.ts). The CSV "all metrics" export uses them too.
+ */
+const ALL_COLUMNS: Record<Platform, Column[]> = {
+  PINTEREST: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'videoViews', 'publishedAt'],
+  INSTAGRAM: ['views', 'reach', 'likes', 'comments', 'saves', 'shares', 'publishedAt'],
+  TIKTOK: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'videoViews', 'publishedAt'],
 };
-/** Everything a platform reports per post, for the CSV export. */
-const CSV_METRICS: Record<Platform, MetricKey[]> = {
-  PINTEREST: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'videoViews'],
-  INSTAGRAM: ['views', 'reach', 'likes', 'comments', 'saves', 'shares'],
-  TIKTOK: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'videoViews'],
+/** Shown until the person picks their own (Content → Columns). */
+const DEFAULT_COLUMNS: Record<Platform, Column[]> = {
+  PINTEREST: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'publishedAt'],
+  INSTAGRAM: ['views', 'reach', 'likes', 'saves', 'publishedAt'],
+  TIKTOK: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'publishedAt'],
 };
+/** Daily post values exist only for these (ADR-0013): others show "—" for a period. */
+const PERIOD_METRICS: Column[] = ['impressions', 'saves', 'pinClicks', 'outboundClicks'];
 /** Platforms whose posts have daily values (ADR-0013); others show lifetime totals only. */
 const HAS_PERIODS: Platform[] = ['PINTEREST'];
-type Sort = ColumnKey | 'publishedAt';
+type Sort = Column;
 const OWNERSHIP = ['own', 'saved', 'all'] as const;
 type Ownership = (typeof OWNERSHIP)[number];
-const ROW_GRID = 'grid-cols-[repeat(4,minmax(0,1fr))_8rem]';
+const columnsKey = (platform: Platform) => `content.columns.${platform}`;
+
+/** The saved choice, if it is still valid for the platform (columns may change between versions). */
+function savedColumns(value: unknown, platform: Platform): Column[] | null {
+  const list = (value as { columns?: unknown } | undefined)?.columns;
+  if (!Array.isArray(list)) return null;
+  const known = list.filter((c): c is Column => ALL_COLUMNS[platform].includes(c as Column));
+  return known.length ? known : null;
+}
+
+/**
+ * Column grid shared by the header and the rows: metrics share the space, the date is fixed. The
+ * width grows with the number of columns (metrics get narrower when there are many).
+ */
+function columnGrid(columns: Column[]) {
+  const metrics = columns.filter((c) => c !== 'publishedAt').length;
+  const metricRem = metrics > 5 ? 6 : 7.5;
+  const width = metrics * metricRem + (columns.length - metrics) * 8 + (columns.length - 1) * 1.5;
+  return {
+    '--cols': columns.map((c) => (c === 'publishedAt' ? '8rem' : 'minmax(0,1fr)')).join(' '),
+    '--table-w': `${width}rem`,
+  } as CSSProperties;
+}
 
 function PostRow({
   post,
@@ -99,7 +128,7 @@ function PostRow({
 }: {
   post: Post;
   sort: Sort;
-  columns: Sort[];
+  columns: Column[];
   selected: boolean;
   onSelect: (selected: boolean) => void;
   onOpen: () => void;
@@ -169,7 +198,10 @@ function PostRow({
         </button>
       </div>
 
-      <dl className={`tabular grid shrink-0 ${ROW_GRID} gap-6 text-right xl:w-[44rem]`}>
+      <dl
+        style={columnGrid(columns)}
+        className="tabular grid shrink-0 grid-cols-3 gap-x-6 gap-y-2 text-right sm:grid-cols-4 md:grid-cols-5 xl:w-(--table-w) xl:[grid-template-columns:var(--cols)]"
+      >
         {columns.map((key) => {
           const metric = key === 'publishedAt' ? null : (post.metrics?.[key] ?? null);
           const text =
@@ -249,14 +281,26 @@ export function Content() {
   const [extra, setExtra] = useState<Post[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [csvAll, setCsvAll] = useState(false);
+  const { prefs, setPreference } = usePreferences();
+  const prefsReady = prefs !== null;
   const base = workspace && project ? `/workspaces/${workspace.id}/projects/${project.id}` : null;
 
   const platformAccounts = (accounts ?? []).filter((a) => a.platform === platform);
-  const metricColumns = PLATFORM_METRICS[platform ?? 'PINTEREST'];
-  const columns: Sort[] = [...metricColumns, 'publishedAt'];
-  // A sort column of another platform falls back to this platform's first metric.
-  const sort: Sort = columns.includes(chosenSort) ? chosenSort : metricColumns[0]!;
+  const columnsPlatform = platform ?? 'PINTEREST';
+  const saved = prefs ? savedColumns(prefs[columnsKey(columnsPlatform)], columnsPlatform) : null;
+  const columns = saved ?? DEFAULT_COLUMNS[columnsPlatform];
   const hasPeriods = !!platform && HAS_PERIODS.includes(platform);
+  const periodActive = hasPeriods && resolveRange(period) !== null;
+  /** Lifetime-only metrics cannot rank posts by a period. */
+  const sortable = (c: Column) =>
+    !periodActive || c === 'publishedAt' || PERIOD_METRICS.includes(c);
+  // A sort column that is hidden, of another platform or not sortable now falls back to the first
+  // sortable column shown (or the publication date).
+  const sort: Sort =
+    columns.includes(chosenSort) && sortable(chosenSort)
+      ? chosenSort
+      : (columns.find(sortable) ?? 'publishedAt');
   /** Pinterest calls its posts pins; every other platform — posts. */
   const kind = platform === 'PINTEREST' ? 'pin' : 'post';
 
@@ -277,23 +321,23 @@ export function Content() {
     };
   }, [base]);
 
-  const query = useMemo(() => {
-    const range = hasPeriods ? resolveRange(period) : null;
-    const pub = resolveRange(published);
-    return new URLSearchParams({
-      sort,
-      ownership,
-      ...(platform ? { platform } : {}),
-      ...(range ?? {}),
-      ...(pub ? { publishedFrom: pub.from, publishedTo: pub.to } : {}),
-      ...(accountId ? { accountId } : {}),
-      ...(boardId ? { boardId } : {}),
-      ...(debounced ? { q: debounced } : {}),
-    });
-  }, [sort, ownership, platform, hasPeriods, period, published, accountId, boardId, debounced]);
+  // A plain string: effects re-run only when the request really changes.
+  const range = hasPeriods ? resolveRange(period) : null;
+  const pub = resolveRange(published);
+  const query = new URLSearchParams({
+    sort,
+    ownership,
+    ...(platform ? { platform } : {}),
+    ...(range ?? {}),
+    ...(pub ? { publishedFrom: pub.from, publishedTo: pub.to } : {}),
+    ...(accountId ? { accountId } : {}),
+    ...(boardId ? { boardId } : {}),
+    ...(debounced ? { q: debounced } : {}),
+  }).toString();
 
   useEffect(() => {
-    if (!base || !platform) return;
+    // Wait for the settings: they decide the columns, and so the sort.
+    if (!base || !platform || !prefsReady) return;
     let cancelled = false;
     api<Page>(`${base}/content?${query}`).then(
       (p) => {
@@ -307,7 +351,7 @@ export function Content() {
     return () => {
       cancelled = true;
     };
-  }, [base, platform, query]);
+  }, [base, platform, query, prefsReady]);
 
   async function loadMore() {
     if (!base || !data) return;
@@ -359,7 +403,12 @@ export function Content() {
 
   function exportCsv() {
     const rows = items.filter((p) => selected.has(p.id));
-    const metricKeys = CSV_METRICS[platform ?? 'PINTEREST'];
+    // What is shown, in its order — or every metric the platform has.
+    const fields = csvAll ? ALL_COLUMNS[columnsPlatform] : columns;
+    const label = (c: Column) =>
+      c === 'publishedAt' ? t('metrics.publishedAt') : t(`csv.metrics.${c}`);
+    const value = (p: Post, c: Column) =>
+      c === 'publishedAt' ? p.publishedAt?.slice(0, 10) : (p.metrics?.[c] ?? null);
     const csv = toCsv([
       [
         t('csv.title'),
@@ -369,8 +418,7 @@ export function Content() {
         t('board'),
         t('csv.type'),
         t('csv.own'),
-        t('metrics.publishedAt'),
-        ...metricKeys.map((k) => t(`csv.metrics.${k}`)),
+        ...fields.map(label),
         t('csv.periodFrom'),
         t('csv.periodTo'),
       ],
@@ -382,8 +430,7 @@ export function Content() {
         p.board?.name,
         t(`types.${p.contentType}`),
         p.isOwn ? t('csv.yes') : t('csv.no'),
-        p.publishedAt?.slice(0, 10),
-        ...metricKeys.map((k) => p.metrics?.[k] ?? null),
+        ...fields.map((c) => value(p, c)),
         data?.period?.from ?? t('csv.lifetime'),
         data?.period?.to ?? p.asOf?.slice(0, 10),
       ]),
@@ -518,10 +565,29 @@ export function Content() {
             label={t('sortBy')}
             value={sort}
             onChange={(v) => setSort(v as Sort)}
-            options={columns.map((c) => ({ value: c, label: t(`metrics.${c}`) }))}
+            options={columns.filter(sortable).map((c) => ({ value: c, label: t(`metrics.${c}`) }))}
             clearable={false}
           />
         </span>
+        {platform && (
+          <ColumnPicker
+            // A fresh panel per platform: its order state belongs to one platform's columns.
+            key={platform}
+            all={ALL_COLUMNS[platform]}
+            value={columns}
+            labels={
+              Object.fromEntries(
+                ALL_COLUMNS[platform].map((c) => [
+                  c,
+                  c === 'publishedAt' ? t('metrics.publishedAt') : t(`csv.metrics.${c}`),
+                ]),
+              ) as Record<Column, string>
+            }
+            isDefault={!saved}
+            onChange={(next) => setPreference(columnsKey(platform), { columns: next })}
+            onReset={() => setPreference(columnsKey(platform), null)}
+          />
+        )}
         <label className="ml-auto flex h-9 w-full items-center gap-2 rounded-full border border-line px-3.5 text-sm focus-within:border-[var(--field-focus)] sm:w-56">
           <Search size={15} className="shrink-0 text-muted" aria-hidden="true" />
           <input
@@ -560,25 +626,40 @@ export function Content() {
               />
               <span className="pl-[68px]">{t('pin', { kind })}</span>
             </span>
-            <span className={`grid w-[44rem] ${ROW_GRID} gap-6 text-right`}>
+            <span
+              style={columnGrid(columns)}
+              className="grid w-(--table-w) [grid-template-columns:var(--cols)] gap-6 text-right"
+            >
               {columns.map((key) => (
-                <span key={key} className="flex items-center justify-end gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setSort(key)}
-                    aria-pressed={sort === key}
-                    className={`flex items-center gap-1 whitespace-nowrap hover:text-foreground ${sort === key ? 'font-semibold text-foreground' : ''}`}
-                  >
-                    {sort === key && <ArrowDown size={12} aria-hidden="true" />}
-                    {t(`metrics.${key}`)}
-                  </button>
-                  {key !== 'publishedAt' && <InfoTip text={tMetric(key)} />}
+                <span key={key} className="flex min-w-0 items-center justify-end gap-1.5">
+                  {sortable(key) ? (
+                    <button
+                      type="button"
+                      onClick={() => setSort(key)}
+                      aria-pressed={sort === key}
+                      className={`flex min-w-0 items-center gap-1 whitespace-nowrap hover:text-foreground ${sort === key ? 'font-semibold text-foreground' : ''}`}
+                    >
+                      {sort === key && <ArrowDown size={12} aria-hidden="true" />}
+                      <span className="truncate">{t(`metrics.${key}`)}</span>
+                    </button>
+                  ) : (
+                    <span className="truncate whitespace-nowrap">{t(`metrics.${key}`)}</span>
+                  )}
+                  {key !== 'publishedAt' && (
+                    <InfoTip
+                      text={
+                        periodActive && !sortable(key)
+                          ? `${tMetric(key)} ${t('lifetimeOnly')}`
+                          : tMetric(key)
+                      }
+                    />
+                  )}
                 </span>
               ))}
             </span>
             <span className="w-8" />
           </div>
-          {data === null ? (
+          {data === null || !prefsReady ? (
             <p className="px-5 py-10 text-center text-sm text-muted">…</p>
           ) : (
             <ul className="divide-y divide-line">
@@ -617,6 +698,17 @@ export function Content() {
           <div className="glass glass-strong animate-rise pointer-events-auto flex items-center gap-2 rounded-full py-1.5 pr-1.5 pl-5 text-sm shadow-[0_8px_30px_var(--shadow)]">
             <span className="font-medium whitespace-nowrap">
               {t('selected', { count: selectedCount, kind })}
+            </span>
+            <span className="ml-2 flex items-center gap-2 pl-2">
+              <Checkbox checked={csvAll} onChange={setCsvAll} label={t('csvAll')} />
+              <button
+                type="button"
+                onClick={() => setCsvAll(!csvAll)}
+                className="whitespace-nowrap text-muted hover:text-foreground"
+              >
+                {t('csvAll')}
+              </button>
+              <InfoTip text={t('csvAllHint')} />
             </span>
             <button
               type="button"

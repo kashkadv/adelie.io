@@ -116,7 +116,8 @@
     "reach": "How many different accounts saw the post at least once.",
     "likes": "Number of likes.",
     "comments": "Number of comments.",
-    "shares": "How many times the post was shared."
+    "shares": "How many times the post was shared.",
+    "videoViews": "How many times the pin’s video was viewed. Lifetime only: Pinterest does not report it per day."
   },
   "Sections": {
     "soonTitle": "Coming soon",
@@ -391,7 +392,8 @@
       "reach": "Reach",
       "likes": "Likes",
       "comments": "Comments",
-      "shares": "Shares"
+      "shares": "Shares",
+      "videoViews": "Video views"
     },
     "types": {
       "IMAGE": "Image",
@@ -468,7 +470,17 @@
     "metricsLifetime": "lifetime metrics",
     "dataSince": "data since {date}",
     "periodHint": "Daily pin metrics summed over the period. Pinterest gives pin history 90 days back; older days build up from the moment the account was connected. “—” means no data, not zero. Pins saved from other accounts have no metrics.",
-    "lifetimeHintInstagram": "Instagram post statistics are lifetime totals: Meta does not provide them by day, so there are no period metrics here yet. “—” means no data, not zero."
+    "lifetimeHintInstagram": "Instagram post statistics are lifetime totals: Meta does not provide them by day, so there are no period metrics here yet. “—” means no data, not zero.",
+    "lifetimeOnly": "Pinterest does not report this metric per day — it shows “—” for a period.",
+    "csvAll": "All metrics",
+    "csvAllHint": "Unchecked, the CSV has the columns shown, in their order; checked, every metric of the platform.",
+    "columns": {
+      "label": "Columns",
+      "title": "Table columns",
+      "hint": "Your columns and their order are saved for you — the same on every device and in every project, separately for each platform. Drag a handle or use ↑/↓ to reorder.",
+      "move": "Move “{column}”",
+      "reset": "Reset to default"
+    }
   },
   "Post": {
     "close": "Close",

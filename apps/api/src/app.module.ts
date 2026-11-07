@@ -4,6 +4,7 @@ import { auth } from './auth/auth.js';
 import { ContentController } from './content/content.controller.js';
 import { HealthController } from './health.controller.js';
 import { OverviewController } from './overview/overview.controller.js';
+import { PreferencesController } from './preferences/preferences.controller.js';
 import { PrismaService } from './prisma.service.js';
 import { ProfileController } from './profile/profile.controller.js';
 import { ConnectService } from './social/connect.service.js';
@@ -22,6 +23,7 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
     HealthController,
     InvitationsController,
     OverviewController,
+    PreferencesController,
     ProfileController,
     SocialController,
     WorkspacesController,
