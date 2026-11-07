@@ -2,7 +2,7 @@
 // (Facebook Login for Business with a read-only configuration). Read-only: instagram_basic +
 // instagram_manage_insights. The token is a system-user token that does not expire; it can grant
 // several Instagram accounts, so every data call names the account (`ctx.accountExternalId`).
-import { AdapterError } from '../errors.js';
+import { AdapterError, isAdapterError } from '../errors.js';
 import { HttpStatusError, type HttpClient } from '../http.js';
 import type {
   AccountData,
@@ -31,8 +31,10 @@ export const META_GRAPH_API = 'https://graph.facebook.com';
 export const META_GRAPH_VERSION = 'v27.0';
 export const INSTAGRAM_AUTHORIZE_URL = `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth`;
 
-/** Account metrics available per day as a series (PoC: only these two support time_series). */
-export const INSTAGRAM_SERIES_METRICS = ['reach', 'follower_count'] as const;
+/** Account metrics available per day as a series (PoC: only reach and follower_count do). */
+export const INSTAGRAM_SERIES_METRICS = ['reach'] as const;
+/** New followers per day: Meta serves only the last 30 days, without today. */
+export const INSTAGRAM_FOLLOWER_DAYS = 30;
 /** Account metrics available only as a total over a range — requested one day at a time. */
 export const INSTAGRAM_DAILY_TOTAL_METRICS = [
   'views',
@@ -70,6 +72,8 @@ const MEDIA_FIELDS = [
 ].join(',');
 
 const v = (path: string) => `/${META_GRAPH_VERSION}${path}`;
+const addDays = (date: string, n: number) =>
+  new Date(Date.parse(date) + n * 86_400_000).toISOString().slice(0, 10);
 
 /** Waiting for Meta to assign the selected accounts after login (see exchangeCode). */
 const ASSIGNMENT_ATTEMPTS = 8;
@@ -183,7 +187,6 @@ export class InstagramAdapter implements PlatformAdapter {
       for (const id of await this.assignedAccounts(accessToken, http)) ids.add(id);
       if (ids.size) console.log(`Instagram accounts assigned after attempt ${attempt + 1}`);
     }
-    if (ids.size === 0) await this.diagnose(accessToken, http, debug);
     return { accessToken, scopes: debug.data?.scopes ?? [], accountIds: [...ids] };
   }
 
@@ -204,34 +207,6 @@ export class InstagramAdapter implements PlatformAdapter {
       after = body.paging?.next ? body.paging.cursors?.after : undefined;
     } while (after);
     return ids;
-  }
-
-  /** TEMPORARY (2026-11-07): logs where a login token's Instagram accounts live — ids only, no token. */
-  private async diagnose(accessToken: string, http: HttpClient, debug: DebugTokenResponse) {
-    const d = debug.data as Record<string, unknown> | undefined;
-    console.log('IG diag debug_token', JSON.stringify({ ...d, scopes: undefined }));
-    const probes: [string, Record<string, string>][] = [
-      ['/me', { fields: 'id,name' }],
-      ['/me/assigned_instagram_accounts', {}],
-      ['/me/accounts', { fields: 'id,name,instagram_business_account' }],
-      ['/me/assigned_business_asset_groups', {}],
-      ['/me/businesses', {}],
-      ['/me/assigned_pages', { fields: 'id,name,instagram_business_account' }],
-    ];
-    for (const [path, query] of probes) {
-      try {
-        const { body } = await http.request<unknown>({
-          path: v(path),
-          query,
-          headers: { Authorization: `Bearer ${accessToken}` },
-          sensitive: true,
-        });
-        console.log('IG diag', path, JSON.stringify(body).slice(0, 400));
-      } catch (error) {
-        const body = error instanceof HttpStatusError ? error.body : String(error);
-        console.log('IG diag', path, 'error', JSON.stringify(body).slice(0, 300));
-      }
-    }
   }
 
   refreshToken(): Promise<TokenSet> {
@@ -312,6 +287,26 @@ export class InstagramAdapter implements PlatformAdapter {
         until: nextDay(chunk.to),
       });
       points.push(...mapTimeSeries(body.data ?? [], today));
+    }
+
+    // New followers: a series limited to the last 30 full days.
+    const followersFrom = [query.from, addDays(today, -INSTAGRAM_FOLLOWER_DAYS)].sort()[1]!;
+    const followersTo = [query.to, addDays(today, -1)].sort()[0]!;
+    if (followersFrom <= followersTo) {
+      try {
+        const body = await this.get<{ data?: InstagramInsight[] }>(ctx, `/${id}/insights`, {
+          metric: 'follower_count',
+          period: 'day',
+          metric_type: 'time_series',
+          since: followersFrom,
+          until: nextDay(followersTo),
+        });
+        points.push(...mapTimeSeries(body.data ?? [], today));
+      } catch (error) {
+        // Not served for some accounts (e.g. under 100 followers): the other metrics still count.
+        if (!isAdapterError(error, 'INVALID') && !isAdapterError(error, 'NOT_AVAILABLE'))
+          throw error;
+      }
     }
 
     // Totals-only metrics: one request per day yields that day's values.

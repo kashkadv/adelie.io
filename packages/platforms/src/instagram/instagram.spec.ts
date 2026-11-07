@@ -200,21 +200,37 @@ describe('InstagramAdapter data', () => {
     const totals = (v: number) => ({
       data: [{ name: 'views', period: 'day', total_value: { value: v } }],
     });
+    const followers = {
+      data: [
+        {
+          name: 'follower_count',
+          values: [{ value: 2, end_time: '2026-11-06T07:00:00+0000' }],
+        },
+      ],
+    };
     const { client, seen } = http({
-      [`/v27.0/${IG}/insights`]: [series, totals(10), totals(12)],
+      [`/v27.0/${IG}/insights`]: [series, followers, totals(10), totals(12)],
     });
     const points = await adapter.getAccountMetrics(ctx(client), {
       from: '2026-11-04',
       to: '2026-11-05',
     });
-    expect(seen).toHaveLength(3);
+    expect(seen).toHaveLength(4);
     expect(seen[0]!.url.searchParams.get('metric_type')).toBe('time_series');
     expect(seen[0]!.url.searchParams.get('until')).toBe('2026-11-06');
-    expect(seen[1]!.url.searchParams.get('since')).toBe('2026-11-04');
-    expect(seen[1]!.url.searchParams.get('until')).toBe('2026-11-05');
+    expect(seen[1]!.url.searchParams.get('metric')).toBe('follower_count');
+    expect(seen[2]!.url.searchParams.get('since')).toBe('2026-11-04');
+    expect(seen[2]!.url.searchParams.get('until')).toBe('2026-11-05');
     expect(points).toEqual([
       { providerKey: 'reach', scope: 'ACCOUNT', date: '2026-11-04', value: 5, dataStatus: 'READY' },
       { providerKey: 'reach', scope: 'ACCOUNT', date: '2026-11-05', value: 7, dataStatus: 'READY' },
+      {
+        providerKey: 'follower_count',
+        scope: 'ACCOUNT',
+        date: '2026-11-05',
+        value: 2,
+        dataStatus: 'READY',
+      },
       {
         providerKey: 'views',
         scope: 'ACCOUNT',
