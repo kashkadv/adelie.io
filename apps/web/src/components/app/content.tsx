@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { Checkbox } from '../ui/checkbox';
@@ -27,6 +27,7 @@ import { InfoTip } from '../ui/info-tip';
 import { Segmented } from '../ui/segmented';
 import { useProjectAccounts, type SocialAccount } from './accounts-data';
 import { EmptyState, PageHeader } from './page-header';
+import { PostDialog } from './post-dialog';
 import { useWorkspace } from './workspace-context';
 
 type Platform = SocialAccount['platform'];
@@ -94,12 +95,14 @@ function PostRow({
   columns,
   selected,
   onSelect,
+  onOpen,
 }: {
   post: Post;
   sort: Sort;
   columns: Sort[];
   selected: boolean;
   onSelect: (selected: boolean) => void;
+  onOpen: () => void;
 }) {
   const t = useTranslations('Content');
   const format = useFormatter();
@@ -120,38 +123,49 @@ function PostRow({
     >
       <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
         <Checkbox checked={selected} onChange={onSelect} label={t('select')} />
-        <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-hover">
-          {post.thumbnailUrl && (
-            // External platform image: plain <img>, lazy.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={post.thumbnailUrl}
-              alt=""
-              loading="lazy"
-              className="h-full w-full object-cover"
-            />
-          )}
-          {post.contentType === 'VIDEO' && (
-            <span className="absolute right-1 bottom-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white">
-              <Play size={10} fill="currentColor" aria-hidden="true" />
-            </span>
-          )}
-        </span>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium" title={title}>
-            {title}
-          </p>
-          <p className="flex min-w-0 items-center gap-2 text-xs text-muted">
-            {!post.isOwn && (
-              <span className="shrink-0 rounded-full border border-line px-1.5 leading-4">
-                {t('savedBadge')}
+        {/* The post itself opens its card (all metrics, daily dynamics). */}
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-haspopup="dialog"
+          className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left"
+        >
+          <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-hover transition-transform duration-200 group-hover:scale-[1.04]">
+            {post.thumbnailUrl && (
+              // External platform image: plain <img>, lazy.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={post.thumbnailUrl}
+                alt=""
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+            )}
+            {post.contentType === 'VIDEO' && (
+              <span className="absolute right-1 bottom-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white">
+                <Play size={10} fill="currentColor" aria-hidden="true" />
               </span>
             )}
-            <span className="truncate">
-              {[post.board?.name, t(`types.${post.contentType}`)].filter(Boolean).join(' · ')}
-            </span>
-          </p>
-        </div>
+          </span>
+          <div className="min-w-0">
+            <p
+              className="truncate text-sm font-medium group-hover:underline group-hover:underline-offset-2"
+              title={title}
+            >
+              {title}
+            </p>
+            <p className="flex min-w-0 items-center gap-2 text-xs text-muted">
+              {!post.isOwn && (
+                <span className="shrink-0 rounded-full border border-line px-1.5 leading-4">
+                  {t('savedBadge')}
+                </span>
+              )}
+              <span className="truncate">
+                {[post.board?.name, t(`types.${post.contentType}`)].filter(Boolean).join(' · ')}
+              </span>
+            </p>
+          </div>
+        </button>
       </div>
 
       <dl className={`tabular grid shrink-0 ${ROW_GRID} gap-6 text-right xl:w-[44rem]`}>
@@ -224,7 +238,9 @@ export function Content() {
   const [accountId, setAccountId] = useState('');
   const [boardId, setBoardId] = useState('');
   const [ownership, setOwnership] = useState<Ownership>('own');
-  const [chosenSort, setSort] = useState<Sort>('impressions');
+  // Newest first by default: the freshest posts are what people check most.
+  const [chosenSort, setSort] = useState<Sort>('publishedAt');
+  const [openId, setOpenId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [boards, setBoards] = useState<Board[]>([]);
@@ -303,6 +319,8 @@ export function Content() {
   }
 
   const items = [...(data?.items ?? []), ...extra];
+  const openIndex = openId ? items.findIndex((p) => p.id === openId) : -1;
+  const closePost = useCallback(() => setOpenId(null), []);
   const selectedCount = items.filter((p) => selected.has(p.id)).length;
   const allChecked: boolean | 'mixed' =
     selectedCount === 0 ? false : selectedCount === items.length ? true : 'mixed';
@@ -567,6 +585,7 @@ export function Content() {
                   post={post}
                   sort={sort}
                   columns={columns}
+                  onOpen={() => setOpenId(post.id)}
                   selected={selected.has(post.id)}
                   onSelect={(on) => toggle(post.id, on)}
                 />
@@ -615,6 +634,20 @@ export function Content() {
             </button>
           </div>
         </div>
+      )}
+
+      {openId && base && (
+        <PostDialog
+          base={base}
+          postId={openId}
+          onClose={closePost}
+          onPrevious={openIndex > 0 ? () => setOpenId(items[openIndex - 1]!.id) : undefined}
+          onNext={
+            openIndex >= 0 && openIndex < items.length - 1
+              ? () => setOpenId(items[openIndex + 1]!.id)
+              : undefined
+          }
+        />
       )}
     </>
   );

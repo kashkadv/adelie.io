@@ -469,5 +469,52 @@
     "dataSince": "data since {date}",
     "periodHint": "Daily pin metrics summed over the period. Pinterest gives pin history 90 days back; older days build up from the moment the account was connected. “—” means no data, not zero. Pins saved from other accounts have no metrics.",
     "lifetimeHintInstagram": "Instagram post statistics are lifetime totals: Meta does not provide them by day, so there are no period metrics here yet. “—” means no data, not zero."
+  },
+  "Post": {
+    "close": "Close",
+    "previous": "Previous post",
+    "next": "Next post",
+    "failed": "Could not load the post.",
+    "published": "Published {date}",
+    "open": "Open on {platform}",
+    "metricsTitle": "Lifetime statistics",
+    "metricsHint": "Totals the platform reported as of {date}. “—” means no data, not zero.",
+    "metricsHintNoDate": "Totals the platform reported. “—” means no data, not zero.",
+    "noMetrics": "The platform reported no statistics for this post.",
+    "instagramNoDaily": "Instagram gives no daily post statistics — daily dynamics will come from Adelie’s own daily snapshots.",
+    "dailyTitle": "Daily dynamics",
+    "dailyHint": "Daily values from {from} to {to}. Dashed: days the platform is still finalizing.",
+    "dailyTotal": "Total for these days: {value}",
+    "metrics": {
+      "impressions": "Impressions",
+      "saves": "Saves",
+      "pin_clicks": "Pin clicks",
+      "outbound_clicks": "Outbound clicks",
+      "reactions": "Reactions",
+      "comments": "Comments",
+      "profile_visits": "Profile visits",
+      "follows": "New followers",
+      "video_views": "Video views",
+      "video_10s_views": "10s+ views",
+      "video_p95_views": "Watched to the end",
+      "views": "Views",
+      "reach": "Reach",
+      "likes": "Likes",
+      "shares": "Shares",
+      "engagements": "Interactions"
+    },
+    "hints": {
+      "impressions": "How many times the pin appeared on screen.",
+      "pin_clicks": "Opens of and clicks on the pin, including clicks to your site.",
+      "outbound_clicks": "Clicks from the pin to your website or shop.",
+      "reactions": "Reactions to the pin (e.g. likes).",
+      "profile_visits": "How many people went from the pin to your profile.",
+      "follows": "How many people followed the account from this pin.",
+      "video_10s_views": "Views that lasted at least 10 seconds.",
+      "video_p95_views": "Views where at least 95% of the video was watched.",
+      "views": "How many times the post was played or displayed.",
+      "reach": "How many different accounts saw the post at least once.",
+      "engagements": "Likes, comments, saves and shares together."
+    }
   }
 }

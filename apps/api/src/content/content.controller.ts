@@ -111,7 +111,7 @@ export class ContentController {
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     await this.visibleProject(request.workspace, projectId);
-    const sort = (query['sort'] ?? 'impressions') as Sort;
+    const sort = (query['sort'] ?? 'publishedAt') as Sort;
     if (!SORTS.includes(sort)) throw new BadRequestException('Unknown sort');
     const page = Math.max(0, Number(query['page'] ?? 0) || 0);
     const platform = query['platform'] ?? 'PINTEREST';
@@ -301,6 +301,83 @@ export class ContentController {
           },
         ];
       }),
+    };
+  }
+
+  /**
+   * One post with everything collected for it: every lifetime metric the platform reports (latest
+   * snapshot per metric) and, where the platform has them (ADR-0013), daily values for the covered
+   * days — a covered day without a row is zero activity, outside the coverage there is no data.
+   */
+  @Get('content/:postId')
+  async post(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('postId', ParseUUIDPipe) postId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    await this.visibleProject(request.workspace, projectId);
+    const db = this.prisma.client;
+    const post = await db.socialPost.findFirst({
+      where: {
+        id: postId,
+        projectId,
+        workspaceId: request.workspace.workspaceId,
+        account: { hiddenAt: null, connection: { status: { not: 'REVOKED' } } },
+      },
+      select: {
+        ...POST_SELECT,
+        dailyFrom: true,
+        account: { select: { id: true, username: true, displayName: true, platform: true } },
+      },
+    });
+    if (!post) throw new NotFoundException();
+    const { latest, ...rest } = post;
+
+    const snapshots = await db.postMetricValue.findMany({
+      where: { postId, dimensionKey: '' },
+      distinct: ['metricId'],
+      orderBy: [{ metricId: 'asc' }, { date: 'desc' }],
+      select: { value: true, dataStatus: true, date: true, metric: { select: { key: true } } },
+    });
+
+    type DailyPoint = { value: number | null; status: string };
+    let daily: { from: string; to: string; series: Record<string, DailyPoint[]> } | null = null;
+    if (post.dailyFrom && post.dailyTo) {
+      const from = day(post.dailyFrom);
+      const to = day(post.dailyTo);
+      const rows = await db.postMetricDaily.findMany({
+        where: { postId },
+        select: { date: true, value: true, dataStatus: true, metric: { select: { key: true } } },
+      });
+      const days = Math.round((asDate(to).getTime() - asDate(from).getTime()) / DAY_MS) + 1;
+      const series: Record<string, DailyPoint[]> = {};
+      for (const r of rows) {
+        const i = Math.round((r.date.getTime() - asDate(from).getTime()) / DAY_MS);
+        if (i < 0 || i >= days) continue;
+        // Covered days without a row had no activity: zero, settled.
+        series[r.metric.key] ??= Array.from({ length: days }, () => ({
+          value: 0,
+          status: 'READY',
+        }));
+        series[r.metric.key]![i] = {
+          value: r.value === null ? null : Math.round(r.value),
+          status: r.dataStatus,
+        };
+      }
+      daily = { from, to, series };
+    }
+
+    return {
+      ...rest,
+      dataStatus: latest?.dataStatus ?? null,
+      asOf: latest?.asOfDate ?? null,
+      metrics: snapshots.map((m) => ({
+        key: m.metric.key,
+        value: m.value === null ? null : Math.round(m.value * 100) / 100,
+        dataStatus: m.dataStatus,
+        date: day(m.date),
+      })),
+      daily,
     };
   }
 
