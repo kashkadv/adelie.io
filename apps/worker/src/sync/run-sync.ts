@@ -33,7 +33,8 @@ const REFRESH_ACCESS_BEFORE_MS = 7 * 24 * 3600 * 1000;
  * synced daily never lets it lapse (docs/integrations/pinterest.md).
  */
 const REFRESH_REFRESH_BEFORE_MS = 30 * 24 * 3600 * 1000;
-const API_VERSION = 'v5';
+/** Recorded with every value (ADR-0008 provenance). */
+const API_VERSION: Record<string, string> = { PINTEREST: 'v5', INSTAGRAM: 'v27.0' };
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
 const asDate = (yyyyMmDd: string) => new Date(`${yyyyMmDd}T00:00:00Z`);
@@ -139,7 +140,12 @@ export async function runSync(
     await storeTokens(tokens);
   }
 
-  const ctx = (): AdapterContext => ({ accessToken, http, today: day(now()) });
+  const ctx = (): AdapterContext => ({
+    accessToken,
+    accountExternalId: account.externalId,
+    http,
+    today: day(now()),
+  });
 
   /** Runs a step; on an expired token refreshes once and retries; NOT_AVAILABLE skips the step. */
   async function step(name: string, fn: () => Promise<void>): Promise<StepOutcome> {
@@ -190,7 +196,7 @@ export async function runSync(
         dataStatus: p.dataStatus,
         providerStatus: p.providerStatus ?? null,
         source,
-        apiVersion: API_VERSION,
+        apiVersion: API_VERSION[account!.platform] ?? '',
         fetchedAt: now(),
       };
       await prisma.accountMetricValue.upsert({
@@ -435,8 +441,8 @@ export async function runSync(
             value: m.value,
             dataStatus: m.dataStatus,
             providerStatus: m.providerStatus ?? null,
-            source: 'pins',
-            apiVersion: API_VERSION,
+            source: 'posts',
+            apiVersion: API_VERSION[account!.platform] ?? '',
             fetchedAt: now(),
           };
           await prisma.postMetricValue.upsert({

@@ -11,7 +11,6 @@ import {
   EyeOff,
   Link2,
   MoreHorizontal,
-  Pin,
   Plug,
   Plus,
   RefreshCw,
@@ -29,26 +28,30 @@ import {
   isSyncing,
   useProjectAccounts,
   useProjectInvitations,
+  type PlatformSlug,
   type SocialAccount,
 } from './accounts-data';
+import { PlatformIcon } from '../ui/platform-icon';
 import { EmptyState, PageHeader } from './page-header';
 
 type ConnectResult = 'connected' | 'denied' | 'expired' | 'alreadyConnected' | 'error';
 const RESULTS: ConnectResult[] = ['connected', 'denied', 'expired', 'alreadyConnected', 'error'];
 
 /** Reads ?connect=… left by the OAuth callback once, then cleans the URL. */
-function useConnectResult(): [ConnectResult | null, () => void] {
+function useConnectResult(): [ConnectResult | null, string, () => void] {
   const [result, setResult] = useState<ConnectResult | null>(null);
+  const [platform, setPlatform] = useState('pinterest');
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const value = params.get('connect') as ConnectResult | null;
     if (value && RESULTS.includes(value)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-off read of the redirect result
       setResult(value);
+      setPlatform(params.get('platform') ?? 'pinterest');
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, []);
-  return [result, () => setResult(null)];
+  return [result, platform, () => setResult(null)];
 }
 
 type RowAction = 'disconnect' | 'remove' | 'reconnect' | 'hide' | 'unhide' | 'sync';
@@ -184,7 +187,12 @@ function AccountRow({
             />
           ) : (
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-              <Pin size={18} strokeWidth={1.75} aria-hidden="true" />
+              <PlatformIcon
+                platform={account.platform}
+                size={18}
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
             </span>
           )}
           <div className={`min-w-0 ${account.hidden ? 'opacity-60' : ''}`}>
@@ -262,6 +270,12 @@ function AccountRow({
   );
 }
 
+/** Platforms that can be connected now (ADR-0004); TikTok is listed as "soon". */
+const CONNECTABLE: { key: 'PINTEREST' | 'INSTAGRAM'; slug: PlatformSlug }[] = [
+  { key: 'PINTEREST', slug: 'pinterest' },
+  { key: 'INSTAGRAM', slug: 'instagram' },
+];
+
 /** "+ Connect account" button with a glass menu of platforms (top-right of the Accounts page). */
 function ConnectMenu({
   canConnect,
@@ -271,9 +285,9 @@ function ConnectMenu({
 }: {
   canConnect: boolean;
   connecting: boolean;
-  onConnect: () => void;
-  /** Creates a connect invitation for Pinterest and copies its link (ADR-0012). */
-  onInvite: () => void;
+  onConnect: (slug: PlatformSlug) => void;
+  /** Creates a connect invitation for the platform and copies its link (ADR-0012). */
+  onInvite: (slug: PlatformSlug) => void;
 }) {
   const t = useTranslations('Accounts');
   const [open, setOpen] = useState(false);
@@ -326,44 +340,45 @@ function ConnectMenu({
             {t('platformsTitle')}
             <InfoTip text={t('anotherAccountHint')} />
           </p>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              onConnect();
-            }}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-hover"
-          >
-            <Pin size={18} strokeWidth={1.75} aria-hidden="true" />
-            <span className="flex-1">{t('platforms.PINTEREST')}</span>
-            <ArrowRight size={14} className="text-muted" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              onInvite();
-            }}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs text-muted hover:bg-hover hover:text-foreground"
-          >
-            <Link2 size={16} strokeWidth={1.75} className="ml-px" aria-hidden="true" />
-            <span className="flex-1">{t('copyInvite')}</span>
-          </button>
-          <div className="my-1 h-px bg-line" />
-          {(['INSTAGRAM', 'TIKTOK'] as const).map((p) => (
-            <div
-              key={p}
-              role="menuitem"
-              aria-disabled="true"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted"
-            >
-              <span className="w-[18px]" aria-hidden="true" />
-              <span className="flex-1">{t(`platforms.${p}`)}</span>
-              <span className="rounded-full border border-line px-2 text-xs">{t('soon')}</span>
+          {CONNECTABLE.map(({ key, slug }) => (
+            <div key={key}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onConnect(slug);
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-hover"
+              >
+                <PlatformIcon platform={key} size={18} strokeWidth={1.75} aria-hidden="true" />
+                <span className="flex-1">{t(`platforms.${key}`)}</span>
+                <ArrowRight size={14} className="text-muted" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onInvite(slug);
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs text-muted hover:bg-hover hover:text-foreground"
+              >
+                <Link2 size={16} strokeWidth={1.75} className="ml-px" aria-hidden="true" />
+                <span className="flex-1">{t('copyInvite')}</span>
+              </button>
             </div>
           ))}
+          <div className="my-1 h-px bg-line" />
+          <div
+            role="menuitem"
+            aria-disabled="true"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted"
+          >
+            <span className="w-[18px]" aria-hidden="true" />
+            <span className="flex-1">{t('platforms.TIKTOK')}</span>
+            <span className="rounded-full border border-line px-2 text-xs">{t('soon')}</span>
+          </div>
         </div>
       )}
     </div>
@@ -398,7 +413,9 @@ export function Accounts() {
   const [dialogError, setDialogError] = useState<string | undefined>();
 
   function onRowAction(account: SocialAccount, action: RowAction) {
-    if (action === 'reconnect') return void onConnect();
+    if (action === 'reconnect') {
+      return void onConnect(account.platform === 'INSTAGRAM' ? 'instagram' : 'pinterest');
+    }
     if (action === 'sync') {
       requestSync(account.id).catch(() => setNotice('actionFailed'));
       return;
@@ -432,9 +449,9 @@ export function Accounts() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const format = useFormatter();
 
-  async function onInvite() {
+  async function onInvite(slug: PlatformSlug) {
     try {
-      const url = await createInvitation('pinterest');
+      const url = await createInvitation(slug);
       await navigator.clipboard.writeText(url);
       setNotice('inviteCopied');
     } catch {
@@ -447,15 +464,15 @@ export function Accounts() {
     setCopiedId(id);
     setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 2000);
   }
-  const [result, dismiss] = useConnectResult();
+  const [result, resultPlatform, dismiss] = useConnectResult();
   const [connecting, setConnecting] = useState(false);
   const [startError, setStartError] = useState(false);
 
-  async function onConnect() {
+  async function onConnect(slug: PlatformSlug) {
     setConnecting(true);
     setStartError(false);
     try {
-      await connect('pinterest');
+      await connect(slug);
     } catch {
       setStartError(true);
       setConnecting(false);
@@ -492,7 +509,11 @@ export function Accounts() {
           ) : (
             <AlertTriangle size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
           )}
-          <p className="flex-1">{t(`result.${startError ? 'error' : result!}`)}</p>
+          <p className="flex-1">
+            {t(`result.${startError ? 'error' : result!}`, {
+              platform: resultPlatform === 'instagram' ? 'Instagram' : 'Pinterest',
+            })}
+          </p>
           <button
             type="button"
             onClick={() => {

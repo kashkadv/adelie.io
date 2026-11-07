@@ -143,4 +143,5 @@
 - [x] PoC: профіль, медіа, insights акаунта й публікацій, глибина історії, ліміти (на adelie.if; Reels/сторіс — на Gushka)
 - [x] Redirect URI `https://dev-api.adelie.space/social/instagram/callback`
 - [ ] Deauthorize і data deletion URL
-- [ ] Адаптер, OAuth, синхронізація, екрани
+- [x] Адаптер, OAuth, запрошення, синхронізація (ADR-0015)
+- [ ] «Огляд» і «Контент» для Instagram

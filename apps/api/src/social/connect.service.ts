@@ -2,16 +2,23 @@ import { Injectable, NotFoundException, ServiceUnavailableException } from '@nes
 import type { SocialPlatform } from '@adelie/db';
 import {
   HttpClient,
+  InstagramAdapter,
+  META_GRAPH_API,
   PINTEREST_API,
   PinterestAdapter,
+  type AccountData,
   type PlatformAdapter,
+  type TokenSet,
 } from '@adelie/platforms';
 import { socialTokenAad, tokenCipherFromEnv, type TokenCipher } from '@adelie/shared/crypto';
 import { config } from '../config.js';
 import { PrismaService } from '../prisma.service.js';
 
-/** URL path segment → platform. Only Pinterest for now (ADR-0004). */
-export const PLATFORMS: Record<string, SocialPlatform> = { pinterest: 'PINTEREST' };
+/** URL path segment → platform (ADR-0004: Pinterest, then Instagram). */
+export const PLATFORMS: Record<string, SocialPlatform> = {
+  pinterest: 'PINTEREST',
+  instagram: 'INSTAGRAM',
+};
 export const PLATFORM_SLUGS: Record<SocialPlatform, string> = {
   PINTEREST: 'pinterest',
   INSTAGRAM: 'instagram',
@@ -46,6 +53,14 @@ export class ConnectService {
   } {
     const platform = PLATFORMS[slug];
     if (!platform) throw new NotFoundException();
+    if (platform === 'INSTAGRAM') {
+      if (!config.instagram) throw new ServiceUnavailableException('Instagram is not configured');
+      return {
+        platform,
+        adapter: new InstagramAdapter(config.instagram),
+        http: new HttpClient({ baseUrl: META_GRAPH_API }),
+      };
+    }
     if (!config.pinterest) throw new ServiceUnavailableException('Pinterest is not configured');
     return {
       platform,
@@ -59,8 +74,9 @@ export class ConnectService {
   }
 
   /**
-   * Exchanges the OAuth code, reads the platform account and stores connection + account in the
-   * project. Access checks are the caller's job. Returns the connection id when connected.
+   * Exchanges the OAuth code, reads the platform account(s) and stores connection + account in the
+   * project. One token can grant several accounts (Instagram): each becomes its own connection.
+   * Access checks are the caller's job. Returns the first connection id when connected.
    */
   async connect(input: {
     slug: string;
@@ -69,18 +85,48 @@ export class ConnectService {
     projectId: string;
     connectedByUserId: string | null;
   }): Promise<{ result: ConnectResult; connectionId?: string }> {
-    const { slug, code, workspaceId, projectId, connectedByUserId } = input;
+    const { slug, code } = input;
     const { platform, adapter, http } = this.adapterFor(slug);
     const tokens = await adapter.exchangeCode(code, this.redirectUri(slug), http);
-    const account = await adapter.getAccount({ accessToken: tokens.accessToken, http });
 
+    // Nothing selected on the consent screen (Meta lets people untick every account).
+    if (tokens.accountIds && tokens.accountIds.length === 0) return { result: 'denied' };
+    const targets = tokens.accountIds ?? [undefined];
+
+    let connectionId: string | undefined;
+    let elsewhere = 0;
+    for (const accountExternalId of targets) {
+      const account = await adapter.getAccount({
+        accessToken: tokens.accessToken,
+        accountExternalId,
+        http,
+      });
+      const id = await this.store({ ...input, platform, tokens, account });
+      if (id) connectionId ??= id;
+      else elsewhere++;
+    }
+    if (!connectionId) return { result: elsewhere ? 'alreadyConnected' : 'error' };
+    // The worker's scheduler picks new accounts up within a minute (INITIAL sync).
+    return { result: 'connected', connectionId };
+  }
+
+  /** Stores one account; null when it already belongs to another project of the workspace. */
+  private async store(input: {
+    workspaceId: string;
+    projectId: string;
+    connectedByUserId: string | null;
+    platform: SocialPlatform;
+    tokens: TokenSet;
+    account: AccountData;
+  }): Promise<string | null> {
+    const { workspaceId, projectId, connectedByUserId, platform, tokens, account } = input;
     const key = { workspaceId, platform, externalUserId: account.externalId };
     const existing = await this.prisma.client.socialConnection.findUnique({
       where: { workspaceId_platform_externalUserId: key },
       select: { projectId: true },
     });
     // One platform account belongs to one project of a workspace.
-    if (existing && existing.projectId !== projectId) return { result: 'alreadyConnected' };
+    if (existing && existing.projectId !== projectId) return null;
 
     const c = this.cipher;
     const aad = (field: 'access' | 'refresh') =>
@@ -107,7 +153,7 @@ export class ConnectService {
       postsCount: account.postsCount,
     };
 
-    const connectionId = await this.prisma.client.$transaction(async (tx) => {
+    return this.prisma.client.$transaction(async (tx) => {
       const connection = await tx.socialConnection.upsert({
         where: { workspaceId_platform_externalUserId: key },
         create: { ...key, projectId, ...secrets },
@@ -136,7 +182,5 @@ export class ConnectService {
       });
       return connection.id;
     });
-    // The worker's scheduler picks the new account up within a minute (INITIAL sync).
-    return { result: 'connected', connectionId };
   }
 }

@@ -1,21 +1,22 @@
 'use client';
 
-import { CheckCircle2, Lock, Pin, RefreshCw, XCircle } from 'lucide-react';
+import { CheckCircle2, Lock, RefreshCw, XCircle } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { api } from '@/lib/api';
 import { AuthFrame } from './auth-frame';
+import { PlatformIcon } from './ui/platform-icon';
 
 type Invitation = {
   status: 'valid' | 'used' | 'revoked' | 'expired';
-  platform: 'pinterest';
+  platform: 'pinterest' | 'instagram';
   workspace: string;
   project: string;
   invitedBy: string | null;
   expiresAt: string;
 };
 
-const PLATFORM_NAMES: Record<string, string> = { pinterest: 'Pinterest' };
+const PLATFORM_NAMES: Record<string, string> = { pinterest: 'Pinterest', instagram: 'Instagram' };
 
 /**
  * Public page of a connect invitation (ADR-0012): says plainly who asks for what access before
@@ -83,7 +84,12 @@ export function ConnectInvite({ token }: { token: string }) {
     <AuthFrame>
       <div className="flex flex-col gap-5">
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
-          <Pin size={22} strokeWidth={1.75} aria-hidden="true" />
+          <PlatformIcon
+            platform={invitation.platform === 'instagram' ? 'INSTAGRAM' : 'PINTEREST'}
+            size={22}
+            strokeWidth={1.75}
+            aria-hidden="true"
+          />
         </span>
         <div>
           <h1 className="text-2xl font-semibold">{t('title', { platform })}</h1>
@@ -118,7 +124,7 @@ export function ConnectInvite({ token }: { token: string }) {
           </div>
         </dl>
 
-        <p className="text-sm text-muted">{t('explain', { platform })}</p>
+        <p className="text-sm text-muted">{t(`explain.${invitation.platform}`, { platform })}</p>
 
         {startFailed && (
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">

@@ -21,6 +21,17 @@ export const config = {
     process.env['PINTEREST_APP_ID'] && process.env['PINTEREST_APP_SECRET']
       ? { appId: process.env['PINTEREST_APP_ID'], appSecret: process.env['PINTEREST_APP_SECRET'] }
       : undefined,
+  /** Optional: connecting Instagram (Meta Unified login, read-only configuration) needs all three. */
+  instagram:
+    process.env['META_APP_ID'] &&
+    process.env['META_APP_SECRET'] &&
+    process.env['INSTAGRAM_CONFIG_ID']
+      ? {
+          appId: process.env['META_APP_ID'],
+          appSecret: process.env['META_APP_SECRET'],
+          configId: process.env['INSTAGRAM_CONFIG_ID'],
+        }
+      : undefined,
   auth: {
     secret: required('BETTER_AUTH_SECRET'),
     url: process.env['BETTER_AUTH_URL'] ?? 'http://localhost:4000',

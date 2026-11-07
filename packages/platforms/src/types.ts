@@ -15,6 +15,11 @@ export interface TokenSet {
   accessTokenExpiresAt?: Date;
   refreshTokenExpiresAt?: Date;
   scopes: string[];
+  /**
+   * Platform accounts the token grants, when one token can cover several (Meta: the Instagram
+   * accounts the person selected). Absent = the token belongs to exactly one account.
+   */
+  accountIds?: string[];
 }
 
 export interface AccountData {
@@ -77,6 +82,8 @@ export interface PostsPage {
 
 export interface AdapterContext {
   accessToken: string;
+  /** The platform account the call is about — required where a token covers several (Instagram). */
+  accountExternalId?: string;
   http: HttpClient;
   signal?: AbortSignal;
   /** Today's date (UTC, YYYY-MM-DD) for snapshot metrics; injectable for tests. */

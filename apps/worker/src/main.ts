@@ -1,6 +1,11 @@
 import { existsSync } from 'node:fs';
 import { createPrismaClient } from '@adelie/db';
-import { PINTEREST_API, PinterestAdapter } from '@adelie/platforms';
+import {
+  InstagramAdapter,
+  META_GRAPH_API,
+  PINTEREST_API,
+  PinterestAdapter,
+} from '@adelie/platforms';
 import {
   QUEUES,
   SYNC_JOBS,
@@ -37,11 +42,26 @@ const pinterest =
       })
     : null;
 
+const instagram =
+  process.env['META_APP_ID'] && process.env['META_APP_SECRET'] && process.env['INSTAGRAM_CONFIG_ID']
+    ? new InstagramAdapter({
+        appId: process.env['META_APP_ID'],
+        appSecret: process.env['META_APP_SECRET'],
+        configId: process.env['INSTAGRAM_CONFIG_ID'],
+      })
+    : null;
+
 const deps: SyncDeps = {
   prisma,
   cipher,
-  adapterFor: (platform) =>
-    platform === 'PINTEREST' && pinterest ? { adapter: pinterest, baseUrl: PINTEREST_API } : null,
+  adapterFor: (platform) => {
+    if (platform === 'PINTEREST' && pinterest)
+      return { adapter: pinterest, baseUrl: PINTEREST_API };
+    if (platform === 'INSTAGRAM' && instagram) {
+      return { adapter: instagram, baseUrl: META_GRAPH_API };
+    }
+    return null;
+  },
   log: (message) => console.log(`[sync] ${message}`),
 };
 

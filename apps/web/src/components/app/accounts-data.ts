@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useWorkspace } from './workspace-context';
 
+/** URL slug of a platform that can be connected. */
+export type PlatformSlug = 'pinterest' | 'instagram';
+
 export type ConnectionStatus = 'ACTIVE' | 'REAUTHORIZATION_REQUIRED' | 'REVOKED';
 
 export type SocialAccount = {
@@ -92,7 +95,7 @@ export function useProjectAccounts() {
 
   /** Sends the browser to the platform's consent page; it comes back to /accounts?connect=… */
   const connect = useCallback(
-    async (platform: 'pinterest') => {
+    async (platform: PlatformSlug) => {
       if (!base) return;
       const { url } = await api<{ url: string }>(`${base}/connections/${platform}`, {
         method: 'POST',
@@ -175,7 +178,7 @@ export function useProjectInvitations() {
 
   /** Creates an invitation and returns its link. */
   const create = useCallback(
-    async (platform: 'pinterest') => {
+    async (platform: PlatformSlug) => {
       if (!base) throw new Error('No project');
       const invitation = await api<Invitation>(`${base}/invitations`, {
         method: 'POST',

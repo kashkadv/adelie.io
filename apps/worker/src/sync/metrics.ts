@@ -42,6 +42,11 @@ const LATEST_COLUMNS = {
   engagements: 'engagements',
   video_views: 'videoViews',
   engagement_rate: 'engagementRate',
+  views: 'views',
+  reach: 'reach',
+  likes: 'likes',
+  comments: 'comments',
+  shares: 'shares',
 } as const;
 
 type LatestColumn = (typeof LATEST_COLUMNS)[keyof typeof LATEST_COLUMNS];
@@ -65,6 +70,11 @@ export function latestRow(
     engagements: null,
     videoViews: null,
     engagementRate: null,
+    views: null,
+    reach: null,
+    likes: null,
+    comments: null,
+    shares: null,
     dataStatus: worstStatus(known.map((m) => m.dataStatus)),
     asOfDate: known.reduce((max, m) => (m.date > max ? m.date : max), known[0]!.date),
   };

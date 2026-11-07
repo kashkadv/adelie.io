@@ -128,6 +128,11 @@ describe('metric helpers', () => {
       engagements: null,
       videoViews: null,
       engagementRate: null,
+      views: null,
+      reach: null,
+      likes: null,
+      comments: null,
+      shares: null,
       dataStatus: 'UNAVAILABLE',
       asOfDate: '2026-11-06',
     });

@@ -528,6 +528,12 @@ model PostMetricsLatest {
   engagements    Int?
   videoViews     Int?
   engagementRate Float?
+  /// Instagram (views ≠ Pinterest impressions — kept apart, docs/integrations/instagram.md).
+  views          Int?
+  reach          Int?
+  likes          Int?
+  comments       Int?
+  shares         Int?
   /// Worst status among the underlying values.
   dataStatus     DataStatus
   asOfDate       DateTime      @db.Date
