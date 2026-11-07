@@ -71,6 +71,11 @@ const MEDIA_FIELDS = [
 
 const v = (path: string) => `/${META_GRAPH_VERSION}${path}`;
 
+/** Waiting for Meta to assign the selected accounts after login (see exchangeCode). */
+const ASSIGNMENT_ATTEMPTS = 8;
+const ASSIGNMENT_DELAY_MS = 2000;
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 function utcToday(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -171,6 +176,19 @@ export class InstagramAdapter implements PlatformAdapter {
         .filter((g) => g.scope === 'instagram_basic' || g.scope === 'instagram_manage_insights')
         .flatMap((g) => g.target_ids ?? []),
     );
+    // Meta assigns the selected accounts to the system user shortly after the redirect: when the
+    // list is still empty, ask again for a few seconds.
+    for (let attempt = 0; ids.size === 0 && attempt < ASSIGNMENT_ATTEMPTS; attempt++) {
+      if (attempt > 0) await sleep(ASSIGNMENT_DELAY_MS);
+      for (const id of await this.assignedAccounts(accessToken, http)) ids.add(id);
+      if (ids.size) console.log(`Instagram accounts assigned after attempt ${attempt + 1}`);
+    }
+    if (ids.size === 0) await this.diagnose(accessToken, http, debug);
+    return { accessToken, scopes: debug.data?.scopes ?? [], accountIds: [...ids] };
+  }
+
+  private async assignedAccounts(accessToken: string, http: HttpClient): Promise<string[]> {
+    const ids: string[] = [];
     let after: string | undefined;
     do {
       const { body } = await http.request<{
@@ -182,11 +200,10 @@ export class InstagramAdapter implements PlatformAdapter {
         headers: { Authorization: `Bearer ${accessToken}` },
         sensitive: true,
       });
-      for (const a of body.data ?? []) ids.add(a.id);
+      for (const a of body.data ?? []) ids.push(a.id);
       after = body.paging?.next ? body.paging.cursors?.after : undefined;
     } while (after);
-    if (ids.size === 0) await this.diagnose(accessToken, http, debug);
-    return { accessToken, scopes: debug.data?.scopes ?? [], accountIds: [...ids] };
+    return ids;
   }
 
   /** TEMPORARY (2026-11-07): logs where a login token's Instagram accounts live — ids only, no token. */
