@@ -108,6 +108,7 @@ interface DebugTokenResponse {
   data?: {
     is_valid?: boolean;
     scopes?: string[];
+    granular_scopes?: { scope: string; target_ids?: string[] }[];
   };
 }
 
@@ -163,9 +164,13 @@ export class InstagramAdapter implements PlatformAdapter {
     if (debug.data?.is_valid === false) {
       throw new AdapterError('INVALID', 'Meta returned an invalid token');
     }
-    // Which Instagram accounts the person selected: the system user's assigned accounts (PoC —
-    // granular scopes of these tokens carry no target ids).
-    const ids = new Set<string>();
+    // Which Instagram accounts the person selected: granular scopes may carry their ids; the
+    // system user's assigned accounts list them too (dashboard tokens have only the latter).
+    const ids = new Set<string>(
+      (debug.data?.granular_scopes ?? [])
+        .filter((g) => g.scope === 'instagram_basic' || g.scope === 'instagram_manage_insights')
+        .flatMap((g) => g.target_ids ?? []),
+    );
     let after: string | undefined;
     do {
       const { body } = await http.request<{

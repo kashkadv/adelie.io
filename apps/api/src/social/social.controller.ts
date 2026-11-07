@@ -275,6 +275,10 @@ export class SocialController {
           : `${config.webUrl}/accounts?connect=${result}&platform=${encodeURIComponent(slug)}`,
       );
 
+    // Diagnostics without secrets: which parameters the platform sent back (names only).
+    console.log(
+      `OAuth callback ${slug}: params=${Object.keys(query).join(',')} error=${query['error'] ?? ''}`,
+    );
     if (!state || state.platform !== slug) return back('expired');
     if (!viaInvitation && (!session || state.userId !== session.user.id)) return back('expired');
     if (query['error'] || !query['code']) return back('denied');

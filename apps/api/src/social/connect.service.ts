@@ -89,6 +89,10 @@ export class ConnectService {
     const { platform, adapter, http } = this.adapterFor(slug);
     const tokens = await adapter.exchangeCode(code, this.redirectUri(slug), http);
 
+    // Diagnostics without secrets: how many accounts the grant covers.
+    console.log(
+      `Connect ${slug}: scopes=${tokens.scopes.join(',')} accounts=${tokens.accountIds?.length ?? 'n/a'}`,
+    );
     // Nothing selected on the consent screen (Meta lets people untick every account).
     if (tokens.accountIds && tokens.accountIds.length === 0) return { result: 'denied' };
     const targets = tokens.accountIds ?? [undefined];
