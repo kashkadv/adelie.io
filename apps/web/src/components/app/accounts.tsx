@@ -25,7 +25,12 @@ import { InfoTip } from '../ui/info-tip';
 import { Select } from '../ui/select';
 import { Switch } from '../ui/switch';
 import { useStoredFlag } from '@/lib/use-stored-flag';
-import { useProjectAccounts, useProjectInvitations, type SocialAccount } from './accounts-data';
+import {
+  isSyncing,
+  useProjectAccounts,
+  useProjectInvitations,
+  type SocialAccount,
+} from './accounts-data';
 import { EmptyState, PageHeader } from './page-header';
 
 type ConnectResult = 'connected' | 'denied' | 'expired' | 'alreadyConnected' | 'error';
@@ -46,25 +51,26 @@ function useConnectResult(): [ConnectResult | null, () => void] {
   return [result, () => setResult(null)];
 }
 
-type RowAction = 'disconnect' | 'remove' | 'reconnect' | 'hide' | 'unhide';
+type RowAction = 'disconnect' | 'remove' | 'reconnect' | 'hide' | 'unhide' | 'sync';
 
 const accountName = (a: SocialAccount) => a.displayName || a.username || a.externalId;
 /** What the user types to confirm deletion (the API checks the same value). */
 const accountHandle = (a: SocialAccount) => a.username ?? a.displayName ?? a.externalId;
 
-/** "⋯" menu of an account row: disconnect / reconnect / hide / delete with data. */
+/** "⋯" menu of an account row: sync now / disconnect / reconnect / hide / delete with data. */
 function RowMenu({
-  disconnected,
-  hidden,
+  account,
   onAction,
 }: {
-  disconnected: boolean;
-  hidden: boolean;
+  account: SocialAccount;
   onAction: (action: RowAction) => void;
 }) {
   const t = useTranslations('Accounts');
+  const format = useFormatter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const disconnected = account.status === 'REVOKED';
+  const hidden = account.hidden;
 
   useEffect(() => {
     if (!open) return;
@@ -80,21 +86,34 @@ function RowMenu({
     };
   }, [open]);
 
-  const item = (action: RowAction, label: string, danger = false) => (
+  const item = (action: RowAction, label: string, danger = false, note?: string) => (
     <button
       type="button"
       role="menuitem"
+      disabled={!!note}
       onClick={() => {
         setOpen(false);
         onAction(action);
       }}
-      className={`flex w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-hover ${
+      className={`flex w-full flex-col rounded-xl px-3 py-2 text-left text-sm hover:bg-hover disabled:opacity-50 disabled:hover:bg-transparent ${
         danger ? 'text-red-600 dark:text-red-400' : ''
       }`}
     >
       {label}
+      {note && <span className="text-xs text-muted">{note}</span>}
     </button>
   );
+
+  // "Sync now": only for working connections; unavailable while syncing and for a while after.
+  const cooldownUntil =
+    account.manualSyncAt && new Date(account.manualSyncAt) > new Date()
+      ? new Date(account.manualSyncAt)
+      : null;
+  const syncNote = isSyncing(account)
+    ? t('syncInProgress')
+    : cooldownUntil
+      ? t('syncAvailableAt', { time: format.dateTime(cooldownUntil, { timeStyle: 'short' }) })
+      : undefined;
 
   return (
     <div ref={ref} className="relative">
@@ -113,6 +132,7 @@ function RowMenu({
           role="menu"
           className="glass glass-strong animate-rise absolute top-full right-0 z-50 mt-2 w-60 rounded-2xl p-2"
         >
+          {account.status === 'ACTIVE' && item('sync', t('syncNow'), false, syncNote)}
           {disconnected ? item('reconnect', t('reconnect')) : item('disconnect', t('disconnect'))}
           {hidden ? item('unhide', t('unhide')) : item('hide', t('hide'))}
           <div className="my-1 h-px bg-line" />
@@ -137,11 +157,7 @@ function AccountRow({
   const needsReauth = account.status === 'REAUTHORIZATION_REQUIRED';
   const disconnected = account.status === 'REVOKED';
   const last = account.lastSync;
-  const syncing =
-    account.status === 'ACTIVE' &&
-    (last?.status === 'RUNNING' ||
-      last?.status === 'PENDING' ||
-      (!last && account.status === 'ACTIVE'));
+  const syncing = isSyncing(account);
   // Pinterest gives apps no pin/board data of personal (PINNER) accounts — only business ones.
   const syncNote: 'personal' | 'partial' | 'failed' | null = disconnected
     ? null
@@ -236,7 +252,7 @@ function AccountRow({
             {t(`status.${account.status}`)}
           </span>
           {onAction ? (
-            <RowMenu disconnected={disconnected} hidden={account.hidden} onAction={onAction} />
+            <RowMenu account={account} onAction={onAction} />
           ) : (
             <span className="w-8" aria-hidden="true" />
           )}
@@ -357,7 +373,8 @@ function ConnectMenu({
 /** Accounts page: connected accounts of the project and connecting new ones (ADR-0011). */
 export function Accounts() {
   const t = useTranslations('Accounts');
-  const { accounts, connect, canConnect, disconnect, setHidden, remove } = useProjectAccounts();
+  const { accounts, connect, canConnect, disconnect, requestSync, setHidden, remove } =
+    useProjectAccounts();
   const [platform, setPlatform] = useState('');
   const [showDisconnected, setShowDisconnected] = useStoredFlag(
     'adelie-accounts-show-disconnected',
@@ -382,6 +399,10 @@ export function Accounts() {
 
   function onRowAction(account: SocialAccount, action: RowAction) {
     if (action === 'reconnect') return void onConnect();
+    if (action === 'sync') {
+      requestSync(account.id).catch(() => setNotice('actionFailed'));
+      return;
+    }
     if (action === 'hide' || action === 'unhide') {
       setHidden(account.id, action === 'hide').catch(() => setNotice('actionFailed'));
       return;

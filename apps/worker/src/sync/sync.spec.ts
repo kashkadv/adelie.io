@@ -38,6 +38,29 @@ describe('dueSync', () => {
     expect(dueSync(synced, at('2026-11-07T04:00Z'))).toBe('DAILY');
   });
 
+  it('MANUAL when a sync was requested after the last attempt', () => {
+    const synced = {
+      ...active,
+      lastSyncedAt: at('2026-11-07T10:00Z'),
+      lastSuccessfulSyncAt: at('2026-11-07T10:00Z'),
+    };
+    const now = at('2026-11-07T10:20Z');
+    expect(dueSync({ ...synced, syncRequestedAt: at('2026-11-07T10:15Z') }, now)).toBe('MANUAL');
+    expect(dueSync({ ...synced, syncRequestedAt: at('2026-11-07T09:00Z') }, now)).toBeNull();
+    expect(
+      dueSync(
+        { ...active, lastSyncedAt: null, lastSuccessfulSyncAt: null, syncRequestedAt: now },
+        now,
+      ),
+    ).toBe('INITIAL');
+    expect(
+      dueSync(
+        { ...synced, connectionStatus: 'REVOKED', syncRequestedAt: at('2026-11-07T10:15Z') },
+        now,
+      ),
+    ).toBeNull();
+  });
+
   it('never for connections that need reauthorization', () => {
     expect(
       dueSync(

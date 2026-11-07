@@ -181,6 +181,7 @@ function PostRow({
  */
 export function Content() {
   const t = useTranslations('Content');
+  const tMetric = useTranslations('MetricHints');
   const format = useFormatter();
   const { workspace, project } = useWorkspace();
   const { accounts: allAccounts } = useProjectAccounts();
@@ -506,16 +507,18 @@ export function Content() {
             </span>
             <span className={`grid w-[35rem] ${ROW_GRID} gap-4 text-right`}>
               {COLUMNS.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSort(key)}
-                  aria-pressed={sort === key}
-                  className={`flex items-center justify-end gap-1 whitespace-nowrap hover:text-foreground ${sort === key ? 'font-semibold text-foreground' : ''}`}
-                >
-                  {sort === key && <ArrowDown size={12} aria-hidden="true" />}
-                  {t(`metrics.${key}`)}
-                </button>
+                <span key={key} className="flex items-center justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSort(key)}
+                    aria-pressed={sort === key}
+                    className={`flex items-center gap-1 whitespace-nowrap hover:text-foreground ${sort === key ? 'font-semibold text-foreground' : ''}`}
+                  >
+                    {sort === key && <ArrowDown size={12} aria-hidden="true" />}
+                    {t(`metrics.${key}`)}
+                  </button>
+                  {key !== 'publishedAt' && <InfoTip text={tMetric(key)} />}
+                </span>
               ))}
             </span>
             <span className="w-8" />

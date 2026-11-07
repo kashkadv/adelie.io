@@ -90,6 +90,7 @@ function PeriodSwitch({ days, onChange }: { days: number; onChange: (d: number) 
 
 export function Overview() {
   const t = useTranslations('Overview');
+  const tMetric = useTranslations('MetricHints');
   const format = useFormatter();
   const { workspace, project } = useWorkspace();
   const { accounts: allAccounts, connect, canConnect } = useProjectAccounts();
@@ -183,7 +184,9 @@ export function Overview() {
             >
               <p className="flex items-center gap-1.5 text-sm text-muted">
                 {t(`metrics.${key}`)}
-                {preliminary && <InfoTip text={t('preliminaryHint')} />}
+                <InfoTip
+                  text={preliminary ? `${tMetric(key)} ${t('preliminaryHint')}` : tMetric(key)}
+                />
               </p>
               <p className="tabular mt-3 font-display text-3xl font-semibold">
                 {m?.value == null ? '—' : format.number(m.value)}

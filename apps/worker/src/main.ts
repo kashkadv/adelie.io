@@ -69,6 +69,7 @@ async function tick(): Promise<number> {
       workspaceId: true,
       lastSyncedAt: true,
       lastSuccessfulSyncAt: true,
+      syncRequestedAt: true,
       connection: { select: { status: true } },
     },
   });

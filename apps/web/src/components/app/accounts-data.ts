@@ -22,6 +22,10 @@ export type SocialAccount = {
   status: ConnectionStatus;
   /** Hidden from Overview/Content by a member; syncing goes on. */
   hidden: boolean;
+  /** "Sync now" was asked for and the worker has not picked it up yet. */
+  syncRequested: boolean;
+  /** When "Sync now" becomes available again; null = available. */
+  manualSyncAt: string | null;
   /** The latest sync run, or null before the first one starts. */
   lastSync: {
     status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'REAUTHORIZATION_REQUIRED';
@@ -30,6 +34,17 @@ export type SocialAccount = {
     finishedAt: string | null;
   } | null;
 };
+
+/** A sync is queued or running (or the very first one has not started yet). */
+export function isSyncing(a: SocialAccount): boolean {
+  if (a.status !== 'ACTIVE') return false;
+  return (
+    a.syncRequested ||
+    !a.lastSync ||
+    a.lastSync.status === 'PENDING' ||
+    a.lastSync.status === 'RUNNING'
+  );
+}
 
 /** Roles that may connect accounts (ADR-0007). */
 export const CONNECT_ROLES = ['OWNER', 'ADMIN', 'MANAGER'];
@@ -56,6 +71,24 @@ export function useProjectAccounts() {
       cancelled = true;
     };
   }, [base]);
+
+  // While something is syncing, refresh every few seconds so the status and dates update by themselves.
+  const syncing = !!accounts?.some(isSyncing);
+  useEffect(() => {
+    if (!syncing) return;
+    const timer = setInterval(() => void reload(), 5000);
+    return () => clearInterval(timer);
+  }, [syncing, reload]);
+
+  /** Asks the worker to sync the account now (picked up within a minute). */
+  const requestSync = useCallback(
+    async (accountId: string) => {
+      if (!base) return;
+      await api(`${base}/accounts/${accountId}/sync`, { method: 'POST' });
+      await reload();
+    },
+    [base, reload],
+  );
 
   /** Sends the browser to the platform's consent page; it comes back to /accounts?connect=… */
   const connect = useCallback(
@@ -104,6 +137,7 @@ export function useProjectAccounts() {
     reload,
     connect,
     disconnect,
+    requestSync,
     setHidden,
     remove,
     canConnect: !!workspace && CONNECT_ROLES.includes(workspace.role),

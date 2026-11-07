@@ -1,9 +1,12 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Delete,
   Get,
+  HttpException,
+  HttpStatus,
   NotFoundException,
   Param,
   ParseUUIDPipe,
@@ -27,6 +30,7 @@ import {
 } from '../workspaces/workspace-access.guard.js';
 import { CONNECT_ROLES, ConnectService, type ConnectResult } from './connect.service.js';
 import { invitationStatus } from './invitation-token.js';
+import { nextManualSync } from './manual-sync.js';
 import { createState, verifyState, type OAuthState } from './oauth-state.js';
 
 /**
@@ -74,6 +78,8 @@ export class SocialController {
         historyAvailableFrom: true,
         lastSuccessfulSyncAt: true,
         hiddenAt: true,
+        lastSyncedAt: true,
+        syncRequestedAt: true,
         connection: { select: { status: true } },
         syncRuns: {
           orderBy: { createdAt: 'desc' },
@@ -82,12 +88,18 @@ export class SocialController {
         },
       },
     });
-    return accounts.map(({ connection, syncRuns, hiddenAt, ...a }) => ({
-      ...a,
-      hidden: hiddenAt !== null,
-      status: connection.status,
-      lastSync: syncRuns[0] ?? null,
-    }));
+    return accounts.map(
+      ({ connection, syncRuns, hiddenAt, lastSyncedAt, syncRequestedAt, ...a }) => ({
+        ...a,
+        hidden: hiddenAt !== null,
+        // Asked for, not picked up yet: the UI shows "syncing" right away.
+        syncRequested: !!syncRequestedAt && (!lastSyncedAt || syncRequestedAt > lastSyncedAt),
+        // "Sync now" is available again from this moment (null = now).
+        manualSyncAt: nextManualSync(lastSyncedAt, new Date())?.toISOString() ?? null,
+        status: connection.status,
+        lastSync: syncRuns[0] ?? null,
+      }),
+    );
   }
 
   private async projectAccount(ctx: WorkspaceRequestContext, projectId: string, accountId: string) {
@@ -122,6 +134,51 @@ export class SocialController {
         accessTokenExpiresAt: null,
         refreshTokenExpiresAt: null,
       },
+    });
+    return { ok: true };
+  }
+
+  /**
+   * "Sync now": marks the account; the worker's minute tick picks it up (no queue access from the
+   * API). Idempotent while a sync is pending or running; at most once per MANUAL_SYNC_COOLDOWN_MS.
+   */
+  @Post('workspaces/:workspaceId/projects/:projectId/accounts/:accountId/sync')
+  @UseGuards(WorkspaceAccessGuard)
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async requestSync(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const { id } = await this.projectAccount(request.workspace, projectId, accountId);
+    const account = await this.prisma.client.socialAccount.findUniqueOrThrow({
+      where: { id },
+      select: {
+        lastSyncedAt: true,
+        syncRequestedAt: true,
+        connection: { select: { status: true } },
+        syncRuns: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true } },
+      },
+    });
+    if (account.connection.status !== 'ACTIVE') {
+      throw new ConflictException({ errors: { sync: 'notActive' } });
+    }
+    const now = new Date();
+    const running = ['PENDING', 'RUNNING'].includes(account.syncRuns[0]?.status ?? '');
+    const pending =
+      !!account.syncRequestedAt &&
+      (!account.lastSyncedAt || account.syncRequestedAt > account.lastSyncedAt);
+    if (running || pending) return { ok: true };
+    const next = nextManualSync(account.lastSyncedAt, now);
+    if (next) {
+      throw new HttpException(
+        { errors: { sync: 'tooSoon' }, retryAt: next.toISOString() },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    await this.prisma.client.socialAccount.update({
+      where: { id },
+      data: { syncRequestedAt: now },
     });
     return { ok: true };
   }

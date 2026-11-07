@@ -289,6 +289,8 @@ model SocialAccount {
   collectingSince      DateTime? @db.Date
   lastSyncedAt         DateTime?
   lastSuccessfulSyncAt DateTime?
+  /// A member asked for a sync now; the worker picks it up if it is newer than lastSyncedAt.
+  syncRequestedAt      DateTime?
   /// Hidden by a member: left out of Overview/Content and listed on Accounts only on demand.
   /// Syncing is unaffected.
   hiddenAt             DateTime?

@@ -23,16 +23,16 @@ Pinterest-акаунт → дані синхронізуються у фоні �
 Мета — підтверджені можливості замість припущень (ТЗ 5.2).
 
 - [x] Створити developer app на developers.pinterest.com _(власник проєкту)_ — ID 1635003, чекає trial
-- [ ] З'ясувати рівень доступу (trial / standard) і що він дозволяє
-- [ ] Налаштувати redirect URI для локальної розробки
+- [x] З'ясувати рівень доступу (trial / standard) і що він дозволяє — Trial, див. integrations/pinterest.md
+- [x] Налаштувати redirect URI для локальної розробки (і для dev.adelie.space)
 - [x] PoC-скрипт (`scripts/pinterest-poc.sh`) з тестовим маркером; OAuth-flow — після схвалення trial
 - [x] PoC: профіль акаунта, борди, піни (з пагінацією) — на порожньому акаунті
-- [ ] PoC: аналітика акаунта і аналітика пінів
-- [ ] Задокументувати в `docs/integrations/pinterest.md`:
+- [x] PoC: аналітика акаунта і аналітика пінів (Gushka, 2026-11-06)
+- [x] Задокументувати в `docs/integrations/pinterest.md`:
       scopes, endpoints, доступні метрики та їх визначення, глибина історії,
       rate limits, вимоги до типу акаунта, життя токенів, вимоги для production access
 
-**Критерій готовності:** реальні дані акаунта Gushka отримано, обмеження задокументовано.
+**Критерій готовності:** реальні дані акаунта Gushka отримано, обмеження задокументовано. ✅
 
 ## Етап 1. Foundation
 
@@ -43,7 +43,7 @@ Pinterest-акаунт → дані синхронізуються у фоні �
 - [x] `apps/api`: NestJS, Better Auth, health-check, guard перевірки членства у workspace
 - [x] Автоматичне створення workspace при реєстрації
 - [x] `apps/web`: Next.js, Tailwind, сторінки логіну/реєстрації, головна зі списком workspace
-- [ ] shadcn/ui — перенесено на етап 3 (UI)
+- [x] ~~shadcn/ui~~ — замість нього власні компоненти за ADR-0009
 - [x] `apps/worker`: BullMQ, тестова задача
 - [x] Тести: налаштований runner, перший тест tenant-ізоляції
 - [x] CI (GitHub Actions): lint, typecheck, test
@@ -56,33 +56,33 @@ Pinterest-акаунт → дані синхронізуються у фоні �
 
 ## Етап 2. Інтеграція Pinterest
 
-- [ ] Контракт `SocialPlatformAdapter` у `packages/shared` (ТЗ 10)
-- [ ] Схема: SocialConnection, SocialAccount, SocialPost, MetricDefinition,
+- [x] Контракт адаптера платформ — `packages/platforms` (ADR-0011)
+- [x] Схема: SocialConnection, SocialAccount, SocialPost, MetricDefinition,
       MetricSnapshot, SyncJob/SyncRun
-- [ ] Шифрування токенів у стані спокою
-- [ ] OAuth-підключення Pinterest (state, redirect URI, refresh, revoke)
-- [ ] Pinterest adapter: профіль, піни, метрики; помилки, rate limits, пагінація
-- [ ] Unit-тести adapter на mock-відповідях
-- [ ] Worker: первинна синхронізація після підключення
-- [ ] Worker: щоденне оновлення + snapshots
-- [ ] Retry з backoff, статуси синхронізації (ТЗ 8.4), ручний перезапуск
+- [x] Шифрування токенів у стані спокою
+- [x] OAuth-підключення Pinterest (state, redirect URI, refresh; revoke на боці Pinterest — потребує 2FA)
+- [x] Pinterest adapter: профіль, піни, метрики; помилки, rate limits, пагінація
+- [x] Unit-тести adapter на mock-відповідях
+- [x] Worker: первинна синхронізація після підключення
+- [x] Worker: щоденне оновлення + snapshots (+ щоденні метрики пінів, ADR-0013)
+- [x] Retry з backoff, статуси синхронізації (ТЗ 8.4), ручний перезапуск («Синхронізувати зараз»)
 
 **Критерій готовності:** після підключення дані з'являються в БД, щоденна синхронізація
-накопичує snapshots, помилки видно в SyncRun.
+накопичує snapshots, помилки видно в SyncRun. ✅
 
 ## Етап 3. UI
 
-- [ ] Сторінка підключень: статус, остання синхронізація, перепідключення, відключення
-- [ ] Сторінка акаунта: основні метрики, графіки динаміки, доступний період історії
-- [ ] Список пінів: сортування за метриками, фільтр за періодом, посилання на пін
-- [ ] Стани loading / empty / partial / error; відсутні дані ≠ 0
-- [ ] Пояснення (tooltip) що означає кожна метрика
+- [x] Сторінка підключень: статус, остання синхронізація, перепідключення, відключення
+- [x] Основні метрики, графік динаміки, доступний період історії — на «Огляді» з вибором акаунта
+- [x] Список пінів («Контент»): сортування, метрики за період, фільтри, пошук, експорт CSV
+- [x] Стани loading / empty / partial / error; відсутні дані ≠ 0
+- [x] Пояснення (tooltip) що означає кожна метрика
 
 ## Етап 4. Розгортання для Gushka
 
 - [ ] Вибір хостингу → ADR
 - [ ] Production-середовище, секрети, бекапи БД
-- [ ] Privacy policy / terms (потрібні для production access платформ)
+- [ ] Privacy policy ✅ / Terms of Service (потрібні для production access платформ і Etsy API)
 - [ ] Production access Pinterest, якщо trial недостатньо
 - [ ] Підключити реальний акаунт Gushka в production
 

@@ -84,6 +84,13 @@
       "TABLET": "Tablet"
     }
   },
+  "MetricHints": {
+    "impressions": "How many times the Pin appeared on screen — in the feed, search or on boards. One person can count several times.",
+    "saves": "How many times the Pin was saved to a board.",
+    "pinClicks": "How many times the Pin was opened or clicked — on or off Pinterest, including clicks to your site.",
+    "outboundClicks": "How many times people went from the Pin to your website or shop via its link.",
+    "followers": "Followers of the account right now — not for the period. Changes are tracked since Adelie started collecting."
+  },
   "Sections": {
     "soonTitle": "Coming soon",
     "reports": {
@@ -261,6 +268,9 @@
     "invitationsHint": "Send the link to whoever owns the account — a client, or yourself in another browser. They connect it without an Adelie account; the link works once and expires in 7 days.",
     "lastSyncLabel": "Last sync:",
     "actions": "Account actions",
+    "syncNow": "Sync now",
+    "syncInProgress": "A sync is already running",
+    "syncAvailableAt": "Available again at {time}",
     "disconnect": "Disconnect",
     "reconnect": "Connect again",
     "hide": "Hide",

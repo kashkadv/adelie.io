@@ -12,6 +12,8 @@ export interface AccountSyncState {
   lastSyncedAt: Date | null;
   /** Last SUCCESS or PARTIAL. */
   lastSuccessfulSyncAt: Date | null;
+  /** "Sync now" from the UI; pending while newer than lastSyncedAt. */
+  syncRequestedAt?: Date | null;
 }
 
 const utcDay = (d: Date) => d.toISOString().slice(0, 10);
@@ -19,6 +21,13 @@ const utcDay = (d: Date) => d.toISOString().slice(0, 10);
 /** Which sync an account needs now, or null. */
 export function dueSync(account: AccountSyncState, now: Date): SyncKind | null {
   if (account.connectionStatus !== 'ACTIVE') return null;
+  // A manual request goes first (the API limits how often it can be made).
+  if (
+    account.syncRequestedAt &&
+    (!account.lastSyncedAt || account.syncRequestedAt > account.lastSyncedAt)
+  ) {
+    return account.lastSuccessfulSyncAt ? 'MANUAL' : 'INITIAL';
+  }
   const recentlyTried =
     account.lastSyncedAt !== null &&
     now.getTime() - account.lastSyncedAt.getTime() < RETRY_AFTER_MS;
