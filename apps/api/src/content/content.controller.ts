@@ -11,7 +11,13 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@adelie/db';
 import { PrismaService } from '../prisma.service.js';
-import { periodMetrics, sortByPeriod, type PeriodMetric, type PeriodValues } from './period.js';
+import {
+  PERIOD_METRICS as PERIOD_SORTS,
+  periodMetrics,
+  sortByPeriod,
+  type PeriodMetric,
+  type PeriodValues,
+} from './period.js';
 import { visibleProjectsWhere } from '../workspaces/project-visibility.js';
 import {
   WorkspaceAccessGuard,
@@ -25,6 +31,12 @@ const SORTS = [
   'pinClicks',
   'outboundClicks',
   'videoViews',
+  // Instagram (lifetime only: Meta gives no daily values per post).
+  'views',
+  'reach',
+  'likes',
+  'comments',
+  'shares',
   'publishedAt',
 ] as const;
 type Sort = (typeof SORTS)[number];
@@ -63,6 +75,11 @@ const POST_SELECT = {
       pinClicks: true,
       outboundClicks: true,
       videoViews: true,
+      views: true,
+      reach: true,
+      likes: true,
+      comments: true,
+      shares: true,
       dataStatus: true,
       asOfDate: true,
     },
@@ -146,7 +163,10 @@ export class ContentController {
         : {}),
     };
 
-    if (from && to) return this.listForPeriod(where, { from, to, sort, page });
+    // Period sums need daily post values (ADR-0013) — Instagram has lifetime totals only.
+    if (from && to && platform !== 'INSTAGRAM') {
+      return this.listForPeriod(where, { from, to, sort, page });
+    }
 
     const orderBy: Prisma.SocialPostOrderByWithRelationInput[] =
       sort === 'publishedAt'
@@ -182,6 +202,11 @@ export class ContentController {
               pinClicks: latest.pinClicks,
               outboundClicks: latest.outboundClicks,
               videoViews: latest.videoViews,
+              views: latest.views,
+              reach: latest.reach,
+              likes: latest.likes,
+              comments: latest.comments,
+              shares: latest.shares,
             }
           : null,
         partial: false,
@@ -238,10 +263,9 @@ export class ContentController {
     }
     const values = periodMetrics(posts, sums, opts.from);
 
-    const ordered =
-      opts.sort === 'publishedAt' || opts.sort === 'videoViews'
-        ? sortByPeriod(posts, new Map(), 'impressions')
-        : sortByPeriod(posts, values, opts.sort);
+    const ordered = (PERIOD_SORTS as readonly string[]).includes(opts.sort)
+      ? sortByPeriod(posts, values, opts.sort as PeriodMetric)
+      : sortByPeriod(posts, new Map(), 'impressions');
     const pageIds = ordered
       .slice(opts.page * PAGE_SIZE, (opts.page + 1) * PAGE_SIZE)
       .map((p) => p.id);

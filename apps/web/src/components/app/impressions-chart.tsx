@@ -25,7 +25,13 @@ function niceMax(max: number): number {
  * title names the series). Days without data are gaps, never zero; days the platform is still
  * finalizing are dashed. Hover/focus shows a crosshair with the day's value and status.
  */
-export function ImpressionsChart({ points }: { points: SeriesPoint[] }) {
+export function ImpressionsChart({
+  points,
+  ariaLabel,
+}: {
+  points: SeriesPoint[];
+  ariaLabel: string;
+}) {
   const t = useTranslations('Overview');
   const format = useFormatter();
   const box = useRef<HTMLDivElement>(null);
@@ -105,7 +111,7 @@ export function ImpressionsChart({ points }: { points: SeriesPoint[] }) {
       onPointerMove={(e) => onMove(e.clientX)}
       onPointerLeave={() => setHover(null)}
       role="img"
-      aria-label={t('chart.aria')}
+      aria-label={ariaLabel}
     >
       {width > 0 && (
         <svg width={width} height={HEIGHT} className="block overflow-visible">

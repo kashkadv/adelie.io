@@ -3,7 +3,7 @@ import { HttpClient } from '../http.js';
 import { isAdapterError } from '../errors.js';
 import type { PostsPage } from '../types.js';
 import { InstagramAdapter } from './adapter.js';
-import { chunkDays, mapMedia, mapTimeSeries, statusFor } from './mapping.js';
+import { chunkDays, mapMedia, mapMediaInsights, mapTimeSeries, statusFor } from './mapping.js';
 
 const TODAY = '2026-11-07';
 const IG = '17841445843555583';
@@ -289,6 +289,20 @@ describe('Instagram mapping', () => {
       { from: '2026-09-09', to: '2026-10-08' },
       { from: '2026-10-09', to: '2026-11-07' },
     ]);
+  });
+
+  it('zero views on media older than July 2024 mean "not tracked"', () => {
+    const insights = { data: [{ name: 'views', values: [{ value: 0 }] }] };
+    const old = mapMediaInsights(
+      { id: 'a', timestamp: '2023-05-01T10:00:00+0000', insights },
+      TODAY,
+    );
+    const recent = mapMediaInsights(
+      { id: 'b', timestamp: '2025-05-01T10:00:00+0000', insights },
+      TODAY,
+    );
+    expect(old[0]).toMatchObject({ value: null, dataStatus: 'UNAVAILABLE' });
+    expect(recent[0]).toMatchObject({ value: 0, dataStatus: 'READY' });
   });
 
   it('carousels and unknown types', () => {

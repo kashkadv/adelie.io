@@ -55,7 +55,10 @@
       "impressions": "Impressions",
       "saves": "Saves",
       "outboundClicks": "Outbound clicks",
-      "followers": "Followers"
+      "followers": "Followers",
+      "views": "Views",
+      "engagements": "Interactions",
+      "newFollowers": "New followers"
     },
     "connectTitle": "Connect your first account",
     "connectText": "Adelie collects analytics from your social accounts every day. Pinterest comes first — Instagram and TikTok are next.",
@@ -75,23 +78,45 @@
     "noDataDay": "No data",
     "preliminaryDay": "Preliminary",
     "chart": {
-      "title": "Impressions by day",
+      "titles": {
+        "impressions": "Impressions by day",
+        "views": "Views by day"
+      },
       "hint": "Dashed: days the platform is still finalizing. Gaps: days without data — not zero.",
-      "aria": "Daily impressions chart"
+      "aria": {
+        "impressions": "Daily impressions chart",
+        "views": "Daily views chart"
+      }
     },
     "devices": {
       "title": "Impressions by device",
       "MOBILE": "Mobile",
       "WEB": "Web",
       "TABLET": "Tablet"
+    },
+    "platform": "Platform",
+    "interactions": {
+      "title": "Interactions",
+      "hint": "Likes, saves, comments and shares of the account's content in the period.",
+      "likes": "Likes",
+      "saves": "Saves",
+      "comments": "Comments",
+      "shares": "Shares"
     }
   },
   "MetricHints": {
     "impressions": "How many times the Pin appeared on screen — in the feed, search or on boards. One person can count several times.",
-    "saves": "How many times the Pin was saved to a board.",
+    "saves": "How many times the post was saved — to a board on Pinterest, or to saved items on Instagram.",
     "pinClicks": "How many times the Pin was opened or clicked — on or off Pinterest, including clicks to your site.",
     "outboundClicks": "How many times people went from the Pin to your website or shop via its link.",
-    "followers": "Followers of the account right now — not for the period. Changes are tracked since Adelie started collecting."
+    "followers": "Followers of the account right now — not for the period. Changes are tracked since Adelie started collecting.",
+    "views": "How many times the account's content was played or displayed — posts, Reels, stories. An Instagram metric, not the same as Pinterest impressions.",
+    "engagements": "All interactions with the content: likes, comments, saves, shares, replies.",
+    "newFollowers": "How many people followed in the period. Instagram gives this only for the last 30 days.",
+    "reach": "How many different accounts saw the post at least once.",
+    "likes": "Number of likes.",
+    "comments": "Number of comments.",
+    "shares": "How many times the post was shared."
   },
   "Sections": {
     "soonTitle": "Coming soon",
@@ -361,7 +386,12 @@
       "saves": "Saves",
       "pinClicks": "Pin clicks",
       "outboundClicks": "Outbound",
-      "publishedAt": "Published"
+      "publishedAt": "Published",
+      "views": "Views",
+      "reach": "Reach",
+      "likes": "Likes",
+      "comments": "Comments",
+      "shares": "Shares"
     },
     "types": {
       "IMAGE": "Image",
@@ -398,7 +428,12 @@
         "saves": "Saves",
         "pinClicks": "Pin clicks",
         "outboundClicks": "Outbound clicks",
-        "videoViews": "Video views"
+        "videoViews": "Video views",
+        "views": "Views",
+        "reach": "Reach",
+        "likes": "Likes",
+        "comments": "Comments",
+        "shares": "Shares"
       },
       "periodFrom": "Period from",
       "periodTo": "Period to",
@@ -432,6 +467,7 @@
     "metricsForPeriod": "metrics for the period",
     "metricsLifetime": "lifetime metrics",
     "dataSince": "data since {date}",
-    "periodHint": "Daily pin metrics summed over the period. Pinterest gives pin history 90 days back; older days build up from the moment the account was connected. “—” means no data, not zero. Pins saved from other accounts have no metrics."
+    "periodHint": "Daily pin metrics summed over the period. Pinterest gives pin history 90 days back; older days build up from the moment the account was connected. “—” means no data, not zero. Pins saved from other accounts have no metrics.",
+    "lifetimeHintInstagram": "Instagram post statistics are lifetime totals: Meta does not provide them by day, so there are no period metrics here yet. “—” means no data, not zero."
   }
 }

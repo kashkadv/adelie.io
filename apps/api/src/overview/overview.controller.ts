@@ -25,9 +25,56 @@ import {
 } from './aggregate.js';
 
 const PERIOD_DAYS = [7, 30, 90] as const;
-const DAILY_KEYS = ['impressions', 'saves', 'outbound_clicks'] as const;
+type Platform = 'PINTEREST' | 'INSTAGRAM';
 
-/** Project overview: key metrics, daily impressions and device breakdown (ADR-0008 aggregation). */
+/**
+ * What the overview shows per platform (one platform at a time: their metrics differ and must not
+ * be added up — Pinterest impressions ≠ Instagram views, ADR-0015).
+ * - kpis: [response id, metric key, DAILY sum or SNAPSHOT]
+ * - series: the daily chart; breakdown: a dimension of one metric, or several metrics side by side.
+ */
+const OVERVIEW: Record<
+  Platform,
+  {
+    kpis: { id: string; key: string; kind: 'daily' | 'snapshot' }[];
+    series: { id: string; key: string };
+    breakdown:
+      | { id: string; type: 'dimension'; key: string; dimension: string }
+      | { id: string; type: 'metrics'; items: { id: string; key: string }[] };
+  }
+> = {
+  PINTEREST: {
+    kpis: [
+      { id: 'impressions', key: 'impressions', kind: 'daily' },
+      { id: 'saves', key: 'saves', kind: 'daily' },
+      { id: 'outboundClicks', key: 'outbound_clicks', kind: 'daily' },
+      { id: 'followers', key: 'followers', kind: 'snapshot' },
+    ],
+    series: { id: 'impressions', key: 'impressions' },
+    breakdown: { id: 'devices', type: 'dimension', key: 'impressions', dimension: 'app_type' },
+  },
+  INSTAGRAM: {
+    kpis: [
+      { id: 'views', key: 'views', kind: 'daily' },
+      { id: 'engagements', key: 'engagements', kind: 'daily' },
+      { id: 'newFollowers', key: 'new_followers', kind: 'daily' },
+      { id: 'followers', key: 'followers', kind: 'snapshot' },
+    ],
+    series: { id: 'views', key: 'views' },
+    breakdown: {
+      id: 'interactions',
+      type: 'metrics',
+      items: [
+        { id: 'likes', key: 'likes' },
+        { id: 'saves', key: 'saves' },
+        { id: 'comments', key: 'comments' },
+        { id: 'shares', key: 'shares' },
+      ],
+    },
+  },
+};
+
+/** Project overview of one platform: key metrics, a daily chart and a breakdown (ADR-0008). */
 @Controller('workspaces/:workspaceId/projects/:projectId/overview')
 @UseGuards(WorkspaceAccessGuard)
 export class OverviewController {
@@ -38,6 +85,7 @@ export class OverviewController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query('days') daysParam: string | undefined,
     @Query('accountId') accountId: string | undefined,
+    @Query('platform') platformParam: string | undefined,
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     const days = Number(daysParam ?? 30);
@@ -50,7 +98,7 @@ export class OverviewController {
     });
     if (!project) throw new NotFoundException();
 
-    const accounts = await this.prisma.client.socialAccount.findMany({
+    const all = await this.prisma.client.socialAccount.findMany({
       where: {
         projectId,
         workspaceId: request.workspace.workspaceId,
@@ -69,7 +117,27 @@ export class OverviewController {
       },
       orderBy: { createdAt: 'asc' },
     });
-    if (accountId && accounts.length === 0) throw new NotFoundException();
+    if (accountId && all.length === 0) throw new NotFoundException();
+    const platforms = [...new Set(all.map((a) => a.platform))].filter(
+      (p): p is Platform => p in OVERVIEW,
+    );
+    if (platformParam && !(platformParam in OVERVIEW)) {
+      throw new BadRequestException('Unknown platform');
+    }
+    const platform = (
+      platformParam && platforms.includes(platformParam as Platform) ? platformParam : platforms[0]
+    ) as Platform | undefined;
+    const accounts = all.filter((a) => a.platform === platform);
+    const view = OVERVIEW[platform ?? 'PINTEREST'];
+    const keys = [
+      ...new Set([
+        ...view.kpis.map((k) => k.key),
+        view.series.key,
+        ...(view.breakdown.type === 'dimension'
+          ? [view.breakdown.key]
+          : view.breakdown.items.map((i) => i.key)),
+      ]),
+    ];
 
     const today = new Date().toISOString().slice(0, 10);
     const { current, previous } = periods(days, today);
@@ -82,7 +150,7 @@ export class OverviewController {
               gte: new Date(`${previous.from}T00:00:00Z`),
               lte: new Date(`${current.to}T00:00:00Z`),
             },
-            metric: { key: { in: [...DAILY_KEYS, 'followers'] } },
+            metric: { platform, key: { in: keys } },
           },
           select: {
             accountId: true,
@@ -101,7 +169,7 @@ export class OverviewController {
             accountId: { in: accounts.map((a) => a.id) },
             date: { lt: new Date(`${previous.from}T00:00:00Z`) },
             dimensionKey: '',
-            metric: { key: 'followers' },
+            metric: { platform, key: 'followers' },
           },
           distinct: ['accountId'],
           orderBy: [{ accountId: 'asc' }, { date: 'desc' }],
@@ -135,7 +203,19 @@ export class OverviewController {
     ];
 
     const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+    const breakdownItems =
+      view.breakdown.type === 'dimension'
+        ? breakdown(values, view.breakdown.key, view.breakdown.dimension, current)
+        : view.breakdown.items
+            .map((i) => ({
+              key: i.id,
+              value: dailyMetric(values, i.key, current, previous).value ?? 0,
+            }))
+            .filter((i) => i.value > 0)
+            .sort((a, b) => b.value - a.value);
     return {
+      platform: platform ?? null,
+      platforms,
       period: current,
       previousPeriod: previous,
       accounts: accounts.map((a) => ({
@@ -150,14 +230,14 @@ export class OverviewController {
           .map((a) => day(a.historyAvailableFrom))
           .filter((d): d is string => !!d)
           .sort()[0] ?? null,
-      metrics: {
-        impressions: dailyMetric(values, 'impressions', current, previous),
-        saves: dailyMetric(values, 'saves', current, previous),
-        outboundClicks: dailyMetric(values, 'outbound_clicks', current, previous),
-        followers: snapshotMetric(values, 'followers', current, previous),
-      },
-      series: dailySeries(values, 'impressions', current),
-      devices: breakdown(values, 'impressions', 'app_type', current),
+      kpis: view.kpis.map((k) => ({
+        id: k.id,
+        ...(k.kind === 'daily'
+          ? dailyMetric(values, k.key, current, previous)
+          : snapshotMetric(values, k.key, current, previous)),
+      })),
+      series: { id: view.series.id, points: dailySeries(values, view.series.key, current) },
+      breakdown: { id: view.breakdown.id, items: breakdownItems },
     };
   }
 }

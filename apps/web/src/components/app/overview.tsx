@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
+import { Segmented } from '../ui/segmented';
 import { Select } from '../ui/select';
 import { useProjectAccounts } from './accounts-data';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
@@ -22,22 +23,42 @@ import { useWorkspace } from './workspace-context';
 
 type Status = SeriesPoint['status'];
 type Metric = { value: number | null; previous: number | null; status: Status; coverage: number };
+type Platform = 'PINTEREST' | 'INSTAGRAM';
+type KpiId =
+  | 'impressions'
+  | 'saves'
+  | 'outboundClicks'
+  | 'followers'
+  | 'views'
+  | 'engagements'
+  | 'newFollowers';
 type OverviewData = {
+  platform: Platform | null;
+  platforms: Platform[];
   period: { from: string; to: string; days: number };
   historyFrom: string | null;
-  metrics: { impressions: Metric; saves: Metric; outboundClicks: Metric; followers: Metric };
-  series: SeriesPoint[];
-  devices: { key: string; value: number }[];
+  kpis: (Metric & { id: KpiId })[];
+  series: { id: 'impressions' | 'views'; points: SeriesPoint[] };
+  breakdown: { id: 'devices' | 'interactions'; items: { key: string; value: number }[] };
 };
 
 const PERIODS = [7, 30, 90] as const;
-const METRICS = ['impressions', 'saves', 'outboundClicks', 'followers'] as const;
-/** Device order and colors follow the validated chart palette (ADR-0009): slots 1–3. */
-const DEVICE_COLORS: Record<string, string> = {
+/** Key metrics per platform, shown as placeholders until data arrives (the API sends the same). */
+const KPIS: Record<Platform, KpiId[]> = {
+  PINTEREST: ['impressions', 'saves', 'outboundClicks', 'followers'],
+  INSTAGRAM: ['views', 'engagements', 'newFollowers', 'followers'],
+};
+/** Breakdown colors follow the validated chart palette (ADR-0009), in its fixed order. */
+const BREAKDOWN_COLORS: Record<string, string> = {
   MOBILE: 'var(--series-1)',
   WEB: 'var(--series-2)',
   TABLET: 'var(--series-3)',
+  likes: 'var(--series-1)',
+  saves: 'var(--series-2)',
+  comments: 'var(--series-3)',
+  shares: 'var(--series-4)',
 };
+const BREAKDOWN_LABELS = ['MOBILE', 'WEB', 'TABLET', 'likes', 'saves', 'comments', 'shares'];
 
 function Delta({ metric }: { metric: Metric }) {
   const t = useTranslations('Overview');
@@ -91,22 +112,38 @@ function PeriodSwitch({ days, onChange }: { days: number; onChange: (d: number) 
 export function Overview() {
   const t = useTranslations('Overview');
   const tMetric = useTranslations('MetricHints');
+  const tPlatforms = useTranslations('Accounts.platforms');
   const format = useFormatter();
   const { workspace, project } = useWorkspace();
   const { accounts: allAccounts, connect, canConnect } = useProjectAccounts();
   // Disconnected and hidden accounts are left out (their history is kept).
-  const accounts = allAccounts?.filter((a) => a.status !== 'REVOKED' && !a.hidden);
+  const visible = allAccounts?.filter((a) => a.status !== 'REVOKED' && !a.hidden);
+  const platforms = [...new Set((visible ?? []).map((a) => a.platform))].filter(
+    (p): p is Platform => p === 'PINTEREST' || p === 'INSTAGRAM',
+  );
+  const [chosenPlatform, setChosenPlatform] = useState<Platform | null>(null);
+  const platform =
+    chosenPlatform && platforms.includes(chosenPlatform) ? chosenPlatform : platforms[0];
+  const accounts = visible?.filter((a) => a.platform === platform);
   const [connecting, setConnecting] = useState(false);
   const [days, setDays] = useState(30);
   const [accountId, setAccountId] = useState('');
   const [data, setData] = useState<OverviewData | null>(null);
-  const needsReauth = accounts?.filter((a) => a.status === 'REAUTHORIZATION_REQUIRED') ?? [];
+  const needsReauth = visible?.filter((a) => a.status === 'REAUTHORIZATION_REQUIRED') ?? [];
   const hasAccounts = !!accounts && accounts.length > 0;
+  const selectPlatform = (p: Platform) => {
+    setChosenPlatform(p);
+    setAccountId('');
+  };
 
   useEffect(() => {
     if (!workspace || !project || !hasAccounts) return;
     let cancelled = false;
-    const q = new URLSearchParams({ days: String(days), ...(accountId ? { accountId } : {}) });
+    const q = new URLSearchParams({
+      days: String(days),
+      ...(platform ? { platform } : {}),
+      ...(accountId ? { accountId } : {}),
+    });
     api<OverviewData>(`/workspaces/${workspace.id}/projects/${project.id}/overview?${q}`).then(
       (d) => !cancelled && setData(d),
       () => !cancelled && setData(null),
@@ -114,7 +151,7 @@ export function Overview() {
     return () => {
       cancelled = true;
     };
-  }, [workspace, project, hasAccounts, days, accountId]);
+  }, [workspace, project, hasAccounts, days, accountId, platform]);
 
   async function onConnect() {
     setConnecting(true);
@@ -133,7 +170,10 @@ export function Overview() {
       hint: a.username ? `@${a.username}` : undefined,
     })),
   ];
-  const deviceTotal = data?.devices.reduce((s, d) => s + d.value, 0) ?? 0;
+  // Only data of the platform on screen (a stale response may belong to the previous one).
+  const shown = data && data.platform === platform ? data : null;
+  const breakdownTotal = shown?.breakdown.items.reduce((s, d) => s + d.value, 0) ?? 0;
+  const kpiIds = platform ? KPIS[platform] : KPIS.PINTEREST;
 
   return (
     <>
@@ -143,6 +183,14 @@ export function Overview() {
         action={
           hasAccounts ? (
             <div className="flex flex-wrap items-center gap-2">
+              {platforms.length > 1 && platform && (
+                <Segmented
+                  value={platform}
+                  onChange={selectPlatform}
+                  options={platforms.map((p) => ({ value: p, label: tPlatforms(p) }))}
+                  ariaLabel={t('platform')}
+                />
+              )}
               {accounts.length > 1 && (
                 <div className="w-56">
                   <Select
@@ -173,8 +221,8 @@ export function Overview() {
 
       {/* Key metrics. No data → an honest dash, never 0 (PRD §6.4). */}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {METRICS.map((key, i) => {
-          const m = data?.metrics[key];
+        {kpiIds.map((key, i) => {
+          const m = shown?.kpis.find((k) => k.id === key);
           const preliminary = m && m.value !== null && m.status !== 'READY';
           return (
             <article
@@ -206,64 +254,70 @@ export function Overview() {
         })}
       </div>
 
-      {hasAccounts && data && (
+      {hasAccounts && shown && (
         <div className="grid gap-4 xl:grid-cols-3">
           <section
             className="card animate-rise rounded-[24px] p-5 xl:col-span-2"
             style={{ animationDelay: '200ms' }}
           >
             <h2 className="mb-1 flex items-center gap-1.5 px-1 text-lg font-semibold">
-              {t('chart.title')}
+              {t(`chart.titles.${shown.series.id}`)}
               <InfoTip text={t('chart.hint')} />
             </h2>
             <p className="mb-3 px-1 text-xs text-muted">
               {format.dateTimeRange(
-                new Date(`${data.period.from}T00:00:00Z`),
-                new Date(`${data.period.to}T00:00:00Z`),
+                new Date(`${shown.period.from}T00:00:00Z`),
+                new Date(`${shown.period.to}T00:00:00Z`),
                 { day: 'numeric', month: 'short', timeZone: 'UTC' },
               )}
             </p>
-            <ImpressionsChart points={data.series} />
+            <ImpressionsChart
+              points={shown.series.points}
+              ariaLabel={t(`chart.aria.${shown.series.id}`)}
+            />
           </section>
 
           <section
             className="card animate-rise rounded-[24px] p-5"
             style={{ animationDelay: '240ms' }}
           >
-            <h2 className="mb-4 px-1 text-lg font-semibold">{t('devices.title')}</h2>
-            {deviceTotal > 0 ? (
+            <h2 className="mb-4 flex items-center gap-1.5 px-1 text-lg font-semibold">
+              {t(`${shown.breakdown.id}.title`)}
+              {shown.breakdown.id === 'interactions' && <InfoTip text={t('interactions.hint')} />}
+            </h2>
+            {breakdownTotal > 0 ? (
               <>
                 <div
                   className="mb-5 flex h-3 overflow-hidden rounded-full"
                   role="img"
-                  aria-label={t('devices.title')}
+                  aria-label={t(`${shown.breakdown.id}.title`)}
                 >
-                  {data.devices.map((d, i) => (
+                  {shown.breakdown.items.map((d, i) => (
                     <span
                       key={d.key}
                       style={{
-                        width: `${(d.value / deviceTotal) * 100}%`,
-                        background: DEVICE_COLORS[d.key] ?? 'var(--muted)',
+                        width: `${(d.value / breakdownTotal) * 100}%`,
+                        background: BREAKDOWN_COLORS[d.key] ?? 'var(--muted)',
                         marginLeft: i ? 2 : 0,
                       }}
                     />
                   ))}
                 </div>
                 <ul className="space-y-3">
-                  {data.devices.map((d) => (
+                  {shown.breakdown.items.map((d) => (
                     <li key={d.key} className="flex items-center gap-3 px-1 text-sm">
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ background: DEVICE_COLORS[d.key] ?? 'var(--muted)' }}
+                        style={{ background: BREAKDOWN_COLORS[d.key] ?? 'var(--muted)' }}
                         aria-hidden="true"
                       />
                       <span className="flex-1">
-                        {['MOBILE', 'WEB', 'TABLET'].includes(d.key)
-                          ? t(`devices.${d.key as 'MOBILE' | 'WEB' | 'TABLET'}`)
+                        {BREAKDOWN_LABELS.includes(d.key)
+                          ? t(`${shown.breakdown.id}.${d.key}` as 'devices.MOBILE')
                           : d.key}
                       </span>
                       <span className="tabular text-muted">
-                        {format.number(d.value / deviceTotal, {
+                        {format.number(d.value / breakdownTotal, {
                           style: 'percent',
                           maximumFractionDigits: 0,
                         })}

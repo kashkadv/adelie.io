@@ -92,10 +92,19 @@ export function mapMedia(raw: InstagramMedia): PostData {
   };
 }
 
+/**
+ * Meta counts `views` only for media created after 2 July 2024 (when it replaced impressions); older
+ * media report 0 — that is "not tracked", not zero views (Gushka, 2026-11-07: every pre-July-2024
+ * image/carousel had 0).
+ */
+export const VIEWS_TRACKED_SINCE = '2024-07-02';
+
 /** Lifetime post metrics that came with the media page (nested `insights` field). */
 export function mapMediaInsights(raw: InstagramMedia, today: string): MetricPoint[] {
+  const untrackedViews = !!raw.timestamp && raw.timestamp.slice(0, 10) < VIEWS_TRACKED_SINCE;
   return (raw.insights?.data ?? []).map((m) => {
-    const value = countOrNull(m.values?.[0]?.value);
+    const reported = countOrNull(m.values?.[0]?.value);
+    const value = m.name === 'views' && reported === 0 && untrackedViews ? null : reported;
     return {
       providerKey: m.name,
       scope: 'POST' as const,

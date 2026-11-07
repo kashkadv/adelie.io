@@ -30,13 +30,20 @@ import { EmptyState, PageHeader } from './page-header';
 import { useWorkspace } from './workspace-context';
 
 type Platform = SocialAccount['platform'];
-type Metrics = {
-  impressions: number | null;
-  saves: number | null;
-  pinClicks: number | null;
-  outboundClicks: number | null;
-  videoViews: number | null;
-};
+type MetricKey =
+  | 'impressions'
+  | 'saves'
+  | 'pinClicks'
+  | 'outboundClicks'
+  | 'videoViews'
+  | 'views'
+  | 'reach'
+  | 'likes'
+  | 'comments'
+  | 'shares';
+type Metrics = Partial<Record<MetricKey, number | null>>;
+/** Metrics that can be a table column (video views go to the CSV only). */
+type ColumnKey = Exclude<MetricKey, 'videoViews'>;
 type Post = {
   id: string;
   url: string | null;
@@ -62,9 +69,21 @@ type Page = {
 };
 type Board = { id: string; name: string; accountId: string; pinCount: number | null };
 
-/** Sortable columns, in display order: metrics, then the publication date. */
-const COLUMNS = ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'publishedAt'] as const;
-type Sort = (typeof COLUMNS)[number];
+/** Metric columns per platform (four fit the table); the publication date always comes last. */
+const PLATFORM_METRICS: Record<Platform, ColumnKey[]> = {
+  PINTEREST: ['impressions', 'saves', 'pinClicks', 'outboundClicks'],
+  INSTAGRAM: ['views', 'reach', 'likes', 'saves'],
+  TIKTOK: ['impressions', 'saves', 'pinClicks', 'outboundClicks'],
+};
+/** Everything a platform reports per post, for the CSV export. */
+const CSV_METRICS: Record<Platform, MetricKey[]> = {
+  PINTEREST: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'videoViews'],
+  INSTAGRAM: ['views', 'reach', 'likes', 'comments', 'saves', 'shares'],
+  TIKTOK: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'videoViews'],
+};
+/** Platforms whose posts have daily values (ADR-0013); others show lifetime totals only. */
+const HAS_PERIODS: Platform[] = ['PINTEREST'];
+type Sort = ColumnKey | 'publishedAt';
 const OWNERSHIP = ['own', 'saved', 'all'] as const;
 type Ownership = (typeof OWNERSHIP)[number];
 const ROW_GRID = 'grid-cols-[repeat(4,minmax(0,1fr))_8rem]';
@@ -72,11 +91,13 @@ const ROW_GRID = 'grid-cols-[repeat(4,minmax(0,1fr))_8rem]';
 function PostRow({
   post,
   sort,
+  columns,
   selected,
   onSelect,
 }: {
   post: Post;
   sort: Sort;
+  columns: Sort[];
   selected: boolean;
   onSelect: (selected: boolean) => void;
 }) {
@@ -134,7 +155,7 @@ function PostRow({
       </div>
 
       <dl className={`tabular grid shrink-0 ${ROW_GRID} gap-6 text-right xl:w-[44rem]`}>
-        {COLUMNS.map((key) => {
+        {columns.map((key) => {
           const metric = key === 'publishedAt' ? null : (post.metrics?.[key] ?? null);
           const text =
             key === 'publishedAt'
@@ -203,7 +224,7 @@ export function Content() {
   const [accountId, setAccountId] = useState('');
   const [boardId, setBoardId] = useState('');
   const [ownership, setOwnership] = useState<Ownership>('own');
-  const [sort, setSort] = useState<Sort>('impressions');
+  const [chosenSort, setSort] = useState<Sort>('impressions');
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [boards, setBoards] = useState<Board[]>([]);
@@ -214,6 +235,11 @@ export function Content() {
   const base = workspace && project ? `/workspaces/${workspace.id}/projects/${project.id}` : null;
 
   const platformAccounts = (accounts ?? []).filter((a) => a.platform === platform);
+  const metricColumns = PLATFORM_METRICS[platform ?? 'PINTEREST'];
+  const columns: Sort[] = [...metricColumns, 'publishedAt'];
+  // A sort column of another platform falls back to this platform's first metric.
+  const sort: Sort = columns.includes(chosenSort) ? chosenSort : metricColumns[0]!;
+  const hasPeriods = !!platform && HAS_PERIODS.includes(platform);
 
   useEffect(() => {
     const id = setTimeout(() => setDebounced(search.trim()), 300);
@@ -233,7 +259,7 @@ export function Content() {
   }, [base]);
 
   const query = useMemo(() => {
-    const range = resolveRange(period);
+    const range = hasPeriods ? resolveRange(period) : null;
     const pub = resolveRange(published);
     return new URLSearchParams({
       sort,
@@ -245,7 +271,7 @@ export function Content() {
       ...(boardId ? { boardId } : {}),
       ...(debounced ? { q: debounced } : {}),
     });
-  }, [sort, ownership, platform, period, published, accountId, boardId, debounced]);
+  }, [sort, ownership, platform, hasPeriods, period, published, accountId, boardId, debounced]);
 
   useEffect(() => {
     if (!base || !platform) return;
@@ -312,13 +338,7 @@ export function Content() {
 
   function exportCsv() {
     const rows = items.filter((p) => selected.has(p.id));
-    const metricKeys = [
-      'impressions',
-      'saves',
-      'pinClicks',
-      'outboundClicks',
-      'videoViews',
-    ] as const;
+    const metricKeys = CSV_METRICS[platform ?? 'PINTEREST'];
     const csv = toCsv([
       [
         t('csv.title'),
@@ -388,7 +408,15 @@ export function Content() {
                   })}
                 </>
               )}
-              <InfoTip text={data.period ? t('periodHint') : t('lifetimeHint')} />
+              <InfoTip
+                text={
+                  data.period
+                    ? t('periodHint')
+                    : platform === 'INSTAGRAM'
+                      ? t('lifetimeHintInstagram')
+                      : t('lifetimeHint')
+                }
+              />
             </span>
           ) : (
             ' '
@@ -408,13 +436,17 @@ export function Content() {
 
       {/* Toolbar: the data period first (it drives every number), then filter chips, then search. */}
       <div className="animate-rise relative z-20 mb-4 flex flex-wrap items-center gap-2">
-        <PeriodControl
-          value={period}
-          onChange={setPeriod}
-          labels={rangeLabels}
-          ariaLabel={t('period.label')}
-        />
-        <span className="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
+        {hasPeriods && (
+          <>
+            <PeriodControl
+              value={period}
+              onChange={setPeriod}
+              labels={rangeLabels}
+              ariaLabel={t('period.label')}
+            />
+            <span className="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
+          </>
+        )}
         {platformAccounts.length > 1 && (
           <FilterChip
             label={t('account')}
@@ -451,19 +483,21 @@ export function Content() {
           onChange={setPublished}
           labels={publishedLabels}
         />
-        <FilterChip
-          label={t('ownershipLabel')}
-          value={ownership}
-          onChange={(v) => setOwnership(v as Ownership)}
-          options={OWNERSHIP.map((o) => ({ value: o, label: t(`ownership.${o}`) }))}
-          clearable={false}
-        />
+        {platform === 'PINTEREST' && (
+          <FilterChip
+            label={t('ownershipLabel')}
+            value={ownership}
+            onChange={(v) => setOwnership(v as Ownership)}
+            options={OWNERSHIP.map((o) => ({ value: o, label: t(`ownership.${o}`) }))}
+            clearable={false}
+          />
+        )}
         <span className="xl:hidden">
           <FilterChip
             label={t('sortBy')}
             value={sort}
             onChange={(v) => setSort(v as Sort)}
-            options={COLUMNS.map((c) => ({ value: c, label: t(`metrics.${c}`) }))}
+            options={columns.map((c) => ({ value: c, label: t(`metrics.${c}`) }))}
             clearable={false}
           />
         </span>
@@ -506,7 +540,7 @@ export function Content() {
               <span className="pl-[68px]">{t('pin')}</span>
             </span>
             <span className={`grid w-[44rem] ${ROW_GRID} gap-6 text-right`}>
-              {COLUMNS.map((key) => (
+              {columns.map((key) => (
                 <span key={key} className="flex items-center justify-end gap-1.5">
                   <button
                     type="button"
@@ -532,6 +566,7 @@ export function Content() {
                   key={post.id}
                   post={post}
                   sort={sort}
+                  columns={columns}
                   selected={selected.has(post.id)}
                   onSelect={(on) => toggle(post.id, on)}
                 />
