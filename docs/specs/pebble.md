@@ -875,6 +875,34 @@ Discovery, джерела даних, аналіз трендів, оцінюв�
 | TikTok | Creative Center / Research API — перевірити доступність і умови |
 | Reddit | API для комерційного використання платний |
 
+### PoC 0 — Pinterest Trends (2026-11-07) ✅ доступ є
+
+Перевірено з токеном Gushka на dev (застосунок Adelie, рівень Trial, scope `user_accounts:read` — окремий
+scope не потрібен): `GET /v5/trends/keywords/{region}/top/{trend_type}`.
+
+- **Типи:** `growing` (найшвидше зростають), `monthly`, `yearly` (найпопулярніші), `seasonal`. До 50
+  ключових слів за запит.
+- **На кожне слово:** зміна тиждень/місяць/рік до року (`pct_growth_wow/mom/yoy`, %; 10001 = «з нуля»),
+  **52 тижневі точки за рік** (`time_series`), поля `predicted_time_series` (у вибірці порожнє) і
+  `demographics` (у вибірці `null`).
+- **Значення — відносні 0–100** (100 = пік слова за рік), не абсолютний обсяг пошуків.
+  `normalize_against_group=true` — у спільному масштабі групи (можна порівнювати слова між собою).
+- **Фільтри:** `include_keywords` (слова, що містять підрядок), `interests` (24 категорії, зокрема
+  `diy_and_crafts`, `home_decor`, `womens_fashion`, `art`, `wedding`), `genders`, `ages`.
+- **Регіони:** 18 — US, CA, DE, FR, ES, IT, BR, MX, AR, CO, `GB+IE`, `AU+NZ`, `DE+AT+CH`, `NL+BE+LU`,
+  `SE+DK+FI+NO`, `PL+RO+HU+SK+CZ`, `IT+ES+PT+GR+MT`, `MX+AR+CO+CL`. **України немає.**
+- **Ліміт:** 60 запитів/хв на застосунок+користувача (окремий бакет `trends_read`).
+- **Обмеження:** це лише **топ** слів — довільне слово «подивитись» не можна. Вузькі ніші з'являються,
+  тільки якщо входять у топ: `knitting`, `crochet`, `felt`, `yarn` — по 50 слів; `wool` — 31 (переважно
+  одяг); `wool rug`, `merino` — по 1; `growing` для вузьких слів часто порожній, а в сезон дає корисне
+  (`crochet christmas garland`, `felt christmas ornaments diy`).
+- **Висновок:** придатне джерело для Search Trends: сезонність (52 тижні), ранні сигнали (`growing`),
+  розширення ключових слів у ніші (`include_keywords` + `interests`). Не замінює обсяги пошуку й дані
+  маркетплейсу. Умови використання Trends-даних — переглянути перед продуктовим (не власним) застосуванням.
+
+Далі в PoC 0: **Etsy Open API v3** — потрібна реєстрація застосунку на Etsy (ключ від власника), перевірити
+пошук оголошень, категорії, ліміти, умови; **Google Trends** і **TikTok Creative Center** — статус доступу.
+
 ### Обсяг першої версії (пропозиція)
 
 - **Так:** Niche-based Discovery; 1–2 джерела; тренд зі статусом, Confidence і доказами (Why Detected,
