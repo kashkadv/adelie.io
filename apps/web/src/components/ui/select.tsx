@@ -20,6 +20,7 @@ export function Select({
   ariaLabel,
   invalid,
   suggested,
+  disabled = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -32,6 +33,7 @@ export function Select({
   invalid?: boolean;
   /** Option to scroll to when nothing is selected yet (e.g. 09:00 for a start time). */
   suggested?: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -142,6 +144,7 @@ export function Select({
         aria-expanded={open}
         aria-controls={listId}
         aria-invalid={invalid || undefined}
+        disabled={disabled}
         onClick={() => (open ? setOpen(false) : openList())}
         className="field flex items-center justify-between gap-2 text-left"
       >

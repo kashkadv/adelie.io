@@ -292,6 +292,11 @@ h3 {
     border-color: rgb(220 38 38 / 0.6);
   }
 
+  /* Read-only for roles that may not edit. */
+  .field:disabled {
+    opacity: 0.6;
+  }
+
   .btn-primary {
     width: 100%;
     border-radius: 14px;

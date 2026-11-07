@@ -1,8 +1,11 @@
 'use client';
 
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus, Settings } from 'lucide-react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { NewProjectDialog } from './new-project-dialog';
+import { MANAGE_PROJECT_ROLES } from './project-settings';
 import { useWorkspace } from './workspace-context';
 
 /** Current project (and workspace) with a popover to switch between them. */
@@ -11,6 +14,7 @@ export function ProjectSwitcher() {
   const tRoles = useTranslations('Roles');
   const { workspaces, workspace, project, selectProject, selectWorkspace } = useWorkspace();
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,6 +75,30 @@ export function ProjectSwitcher() {
               {p.id === project?.id && <Check size={16} aria-hidden="true" />}
             </button>
           ))}
+          <div className="my-1 h-px bg-line" />
+          {MANAGE_PROJECT_ROLES.includes(workspace.role) && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                setCreating(true);
+              }}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-hover"
+            >
+              <Plus size={16} aria-hidden="true" />
+              {t('newProject')}
+            </button>
+          )}
+          <Link
+            href="/settings"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-hover"
+          >
+            <Settings size={16} aria-hidden="true" />
+            {t('projectSettings')}
+          </Link>
 
           {workspaces && workspaces.length > 1 && (
             <>
@@ -103,6 +131,7 @@ export function ProjectSwitcher() {
           )}
         </div>
       )}
+      {creating && <NewProjectDialog onClose={() => setCreating(false)} />}
     </div>
   );
 }

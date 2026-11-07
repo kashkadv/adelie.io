@@ -20,6 +20,8 @@ type WorkspaceState = {
   project: Project | null;
   selectWorkspace: (id: string) => void;
   selectProject: (id: string) => void;
+  /** Re-reads the current workspace (after creating, renaming or deleting a project). */
+  reloadWorkspace: (selectProjectId?: string) => Promise<void>;
 };
 
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
@@ -49,8 +51,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [workspace, setWorkspace] = useState<WorkspaceDetail | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
 
-  const loadWorkspace = useCallback(async (id: string) => {
+  const loadWorkspace = useCallback(async (id: string, selectProjectId?: string) => {
     const detail = await api<WorkspaceDetail>(`/workspaces/${id}`);
+    if (selectProjectId) write(projectKey(id), selectProjectId);
     const saved = read(projectKey(id));
     setWorkspace(detail);
     setProjectId(detail.projects.find((p) => p.id === saved)?.id ?? detail.projects[0]?.id ?? null);
@@ -85,11 +88,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [workspace],
   );
 
+  const workspaceId = workspace?.id;
+  const reloadWorkspace = useCallback(
+    async (selectProjectId?: string) => {
+      if (workspaceId) await loadWorkspace(workspaceId, selectProjectId);
+    },
+    [workspaceId, loadWorkspace],
+  );
+
   const project = workspace?.projects.find((p) => p.id === projectId) ?? null;
 
   return (
     <WorkspaceContext.Provider
-      value={{ workspaces, workspace, project, selectWorkspace, selectProject }}
+      value={{ workspaces, workspace, project, selectWorkspace, selectProject, reloadWorkspace }}
     >
       {children}
     </WorkspaceContext.Provider>

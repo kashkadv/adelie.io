@@ -36,6 +36,8 @@
     "reports": "Reports",
     "settings": "Settings",
     "projects": "Projects",
+    "newProject": "New project",
+    "projectSettings": "Project settings",
     "workspaces": "Workspaces",
     "collapse": "Collapse",
     "expand": "Expand sidebar",
@@ -88,11 +90,6 @@
       "title": "Reports",
       "subtitle": "Snapshots to share with clients",
       "text": "Build a report for a period and share it by a secret link — no sign-in needed for the reader."
-    },
-    "settings": {
-      "title": "Settings",
-      "subtitle": "Project, team and workspace",
-      "text": "Project timezone and currency, team members and their access will be managed here."
     }
   },
   "Profile": {
@@ -155,6 +152,62 @@
       "tooLarge": "The image is too large"
     },
     "nothingFound": "Nothing found"
+  },
+  "ProjectSettings": {
+    "title": "Settings",
+    "subtitle": "Project {project}",
+    "sections": {
+      "general": "General",
+      "regional": "Regional",
+      "danger": "Delete project"
+    },
+    "fields": {
+      "name": "Project name",
+      "timezone": "Time zone",
+      "currency": "Currency",
+      "reportLocale": "Report language"
+    },
+    "hints": {
+      "timezone": "Day boundaries in the project's reports follow this time zone.",
+      "currency": "Sales and spend of the project will be shown in this currency.",
+      "reportLocale": "Language of the reports you share by link."
+    },
+    "search": "Search",
+    "nothingFound": "Nothing found",
+    "save": "Save",
+    "saved": "Saved",
+    "fixErrors": "Check the highlighted fields.",
+    "errors": {
+      "required": "Required.",
+      "tooLong": "Too long — up to 80 characters.",
+      "invalidTimezone": "Unknown time zone.",
+      "invalidCurrency": "Unknown currency.",
+      "invalidLocale": "Unsupported language.",
+      "invalidType": "Invalid value."
+    },
+    "deleteText": "The project's accounts and all collected data will be deleted for good.",
+    "lastProjectHint": "This is the only project in the workspace — create another one first.",
+    "delete": "Delete project",
+    "deleteFailed": "Couldn't delete the project. Please try again.",
+    "cancel": "Cancel",
+    "deleteDialog": {
+      "title": "Delete project “{name}”?",
+      "text": "Connected accounts, pins, metrics and sync history will be deleted. This can't be undone.",
+      "confirm": "Delete for good",
+      "typeToConfirm": "To confirm, type the project name: {name}"
+    }
+  },
+  "NewProject": {
+    "title": "New project",
+    "name": "Name",
+    "namePlaceholder": "E.g. a client or brand name",
+    "create": "Create",
+    "cancel": "Cancel",
+    "errors": {
+      "required": "Enter a project name.",
+      "tooLong": "The name is too long — up to 80 characters.",
+      "failed": "Couldn't create the project. Please try again."
+    }
   },
   "Accounts": {
     "title": "Accounts",

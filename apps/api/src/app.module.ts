@@ -10,6 +10,7 @@ import { ConnectService } from './social/connect.service.js';
 import { InvitationsController } from './social/invitations.controller.js';
 import { SocialController } from './social/social.controller.js';
 import { WorkspaceAccessGuard } from './workspaces/workspace-access.guard.js';
+import { ProjectsController } from './projects/projects.controller.js';
 import { WorkspacesController } from './workspaces/workspaces.controller.js';
 
 @Module({
@@ -24,6 +25,7 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
     ProfileController,
     SocialController,
     WorkspacesController,
+    ProjectsController,
   ],
   providers: [ConnectService, PrismaService, WorkspaceAccessGuard],
 })

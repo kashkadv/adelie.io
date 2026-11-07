@@ -32,3 +32,4 @@
 - [ADR-0011](decisions/0011-platform-adapters.md) — Контракт адаптера платформ (прийнято)
 - [ADR-0012](decisions/0012-connect-invitations.md) — Запрошення на підключення акаунта (прийнято)
 - [ADR-0013](decisions/0013-post-daily-metrics.md) — Щоденні метрики публікацій і метрики за період (прийнято)
+- [ADR-0014](decisions/0014-project-management.md) — Керування проєктами й налаштування проєкту (прийнято)

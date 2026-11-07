@@ -1,5 +1,5 @@
-import { SectionPlaceholder } from '@/components/app/section-placeholder';
+import { ProjectSettings } from '@/components/app/project-settings';
 
 export default function SettingsPage() {
-  return <SectionPlaceholder section="settings" />;
+  return <ProjectSettings />;
 }
