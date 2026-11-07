@@ -9,11 +9,15 @@ import { ThemeToggle } from './theme-toggle';
 
 const SITE_URL = 'https://adelie.space';
 
+/** Legal page on the public site in the current language (English lives at the root). */
+export function siteUrl(locale: string, page: 'privacy' | 'terms'): string {
+  return locale === 'en' ? `${SITE_URL}/${page}` : `${SITE_URL}/${locale}/${page}`;
+}
+
 /** Full-screen frame for sign-in / sign-up: brand on top, a glass card in the middle. */
 export function AuthFrame({ children }: { children: ReactNode }) {
   const t = useTranslations('Common');
   const locale = useLocale();
-  const privacyUrl = locale === 'en' ? `${SITE_URL}/privacy` : `${SITE_URL}/${locale}/privacy`;
 
   return (
     <div className="flex min-h-dvh flex-col px-4 py-4 md:px-8">
@@ -36,8 +40,11 @@ export function AuthFrame({ children }: { children: ReactNode }) {
 
       <footer className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-muted">
         <span>© 2026 Adelie</span>
-        <a href={privacyUrl} className="hover:text-foreground">
+        <a href={siteUrl(locale, 'privacy')} className="hover:text-foreground">
           {t('privacyPolicy')}
+        </a>
+        <a href={siteUrl(locale, 'terms')} className="hover:text-foreground">
+          {t('terms')}
         </a>
         <a href="mailto:hello@adelie.space" className="hover:text-foreground">
           hello@adelie.space

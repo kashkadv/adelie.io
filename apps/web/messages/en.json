@@ -4,7 +4,8 @@
     "language": "Language",
     "genericError": "Something went wrong",
     "toggleTheme": "Toggle theme",
-    "privacyPolicy": "Privacy Policy"
+    "privacyPolicy": "Privacy Policy",
+    "terms": "Terms of Service"
   },
   "Auth": {
     "signInTitle": "Sign in to your workspace",
@@ -16,6 +17,7 @@
     "hidePassword": "Hide password",
     "signIn": "Sign in",
     "createAccount": "Create account",
+    "agreement": "By creating an account you accept the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
     "haveAccount": "Have an account?",
     "noAccount": "No account?",
     "createOne": "Create one",

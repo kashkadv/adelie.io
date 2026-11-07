@@ -82,7 +82,7 @@ Pinterest-акаунт → дані синхронізуються у фоні �
 
 - [ ] Вибір хостингу → ADR
 - [ ] Production-середовище, секрети, бекапи БД
-- [ ] Privacy policy ✅ / Terms of Service (потрібні для production access платформ і Etsy API)
+- [x] Privacy policy / Terms of Service (потрібні для production access платформ і Etsy API)
 - [ ] Production access Pinterest, якщо trial недостатньо
 - [ ] Підключити реальний акаунт Gushka в production
 

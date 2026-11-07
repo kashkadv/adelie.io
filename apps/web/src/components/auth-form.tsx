@@ -1,10 +1,10 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { authClient } from '@/lib/auth-client';
-import { AuthFrame } from './auth-frame';
+import { AuthFrame, siteUrl } from './auth-frame';
 import { PasswordInput } from './password-input';
 
 type Mode = 'login' | 'register';
@@ -14,6 +14,7 @@ const input = 'field';
 export function AuthForm({ mode }: { mode: Mode }) {
   const t = useTranslations('Auth');
   const tCommon = useTranslations('Common');
+  const locale = useLocale();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -86,6 +87,22 @@ export function AuthForm({ mode }: { mode: Mode }) {
         <button type="submit" disabled={pending} className="btn-primary">
           {pending ? '…' : mode === 'register' ? t('createAccount') : t('signIn')}
         </button>
+        {mode === 'register' && (
+          <p className="text-center text-xs text-muted">
+            {t.rich('agreement', {
+              terms: (chunks) => (
+                <a href={siteUrl(locale, 'terms')} className="underline underline-offset-2">
+                  {chunks}
+                </a>
+              ),
+              privacy: (chunks) => (
+                <a href={siteUrl(locale, 'privacy')} className="underline underline-offset-2">
+                  {chunks}
+                </a>
+              ),
+            })}
+          </p>
+        )}
         <p className="text-center text-sm text-muted">
           {mode === 'register' ? (
             <>

@@ -4,7 +4,8 @@
     "language": "Мова",
     "genericError": "Щось пішло не так",
     "toggleTheme": "Змінити тему",
-    "privacyPolicy": "Політика конфіденційності"
+    "privacyPolicy": "Політика конфіденційності",
+    "terms": "Умови використання"
   },
   "Auth": {
     "signInTitle": "Увійдіть у свій робочий простір",
@@ -16,6 +17,7 @@
     "hidePassword": "Сховати пароль",
     "signIn": "Увійти",
     "createAccount": "Створити акаунт",
+    "agreement": "Створюючи акаунт, ви приймаєте <terms>Умови використання</terms> й <privacy>Політику конфіденційності</privacy>.",
     "haveAccount": "Вже маєте акаунт?",
     "noAccount": "Немає акаунта?",
     "createOne": "Створити",
