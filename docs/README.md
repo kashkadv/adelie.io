@@ -17,6 +17,7 @@
 | [plans/infra-discussion.md](plans/infra-discussion.md) | Обговорення інфраструктури на домашньому Proxmox (в роботі) |
 | [infra/server-setup.md](infra/server-setup.md) | Сервер на Proxmox: створення VM, доступ, журнал налаштування |
 | [integrations/pinterest.md](integrations/pinterest.md) | Pinterest API: scopes, endpoints, метрики, обмеження, як створити застосунок |
+| [integrations/instagram.md](integrations/instagram.md) | Instagram API (Instagram Login): доступ, дозволи, метрики, обмеження, кроки |
 
 ## Рішення (ADR)
 

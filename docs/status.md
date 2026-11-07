@@ -70,8 +70,11 @@ SUCCESS — 10 дошок, 55 пінів із метриками, 90 днів а
    дошка, дата публікації, власні / збережені; пошук; сортування кліком по колонці; вибір пінів і експорт у CSV
    з плаваючої панелі; від'єднані акаунти на «Огляді» й «Контенті» приховано). Далі — переглянути план MVP-1
    ([plans/mvp-1.md](plans/mvp-1.md)): звіти за посиланням, сторінка команди, staging/production. Модель: [plans/stage-2-data-model.md](plans/stage-2-data-model.md).
-2. Сторінка команди з профілями колег (ADR-0010) і керування доступами до проєктів.
-3. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
+2. **Instagram** (друга платформа, ADR-0004): документацію досліджено — [integrations/instagram.md](integrations/instagram.md).
+   Для Gushka вистачає Standard access (без App Review); для клієнтів — App Review + Business Verification (юрособа).
+   Далі: власник створює застосунок Meta й додає Gushka тестувальником → PoC.
+3. Сторінка команди з профілями колег (ADR-0010) і керування доступами до проєктів.
+4. Стаціонарний ПК: Tailscale → `git clone` → кроки з README (`pnpm env:pull && pnpm build && pnpm dev`).
 
 Підказки для локального запуску:
 - `pnpm` є лише в Node 24: у новій вкладці `nvm use` (або раз `nvm alias default 24`).
