@@ -778,7 +778,9 @@
       "variationQuantity": "Quantity: {variation}",
       "onSale": "On sale",
       "nowOnSale": "now on sale",
-      "nowOffSale": "taken off sale"
+      "nowOffSale": "taken off sale",
+      "bullets": "List",
+      "bulletsHint": "Adds “• ” at the start of the selected lines (or removes it). Etsy shows descriptions as plain text — bold or italics do not work there, bullets do."
     },
     "card": {
       "close": "Close",

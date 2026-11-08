@@ -1,12 +1,12 @@
 'use client';
 
-import { ArrowLeft, ArrowRight, Check, Lock, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, List, Lock, X } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { useEffect, useId, useState, type KeyboardEvent } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
+import { PanelSheet } from '../ui/panel-sheet';
 import { Switch } from '../ui/switch';
 import { minorDigits, useMoney } from './sales-data';
 
@@ -81,6 +81,7 @@ const priceTextOf = (minor: number | null, digits: number) =>
 const toMinor = (text: string, digits: number) =>
   text.trim() ? Math.round(Number(text.replace(',', '.')) * 10 ** digits) : null;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const BULLET = '• ';
 
 /** Tags as chips: Enter or comma adds, Backspace in an empty input removes the last one. */
 function TagInput({
@@ -172,6 +173,7 @@ export function ProductEditor({
   const [loadFailed, setLoadFailed] = useState(false);
   const [values, setValues] = useState<Values | null>(null);
   const [priceText, setPriceText] = useState('');
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
   /** Per-variation price as typed, by variation id. */
   const [varPrices, setVarPrices] = useState<Record<string, string>>({});
   const [step, setStep] = useState<'edit' | 'review'>('edit');
@@ -339,6 +341,26 @@ export function ProductEditor({
     }
   }
 
+  /** "• " in front of every selected line, or off again when they all have it. */
+  function toggleBullets() {
+    const el = descriptionRef.current;
+    if (!el || !values) return;
+    const text = values.description;
+    const start = text.lastIndexOf('\n', el.selectionStart - 1) + 1;
+    const endBreak = text.indexOf('\n', el.selectionEnd);
+    const end = endBreak === -1 ? text.length : endBreak;
+    const lines = text.slice(start, end).split('\n');
+    const on = lines.every((l) => !l.trim() || l.startsWith(BULLET));
+    const next = lines
+      .map((l) => (!l.trim() ? l : on ? l.slice(BULLET.length) : `${BULLET}${l}`))
+      .join('\n');
+    setValues({ ...values, description: text.slice(0, start) + next + text.slice(end) });
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start, start + next.length);
+    });
+  }
+
   const show = (f: Field, v: unknown): string => {
     if (v === null || v === undefined || v === '') return '—';
     if (f === 'price') return money(v as number, currency);
@@ -361,39 +383,28 @@ export function ProductEditor({
       <p className="mt-1 px-3.5 text-xs text-rose-600 dark:text-rose-400">{errors[f]}</p>
     );
 
-  return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-      <button
-        type="button"
-        aria-label={t('close')}
-        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={() => !saving && onClose()}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="glass glass-strong animate-rise relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-[28px]"
-      >
-        <div className="flex items-start gap-3 border-b border-line p-5">
-          <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-lg font-semibold">
-              {step === 'review' ? t('reviewTitle') : t('title')}
-            </h2>
-            <p className="truncate text-sm text-muted">{data?.current?.title ?? '…'}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            aria-label={t('close')}
-            className="icon-btn h-8 w-8"
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
+  return (
+    <PanelSheet labelledBy={titleId} onClose={() => !saving && onClose()} closeLabel={t('close')}>
+      <div className="flex items-start gap-3 border-b border-line p-5">
+        <div className="min-w-0 flex-1">
+          <h2 id={titleId} className="text-lg font-semibold">
+            {step === 'review' ? t('reviewTitle') : t('title')}
+          </h2>
+          <p className="truncate text-sm text-muted">{data?.current?.title ?? '…'}</p>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={saving}
+          aria-label={t('close')}
+          className="icon-btn h-8 w-8"
+        >
+          <X size={16} aria-hidden="true" />
+        </button>
+      </div>
 
-        <div className="scroll-thin flex-1 overflow-y-auto p-5">
+      <div className="scroll-thin flex-1 overflow-y-auto p-5 sm:p-8">
+        <div className="mx-auto w-full max-w-3xl">
           {notice && (
             <p
               role="status"
@@ -434,14 +445,28 @@ export function ProductEditor({
                 />
                 {fieldError('title')}
               </label>
-              <label className="block">
-                {label('description')}
+              <div>
+                <div className="flex items-end justify-between gap-2">
+                  {label('description')}
+                  {/* Etsy shows plain text only: a bullet list is the formatting that survives. */}
+                  <button
+                    type="button"
+                    onClick={toggleBullets}
+                    className="mb-1.5 inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs text-muted hover:bg-hover hover:text-foreground"
+                    title={t('bulletsHint')}
+                  >
+                    <List size={14} aria-hidden="true" />
+                    {t('bullets')}
+                  </button>
+                </div>
                 <textarea
-                  className="field scroll-thin min-h-40 resize-y py-3 leading-relaxed"
+                  ref={descriptionRef}
+                  aria-label={t('fields.description')}
+                  className="field scroll-thin min-h-56 resize-y py-3 leading-relaxed"
                   value={values.description}
                   onChange={(e) => setValues({ ...values, description: e.target.value })}
                 />
-              </label>
+              </div>
               <div>
                 {label('tags', `${values.tags.length}/${LIMITS.tags}`)}
                 <TagInput
@@ -688,50 +713,49 @@ export function ProductEditor({
             </section>
           )}
         </div>
-
-        {data?.canEdit && (
-          <div className="flex items-center justify-end gap-2 border-t border-line p-4">
-            {step === 'edit' ? (
-              <>
-                <span className="mr-auto px-1 text-xs text-muted">
-                  {changed.length ? t('changedCount', { count: changed.length }) : t('noChanges')}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setStep('review')}
-                  disabled={!changed.length || !valid}
-                  className="btn-primary inline-flex w-auto items-center gap-2 px-5"
-                >
-                  {t('review')}
-                  <ArrowRight size={15} aria-hidden="true" />
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setStep('edit')}
-                  disabled={saving}
-                  className="mr-auto inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm text-muted hover:bg-hover hover:text-foreground"
-                >
-                  <ArrowLeft size={15} aria-hidden="true" />
-                  {t('back')}
-                </button>
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={saving}
-                  className="btn-primary inline-flex w-auto items-center gap-2 px-5"
-                >
-                  <Check size={15} aria-hidden="true" />
-                  {saving ? t('saving') : t('save')}
-                </button>
-              </>
-            )}
-          </div>
-        )}
       </div>
-    </div>,
-    document.body,
+
+      {data?.canEdit && (
+        <div className="flex items-center justify-end gap-2 border-t border-line p-4">
+          {step === 'edit' ? (
+            <>
+              <span className="mr-auto px-1 text-xs text-muted">
+                {changed.length ? t('changedCount', { count: changed.length }) : t('noChanges')}
+              </span>
+              <button
+                type="button"
+                onClick={() => setStep('review')}
+                disabled={!changed.length || !valid}
+                className="btn-primary inline-flex w-auto items-center gap-2 px-5"
+              >
+                {t('review')}
+                <ArrowRight size={15} aria-hidden="true" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setStep('edit')}
+                disabled={saving}
+                className="mr-auto inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm text-muted hover:bg-hover hover:text-foreground"
+              >
+                <ArrowLeft size={15} aria-hidden="true" />
+                {t('back')}
+              </button>
+              <button
+                type="button"
+                onClick={save}
+                disabled={saving}
+                className="btn-primary inline-flex w-auto items-center gap-2 px-5"
+              >
+                <Check size={15} aria-hidden="true" />
+                {saving ? t('saving') : t('save')}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </PanelSheet>
   );
 }
