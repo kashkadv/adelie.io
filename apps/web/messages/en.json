@@ -600,13 +600,14 @@
       "inactive": "Inactive",
       "sold_out": "Sold out",
       "draft": "Drafts",
-      "expired": "Expired"
+      "expired": "Expired",
+      "removed": "Removed"
     },
     "products": {
       "title": "Products",
       "subtitle": "What you sell — across the project’s shops",
       "count": "{count, plural, one {# product} other {# products}}",
-      "hint": "Sold and revenue come from orders in the chosen period. Views and favorites are lifetime, as Etsy reports them. Price is the current one.",
+      "hint": "Sold and revenue come from orders in the chosen period. Views and favorites are lifetime, as Etsy reports them. Price is the current one. “Removed” — products no longer in the shop that appear in orders.",
       "state": "State",
       "search": "Search products",
       "product": "Product",

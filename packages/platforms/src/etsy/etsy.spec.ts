@@ -3,7 +3,7 @@ import { HttpClient } from '../http.js';
 import { isAdapterError } from '../errors.js';
 import type { ProductData } from '../types.js';
 import { EtsyAdapter } from './adapter.js';
-import { mapReceipt, money } from './mapping.js';
+import { mapReceipt, money, unescapeHtml } from './mapping.js';
 
 const TODAY = '2026-11-08';
 const PKCE = { verifier: 'v'.repeat(43), challenge: 'c'.repeat(43) };
@@ -179,6 +179,12 @@ describe('EtsyAdapter data', () => {
 });
 
 describe('Etsy mapping', () => {
+  it('titles come HTML-escaped', () => {
+    expect(unescapeHtml('Pillow 20&quot; x 20&quot; &amp; linen &#39;natural&#39;')).toBe(
+      'Pillow 20" x 20" & linen \'natural\'',
+    );
+  });
+
   it('money in minor units of its currency', () => {
     expect(money({ amount: 4599, divisor: 100, currency_code: 'USD' })).toEqual({
       amount: 4599,

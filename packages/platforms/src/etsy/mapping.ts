@@ -62,6 +62,16 @@ export interface EtsyReceipt {
   transactions?: EtsyTransaction[];
 }
 
+/** Etsy returns titles HTML-escaped (`20&quot; x 20&quot;`). */
+export function unescapeHtml(text: string): string {
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
 const count = (v: number | null | undefined): number | null =>
   typeof v === 'number' && v >= 0 ? v : null;
 
@@ -115,7 +125,7 @@ export function mapShop(raw: EtsyShop, today: string): AccountData {
 export function mapListing(raw: EtsyListing): ProductData {
   return {
     externalId: String(raw.listing_id),
-    title: raw.title?.trim() || String(raw.listing_id),
+    title: unescapeHtml(raw.title?.trim() || String(raw.listing_id)),
     url: raw.url,
     imageUrl: raw.images?.[0]?.url_570xN ?? raw.images?.[0]?.url_fullxfull,
     state: raw.state ?? 'active',
@@ -147,7 +157,7 @@ export function mapReceipt(raw: EtsyReceipt): OrderData {
     items: (raw.transactions ?? []).map((t) => ({
       externalId: String(t.transaction_id),
       productExternalId: t.listing_id ? String(t.listing_id) : undefined,
-      title: t.title ?? undefined,
+      title: t.title ? unescapeHtml(t.title) : undefined,
       quantity: t.quantity ?? 1,
       price: money(t.price),
     })),

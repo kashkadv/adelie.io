@@ -32,7 +32,7 @@ type Response = { period: { from: string; to: string } | null; items: Product[] 
 
 const COLUMNS = ['price', 'quantity', 'views', 'favorers', 'sold', 'revenue'] as const;
 type Column = (typeof COLUMNS)[number];
-const STATES = ['active', 'inactive', 'sold_out', 'draft', 'expired'] as const;
+const STATES = ['active', 'inactive', 'sold_out', 'draft', 'expired', 'removed'] as const;
 
 /** Products of the project's shops (ADR-0018): what sells, what is seen, what is in stock. */
 export function Products() {

@@ -599,6 +599,29 @@ export async function runSync(
           ).map((p) => [p.externalId, p.id]),
         );
         for await (const page of adapter.listOrders!(ctx(), { since })) {
+          // Products sold earlier but no longer listed (removed on the platform) are kept as
+          // "removed", so their sales and the posts leading to them are not lost.
+          for (const item of page.flatMap((o) => o.items)) {
+            const ext = item.productExternalId;
+            if (!ext || products.has(ext)) continue;
+            const removed = await prisma.shopProduct.upsert({
+              where: { accountId_externalId: { accountId: account.id, externalId: ext } },
+              create: {
+                workspaceId: account.workspaceId,
+                projectId: account.projectId,
+                accountId: account.id,
+                externalId: ext,
+                title: item.title ?? ext,
+                state: 'removed',
+                price: item.price?.amount ?? null,
+                currency: item.price?.currency ?? null,
+              },
+              update: {},
+              select: { id: true },
+            });
+            products.set(ext, removed.id);
+            count('removedProducts');
+          }
           for (const o of page) {
             const data = {
               orderedAt: o.orderedAt,
