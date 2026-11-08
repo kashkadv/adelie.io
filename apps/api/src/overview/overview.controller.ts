@@ -23,9 +23,15 @@ import {
   snapshotMetric,
   type StoredValue,
 } from './aggregate.js';
+import { salesOverview } from '../sales/sales.js';
 
 const PERIOD_DAYS = [7, 30, 90] as const;
 type Platform = 'PINTEREST' | 'INSTAGRAM';
+/** Points of sale get the sales overview (ADR-0018). */
+const SALES_PLATFORMS = ['ETSY'] as const;
+type SalesPlatform = (typeof SALES_PLATFORMS)[number];
+const isSales = (p: string): p is SalesPlatform =>
+  (SALES_PLATFORMS as readonly string[]).includes(p);
 
 /**
  * What the overview shows per platform (one platform at a time: their metrics differ and must not
@@ -119,14 +125,65 @@ export class OverviewController {
     });
     if (accountId && all.length === 0) throw new NotFoundException();
     const platforms = [...new Set(all.map((a) => a.platform))].filter(
-      (p): p is Platform => p in OVERVIEW,
+      (p): p is Platform | SalesPlatform => p in OVERVIEW || isSales(p),
     );
-    if (platformParam && !(platformParam in OVERVIEW)) {
+    if (platformParam && !(platformParam in OVERVIEW) && !isSales(platformParam)) {
       throw new BadRequestException('Unknown platform');
     }
-    const platform = (
+    const chosen = (
       platformParam && platforms.includes(platformParam as Platform) ? platformParam : platforms[0]
-    ) as Platform | undefined;
+    ) as Platform | SalesPlatform | undefined;
+    const today = new Date().toISOString().slice(0, 10);
+    const { current, previous } = periods(days, today);
+
+    if (chosen && isSales(chosen)) {
+      const shops = all.filter((a) => a.platform === chosen);
+      const orders = await this.prisma.client.shopOrder.findMany({
+        where: {
+          accountId: { in: shops.map((a) => a.id) },
+          orderedAt: {
+            gte: new Date(`${previous.from}T00:00:00Z`),
+            lt: new Date(new Date(`${current.to}T00:00:00Z`).getTime() + 86_400_000),
+          },
+        },
+        select: {
+          orderedAt: true,
+          currency: true,
+          total: true,
+          tax: true,
+          country: true,
+          items: { select: { quantity: true } },
+        },
+      });
+      const sales = salesOverview(
+        orders.map(({ items, ...o }) => ({
+          ...o,
+          units: items.reduce((n, i) => n + i.quantity, 0),
+        })),
+        current,
+        previous,
+      );
+      return {
+        platform: chosen,
+        platforms,
+        period: current,
+        previousPeriod: previous,
+        accounts: shops.map((a) => ({
+          id: a.id,
+          platform: a.platform,
+          username: a.username,
+          displayName: a.displayName,
+        })),
+        // Orders carry their whole history: no platform limit to explain.
+        historyFrom: null,
+        currency: sales.currency,
+        kpis: sales.kpis,
+        series: { id: 'revenue', points: sales.series },
+        breakdown: { id: 'countries', items: sales.breakdown },
+      };
+    }
+
+    const platform = chosen;
     const accounts = all.filter((a) => a.platform === platform);
     const view = OVERVIEW[platform ?? 'PINTEREST'];
     const keys = [
@@ -138,9 +195,6 @@ export class OverviewController {
           : view.breakdown.items.map((i) => i.key)),
       ]),
     ];
-
-    const today = new Date().toISOString().slice(0, 10);
-    const { current, previous } = periods(days, today);
 
     const rows = accounts.length
       ? await this.prisma.client.accountMetricValue.findMany({

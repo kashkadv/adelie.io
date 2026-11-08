@@ -9,7 +9,7 @@ import {
   Plug,
   RefreshCw,
 } from 'lucide-react';
-import { useFormatter, useTranslations } from 'next-intl';
+import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -19,11 +19,12 @@ import { Select } from '../ui/select';
 import { useProjectAccounts } from './accounts-data';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
 import { EmptyState, PageHeader } from './page-header';
+import { minorDigits, useMoney } from './sales-data';
 import { useWorkspace } from './workspace-context';
 
 type Status = SeriesPoint['status'];
 type Metric = { value: number | null; previous: number | null; status: Status; coverage: number };
-type Platform = 'PINTEREST' | 'INSTAGRAM';
+type Platform = 'PINTEREST' | 'INSTAGRAM' | 'ETSY';
 type KpiId =
   | 'impressions'
   | 'saves'
@@ -31,15 +32,26 @@ type KpiId =
   | 'followers'
   | 'views'
   | 'engagements'
-  | 'newFollowers';
+  | 'newFollowers'
+  | 'orders'
+  | 'revenue'
+  | 'average'
+  | 'units';
+/** Money KPIs, in minor units of `OverviewData.currency` (ADR-0018). */
+const MONEY_KPIS: KpiId[] = ['revenue', 'average'];
 type OverviewData = {
   platform: Platform | null;
   platforms: Platform[];
   period: { from: string; to: string; days: number };
   historyFrom: string | null;
   kpis: (Metric & { id: KpiId })[];
-  series: { id: 'impressions' | 'views'; points: SeriesPoint[] };
-  breakdown: { id: 'devices' | 'interactions'; items: { key: string; value: number }[] };
+  series: { id: 'impressions' | 'views' | 'revenue'; points: SeriesPoint[] };
+  breakdown: {
+    id: 'devices' | 'interactions' | 'countries';
+    items: { key: string; value: number }[];
+  };
+  /** Shops: the currency of money values. */
+  currency?: string | null;
 };
 
 const PERIODS = [7, 30, 90] as const;
@@ -47,6 +59,7 @@ const PERIODS = [7, 30, 90] as const;
 const KPIS: Record<Platform, KpiId[]> = {
   PINTEREST: ['impressions', 'saves', 'outboundClicks', 'followers'],
   INSTAGRAM: ['views', 'engagements', 'newFollowers', 'followers'],
+  ETSY: ['orders', 'revenue', 'average', 'units'],
 };
 /** Breakdown colors follow the validated chart palette (ADR-0009), in its fixed order. */
 const BREAKDOWN_COLORS: Record<string, string> = {
@@ -59,6 +72,10 @@ const BREAKDOWN_COLORS: Record<string, string> = {
   shares: 'var(--series-4)',
 };
 const BREAKDOWN_LABELS = ['MOBILE', 'WEB', 'TABLET', 'likes', 'saves', 'comments', 'shares'];
+/** Countries have no fixed keys: the palette in order, the rest muted. */
+const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)'];
+const colorOf = (key: string, index: number) =>
+  BREAKDOWN_COLORS[key] ?? (key === 'other' ? 'var(--muted)' : (SERIES[index] ?? 'var(--muted)'));
 
 function Delta({ metric }: { metric: Metric }) {
   const t = useTranslations('Overview');
@@ -114,12 +131,14 @@ export function Overview() {
   const tMetric = useTranslations('MetricHints');
   const tPlatforms = useTranslations('Accounts.platforms');
   const format = useFormatter();
+  const money = useMoney();
+  const locale = useLocale();
   const { workspace, project } = useWorkspace();
   const { accounts: allAccounts, connect, canConnect } = useProjectAccounts();
   // Disconnected and hidden accounts are left out (their history is kept).
   const visible = allAccounts?.filter((a) => a.status !== 'REVOKED' && !a.hidden);
   const platforms = [...new Set((visible ?? []).map((a) => a.platform))].filter(
-    (p): p is Platform => p === 'PINTEREST' || p === 'INSTAGRAM',
+    (p): p is Platform => p in KPIS,
   );
   const [chosenPlatform, setChosenPlatform] = useState<Platform | null>(null);
   const platform =
@@ -174,6 +193,27 @@ export function Overview() {
   const shown = data && data.platform === platform ? data : null;
   const breakdownTotal = shown?.breakdown.items.reduce((s, d) => s + d.value, 0) ?? 0;
   const kpiIds = platform ? KPIS[platform] : KPIS.PINTEREST;
+  const currency = shown?.currency ?? null;
+  const digits = currency ? minorDigits(currency) : 0;
+  const kpiValue = (id: KpiId, value: number) =>
+    MONEY_KPIS.includes(id) ? money(value, currency, true) : format.number(value);
+  // Shops: revenue in currency units for the chart; money in its tooltip.
+  const chartPoints =
+    shown?.series.id === 'revenue'
+      ? shown.series.points.map((p) => ({
+          ...p,
+          value: p.value === null ? null : p.value / 10 ** digits,
+        }))
+      : shown?.series.points;
+  const regionName = (code: string) => {
+    if (code === 'other') return t('countries.other');
+    if (!code) return t('countries.unknown');
+    try {
+      return new Intl.DisplayNames([locale], { type: 'region' }).of(code) ?? code;
+    } catch {
+      return code;
+    }
+  };
 
   return (
     <>
@@ -237,7 +277,7 @@ export function Overview() {
                 />
               </p>
               <p className="tabular mt-3 font-display text-3xl font-semibold">
-                {m?.value == null ? '—' : format.number(m.value)}
+                {m?.value == null ? '—' : kpiValue(key, m.value)}
               </p>
               <p className="mt-1 flex items-center gap-2 text-xs text-muted">
                 {m?.value == null ? (
@@ -272,8 +312,13 @@ export function Overview() {
               )}
             </p>
             <ImpressionsChart
-              points={shown.series.points}
+              points={chartPoints ?? []}
               ariaLabel={t(`chart.aria.${shown.series.id}`)}
+              formatValue={
+                shown.series.id === 'revenue'
+                  ? (v) => money(Math.round(v * 10 ** digits), currency)
+                  : undefined
+              }
             />
           </section>
 
@@ -297,7 +342,7 @@ export function Overview() {
                       key={d.key}
                       style={{
                         width: `${(d.value / breakdownTotal) * 100}%`,
-                        background: BREAKDOWN_COLORS[d.key] ?? 'var(--muted)',
+                        background: colorOf(d.key, i),
                         marginLeft: i ? 2 : 0,
                       }}
                     />
@@ -308,13 +353,15 @@ export function Overview() {
                     <li key={d.key} className="flex items-center gap-3 px-1 text-sm">
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ background: BREAKDOWN_COLORS[d.key] ?? 'var(--muted)' }}
+                        style={{ background: colorOf(d.key, shown.breakdown.items.indexOf(d)) }}
                         aria-hidden="true"
                       />
                       <span className="flex-1">
-                        {BREAKDOWN_LABELS.includes(d.key)
-                          ? t(`${shown.breakdown.id}.${d.key}` as 'devices.MOBILE')
-                          : d.key}
+                        {shown.breakdown.id === 'countries'
+                          ? regionName(d.key)
+                          : BREAKDOWN_LABELS.includes(d.key)
+                            ? t(`${shown.breakdown.id}.${d.key}` as 'devices.MOBILE')
+                            : d.key}
                       </span>
                       <span className="tabular text-muted">
                         {format.number(d.value / breakdownTotal, {

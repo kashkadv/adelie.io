@@ -64,7 +64,11 @@
       "followers": "Followers",
       "views": "Views",
       "engagements": "Interactions",
-      "newFollowers": "New followers"
+      "newFollowers": "New followers",
+      "orders": "Orders",
+      "revenue": "Revenue",
+      "average": "Average order",
+      "units": "Units sold"
     },
     "connectTitle": "Connect your first account",
     "connectText": "Adelie collects analytics from your social accounts every day. Pinterest comes first — Instagram and TikTok are next.",
@@ -86,12 +90,14 @@
     "chart": {
       "titles": {
         "impressions": "Impressions by day",
-        "views": "Views by day"
+        "views": "Views by day",
+        "revenue": "Revenue by day"
       },
       "hint": "Dashed: days the platform is still finalizing. Gaps: days without data — not zero.",
       "aria": {
         "impressions": "Daily impressions chart",
-        "views": "Daily views chart"
+        "views": "Daily views chart",
+        "revenue": "Shop revenue by day"
       }
     },
     "devices": {
@@ -108,6 +114,11 @@
       "saves": "Saves",
       "comments": "Comments",
       "shares": "Shares"
+    },
+    "countries": {
+      "title": "Buyers’ countries",
+      "other": "Other",
+      "unknown": "Unknown"
     }
   },
   "MetricHints": {
@@ -123,7 +134,11 @@
     "likes": "Number of likes.",
     "comments": "Number of comments.",
     "shares": "How many times the post was shared.",
-    "videoViews": "How many times the pin’s video was viewed. Lifetime only: Pinterest does not report it per day."
+    "videoViews": "How many times the pin’s video was viewed. Lifetime only: Pinterest does not report it per day.",
+    "orders": "Number of shop orders in the period.",
+    "revenue": "What buyers paid, without the sales tax Etsy remits itself. Etsy fees are not subtracted.",
+    "average": "Revenue ÷ number of orders.",
+    "units": "Units of products sold."
   },
   "Sections": {
     "soonTitle": "Coming soon",

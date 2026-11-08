@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { netRevenue, ordersByDay } from './sales.js';
+import { netRevenue, ordersByDay, salesOverview } from './sales.js';
 
 describe('sales', () => {
   it('revenue leaves out the sales tax the platform remits', () => {
@@ -25,5 +25,37 @@ describe('sales', () => {
       { date: '2026-10-02', revenue: 1500, orders: 2 },
       { date: '2026-10-03', revenue: 0, orders: 0 },
     ]);
+  });
+});
+
+describe('salesOverview', () => {
+  const order = (date: string, total: number, country = 'US', currency = 'USD') => ({
+    orderedAt: new Date(`${date}T12:00:00Z`),
+    currency,
+    total,
+    tax: 0,
+    country,
+    units: 1,
+  });
+
+  it('compares the period with the previous one in the main currency only', () => {
+    const r = salesOverview(
+      [
+        order('2026-10-10', 1000),
+        order('2026-10-11', 3000, 'DE'),
+        order('2026-09-20', 2000),
+        order('2026-10-12', 99999, 'GB', 'EUR'), // another currency: never added in
+      ],
+      { from: '2026-10-01', to: '2026-10-30' },
+      { from: '2026-09-01', to: '2026-09-30' },
+    );
+    expect(r.currency).toBe('USD');
+    expect(r.kpis.find((k) => k.id === 'revenue')).toMatchObject({ value: 4000, previous: 2000 });
+    expect(r.kpis.find((k) => k.id === 'average')).toMatchObject({ value: 2000, previous: 2000 });
+    expect(r.breakdown).toEqual([
+      { key: 'US', value: 1 },
+      { key: 'DE', value: 1 },
+    ]);
+    expect(r.series).toHaveLength(30);
   });
 });
