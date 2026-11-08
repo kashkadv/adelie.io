@@ -317,12 +317,12 @@ export function ProductDialog({
                     <ul className="divide-y divide-line rounded-2xl border border-line">
                       {detail.orders.map((o) => (
                         <li key={o.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                          <span className="tabular w-24 shrink-0 text-muted">
+                          <span className="tabular w-32 shrink-0 whitespace-nowrap text-muted">
                             {date(o.orderedAt)}
                           </span>
                           <span className="flex-1 truncate">{country(o.country)}</span>
                           <span className="text-xs text-muted">×{o.quantity}</span>
-                          <span className="tabular w-20 text-right">
+                          <span className="tabular w-24 shrink-0 text-right whitespace-nowrap">
                             {money(o.price === null ? null : o.price * o.quantity, o.currency)}
                           </span>
                         </li>

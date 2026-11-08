@@ -327,7 +327,7 @@ export function Orders() {
                 const units = o.items.reduce((n, i) => n + i.quantity, 0);
                 return (
                   <li key={o.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3">
-                    <span className="tabular w-24 shrink-0 text-sm text-muted">
+                    <span className="tabular w-32 shrink-0 text-sm whitespace-nowrap text-muted">
                       {format.dateTime(new Date(o.orderedAt), {
                         day: 'numeric',
                         month: 'short',
