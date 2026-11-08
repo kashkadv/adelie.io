@@ -156,6 +156,8 @@ export type Invitation = {
   id: string;
   platform: 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY';
   access: 'read' | 'write';
+  /** Set when the invitation updates access of a connected account (ADR-0020). */
+  account: { username: string | null; displayName: string | null } | null;
   url: string;
   expiresAt: string;
   createdAt: string;
@@ -184,11 +186,11 @@ export function useProjectInvitations() {
 
   /** Creates an invitation and returns its link. */
   const create = useCallback(
-    async (platform: PlatformSlug, access?: 'read' | 'write') => {
+    async (platform: PlatformSlug, access?: 'read' | 'write', accountId?: string) => {
       if (!base) throw new Error('No project');
       const invitation = await api<Invitation>(`${base}/invitations`, {
         method: 'POST',
-        json: { platform, ...(access ? { access } : {}) },
+        json: { platform, ...(access ? { access } : {}), ...(accountId ? { accountId } : {}) },
       });
       setInvitations(await load());
       return invitation.url;

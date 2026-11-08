@@ -276,6 +276,9 @@ model ConnectInvitation {
   connectionId    String?        @db.Uuid
   /// Access the connection will ask for (ADR-0019): "read" or "write".
   access          String         @default("read")
+  /// Set when the invitation updates access of a connected account (ADR-0020).
+  accountId       String?        @db.Uuid
+  account         SocialAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
   createdAt       DateTime       @default(now())
 
   @@index([projectId])
@@ -327,6 +330,7 @@ model SocialAccount {
   orders       ShopOrder[]
   ledger       ShopLedgerEntry[]
   audiences    AccountAudience[]
+  invitations  ConnectInvitation[]
 
   @@unique([workspaceId, platform, externalId])
   @@index([projectId])

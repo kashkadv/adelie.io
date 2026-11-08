@@ -12,6 +12,8 @@ type Invitation = {
   platform: 'pinterest' | 'instagram' | 'etsy';
   /** Access the connection will ask for (ADR-0019). */
   access: 'read' | 'write';
+  /** Updating access of a connected account: its name and the features it gains (ADR-0020). */
+  account: { name: string | null; features: string[] } | null;
   workspace: string;
   project: string;
   invitedBy: string | null;
@@ -98,11 +100,25 @@ export function ConnectInvite({ token }: { token: string }) {
           />
         </span>
         <div>
-          <h1 className="text-2xl font-semibold">{t('title', { platform })}</h1>
+          <h1 className="text-2xl font-semibold">
+            {invitation.account ? t('updateTitle', { platform }) : t('title', { platform })}
+          </h1>
           <p className="mt-2 text-muted">
-            {invitation.invitedBy
-              ? t('lead', { name: invitation.invitedBy, workspace: invitation.workspace })
-              : t('leadNoName', { workspace: invitation.workspace })}
+            {invitation.account
+              ? t('updateLead', {
+                  workspace: invitation.workspace,
+                  account: invitation.account.name ?? '',
+                  features: invitation.account.features
+                    .map((f) =>
+                      t.has(`features.${f}` as 'features.audience')
+                        ? t(`features.${f}` as 'features.audience')
+                        : f,
+                    )
+                    .join(', '),
+                })
+              : invitation.invitedBy
+                ? t('lead', { name: invitation.invitedBy, workspace: invitation.workspace })
+                : t('leadNoName', { workspace: invitation.workspace })}
           </p>
         </div>
 

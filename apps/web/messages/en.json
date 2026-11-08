@@ -412,7 +412,9 @@
     "updateAccess": {
       "action": "Update access",
       "title": "More data available",
-      "text": "Features “{features}” need an extra permission. “Update access” in the “⋯” menu — the platform asks for consent; the connection and all its history stay."
+      "text": "Features “{features}” need an extra permission. “Update access” in the “⋯” menu — the platform asks for consent; the connection and all its history stay.",
+      "copyLink": "Copy link to update access",
+      "inviteBadge": "update access · {account}"
     },
     "features": {
       "audience": "audience",
@@ -465,7 +467,13 @@
         "text": "The account could not be connected. Please try again a bit later."
       }
     },
-    "fullAccess": "Full access"
+    "fullAccess": "Full access",
+    "updateTitle": "Update access to {platform}",
+    "updateLead": "{workspace} asks to update access for {account} to add: {features}. The connection and all history stay — just confirm the new permission.",
+    "features": {
+      "audience": "audience (age, gender, countries, interests)",
+      "core": "core data"
+    }
   },
   "Content": {
     "title": "Content",

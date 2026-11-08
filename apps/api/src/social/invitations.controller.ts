@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { AllowAnonymous, Session, type UserSession } from '@thallesp/nestjs-better-auth';
 import { config } from '../config.js';
+import { missingFeatures } from '@adelie/platforms';
 import { PrismaService } from '../prisma.service.js';
 import { visibleProjectsWhere } from '../workspaces/project-visibility.js';
 import {
@@ -61,13 +62,31 @@ export class InvitationsController {
   @WorkspaceRoles(...CONNECT_ROLES)
   async create(
     @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Body() body: { platform?: string; access?: unknown },
+    @Body() body: { platform?: string; access?: unknown; accountId?: unknown },
     @Req() request: { workspace: WorkspaceRequestContext },
     @Session() session: UserSession,
   ) {
     const { platform, adapter } = this.connector.adapterFor(body?.platform ?? '');
     const access = parseAccess(adapter, body?.access);
     await this.visibleProject(request.workspace, projectId);
+    // Updating access of a connected account (ADR-0020): it must be this project's, same platform.
+    let accountId: string | null = null;
+    if (body?.accountId !== undefined) {
+      const account =
+        typeof body.accountId === 'string'
+          ? await this.prisma.client.socialAccount.findFirst({
+              where: {
+                id: body.accountId,
+                projectId,
+                workspaceId: request.workspace.workspaceId,
+                platform,
+              },
+              select: { id: true },
+            })
+          : null;
+      if (!account) throw new NotFoundException();
+      accountId = account.id;
+    }
     const token = generateInvitationToken();
     const tokenHash = hashInvitationToken(token);
     const invitation = await this.prisma.client.connectInvitation.create({
@@ -80,6 +99,7 @@ export class InvitationsController {
         createdByUserId: session.user.id,
         expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
         access,
+        accountId,
       },
       select: { id: true, platform: true, access: true, expiresAt: true, createdAt: true },
     });
@@ -108,6 +128,7 @@ export class InvitationsController {
         id: true,
         platform: true,
         access: true,
+        account: { select: { username: true, displayName: true } },
         tokenHash: true,
         tokenEncrypted: true,
         expiresAt: true,
@@ -154,6 +175,14 @@ export class InvitationsController {
       include: {
         project: { select: { name: true, workspace: { select: { name: true } } } },
         createdBy: { select: { name: true } },
+        account: {
+          select: {
+            username: true,
+            displayName: true,
+            platform: true,
+            connection: { select: { scopes: true } },
+          },
+        },
       },
     });
     if (!invitation) throw new NotFoundException();
@@ -169,6 +198,13 @@ export class InvitationsController {
       status: invitationStatus(inv),
       platform: PLATFORM_SLUGS[inv.platform],
       access: inv.access,
+      // Updating access of a connected account: who, and which features it gains.
+      account: inv.account
+        ? {
+            name: inv.account.username ?? inv.account.displayName,
+            features: missingFeatures(inv.account.platform, inv.account.connection.scopes),
+          }
+        : null,
       workspace: inv.project.workspace.name,
       project: inv.project.name,
       invitedBy: inv.createdBy?.name ?? null,

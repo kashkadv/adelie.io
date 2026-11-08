@@ -58,7 +58,15 @@ function useConnectResult(): [ConnectResult | null, string, () => void] {
 }
 
 type RowAction =
-  'disconnect' | 'remove' | 'reconnect' | 'hide' | 'unhide' | 'sync' | 'access' | 'upgrade';
+  | 'disconnect'
+  | 'remove'
+  | 'reconnect'
+  | 'hide'
+  | 'unhide'
+  | 'sync'
+  | 'access'
+  | 'upgrade'
+  | 'upgradeInvite';
 
 const accountName = (a: SocialAccount) => a.displayName || a.username || a.externalId;
 /** What the user types to confirm deletion (the API checks the same value). */
@@ -142,6 +150,7 @@ function RowMenu({
           {account.status === 'ACTIVE' && item('sync', t('syncNow'), false, syncNote)}
           {account.status !== 'REVOKED' && account.access && item('access', t('changeAccess'))}
           {account.missingFeatures.length > 0 && item('upgrade', t('updateAccess.action'))}
+          {account.missingFeatures.length > 0 && item('upgradeInvite', t('updateAccess.copyLink'))}
           {disconnected ? item('reconnect', t('reconnect')) : item('disconnect', t('disconnect'))}
           {hidden ? item('unhide', t('unhide')) : item('hide', t('hide'))}
           <div className="my-1 h-px bg-line" />
@@ -494,6 +503,10 @@ export function Accounts() {
 
   function onRowAction(account: SocialAccount, action: RowAction) {
     const slug = account.platform.toLowerCase() as PlatformSlug;
+    // A link for the account's owner: same consent, same account updated in place (ADR-0020).
+    if (action === 'upgradeInvite') {
+      return void onInvite(slug, account.access ?? undefined, account.id);
+    }
     if (
       account.platform === 'ETSY' &&
       (action === 'reconnect' || action === 'access' || action === 'upgrade')
@@ -550,9 +563,9 @@ export function Accounts() {
     current?: AccessLevel;
   } | null>(null);
 
-  async function onInvite(slug: PlatformSlug, access?: AccessLevel) {
+  async function onInvite(slug: PlatformSlug, access?: AccessLevel, accountId?: string) {
     try {
-      const url = await createInvitation(slug, access);
+      const url = await createInvitation(slug, access, accountId);
       await navigator.clipboard.writeText(url);
       setNotice('inviteCopied');
     } catch {
@@ -767,6 +780,13 @@ export function Accounts() {
                     {inv.platform === 'ETSY' && (
                       <span className="ml-2 rounded-full bg-hover px-1.5 text-xs font-normal">
                         {t(`accessLevel.${inv.access}`)}
+                      </span>
+                    )}
+                    {inv.account && (
+                      <span className="ml-2 rounded-full bg-hover px-1.5 text-xs font-normal">
+                        {t('updateAccess.inviteBadge', {
+                          account: inv.account.username ?? inv.account.displayName ?? '',
+                        })}
                       </span>
                     )}
                   </p>
