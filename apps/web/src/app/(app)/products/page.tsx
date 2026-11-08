@@ -1,5 +1,5 @@
-import { SectionPlaceholder } from '@/components/app/section-placeholder';
+import { Products } from '@/components/app/products';
 
 export default function ProductsPage() {
-  return <SectionPlaceholder section="products" />;
+  return <Products />;
 }

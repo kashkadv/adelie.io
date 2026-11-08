@@ -131,16 +131,6 @@
       "title": "Reports",
       "subtitle": "Snapshots to share with clients",
       "text": "Build a report for a period and share it by a secret link — no sign-in needed for the reader."
-    },
-    "products": {
-      "title": "Products",
-      "subtitle": "What you sell — across the project’s shops",
-      "text": "Products from connected shops will be here — Etsy, later Shopify and your website: sales, revenue and the posts that lead to each product."
-    },
-    "orders": {
-      "title": "Orders",
-      "subtitle": "What people buy from you — across the project’s shops",
-      "text": "Orders from connected shops by day will be here: amounts, platform fees and net revenue."
     }
   },
   "Profile": {
@@ -579,6 +569,75 @@
       "views": "How many times the post was played or displayed.",
       "reach": "How many different accounts saw the post at least once.",
       "engagements": "Likes, comments, saves and shares together."
+    }
+  },
+  "Sales": {
+    "shop": "Shop",
+    "noShopsTitle": "No shops yet",
+    "noShopsText": "Connect a shop — Etsy, later Shopify and your website — and its products and orders show up here.",
+    "connectShop": "Connect a shop",
+    "salesForPeriod": "sales for the period",
+    "salesAllTime": "all-time sales",
+    "states": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "sold_out": "Sold out",
+      "draft": "Drafts",
+      "expired": "Expired"
+    },
+    "products": {
+      "title": "Products",
+      "subtitle": "What you sell — across the project’s shops",
+      "count": "{count, plural, one {# product} other {# products}}",
+      "hint": "Sold and revenue come from orders in the chosen period. Views and favorites are lifetime, as Etsy reports them. Price is the current one.",
+      "state": "State",
+      "search": "Search products",
+      "product": "Product",
+      "noMatches": "No products match these filters.",
+      "listed": "listed since {date}",
+      "columns": {
+        "price": "Price",
+        "quantity": "In stock",
+        "views": "Views",
+        "favorers": "Favorites",
+        "sold": "Sold",
+        "revenue": "Revenue"
+      },
+      "hints": {
+        "price": "The product’s current price (base price for variations).",
+        "quantity": "Units available for sale.",
+        "views": "How many times the product page was viewed on Etsy — lifetime.",
+        "favorers": "How many people favorited the product on Etsy — lifetime.",
+        "sold": "Units sold in the chosen period.",
+        "revenue": "Earned for the units sold in the period — price × quantity, without tax and shipping."
+      }
+    },
+    "orders": {
+      "title": "Orders",
+      "subtitle": "What people buy from you — across the project’s shops",
+      "count": "{count, plural, one {# order} other {# orders}}",
+      "currencies": "amounts in {currency}; other currencies are not added up",
+      "kpis": {
+        "orders": "Orders",
+        "revenue": "Revenue",
+        "average": "Average order",
+        "units": "Units sold"
+      },
+      "hints": {
+        "orders": "Number of orders in the period.",
+        "revenue": "What buyers paid, without the sales tax Etsy collects and remits itself. Etsy fees are not subtracted yet.",
+        "average": "Revenue ÷ number of orders.",
+        "units": "Units of products sold in these orders."
+      },
+      "chartDaily": "Revenue by day",
+      "chartMonthly": "Revenue by month",
+      "countries": "Buyers’ countries",
+      "unknownCountry": "Unknown",
+      "list": "Orders",
+      "none": "No orders in this period.",
+      "noTitle": "Untitled product",
+      "units": "{count, plural, one {# unit} other {# units}}",
+      "more": "{count, plural, one {# more product} other {# more products}}"
     }
   }
 }

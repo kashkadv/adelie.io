@@ -28,9 +28,12 @@ function niceMax(max: number): number {
 export function ImpressionsChart({
   points,
   ariaLabel,
+  formatValue,
 }: {
   points: SeriesPoint[];
   ariaLabel: string;
+  /** Tooltip value, e.g. money; numbers by default. Axis labels stay compact numbers. */
+  formatValue?: (value: number) => string;
 }) {
   const t = useTranslations('Overview');
   const format = useFormatter();
@@ -197,7 +200,11 @@ export function ImpressionsChart({
         >
           <p className="opacity-70">{label(h.date, true)}</p>
           <p className="tabular text-sm font-semibold">
-            {h.value === null ? t('noDataDay') : format.number(h.value)}
+            {h.value === null
+              ? t('noDataDay')
+              : formatValue
+                ? formatValue(h.value)
+                : format.number(h.value)}
           </p>
           {h.value !== null && h.status !== 'READY' && (
             <p className="opacity-70">{t('preliminaryDay')}</p>

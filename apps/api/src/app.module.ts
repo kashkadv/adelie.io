@@ -6,6 +6,7 @@ import { HealthController } from './health.controller.js';
 import { OverviewController } from './overview/overview.controller.js';
 import { PreferencesController } from './preferences/preferences.controller.js';
 import { PrismaService } from './prisma.service.js';
+import { SalesController } from './sales/sales.controller.js';
 import { ProfileController } from './profile/profile.controller.js';
 import { ConnectService } from './social/connect.service.js';
 import { InvitationsController } from './social/invitations.controller.js';
@@ -24,6 +25,7 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
     InvitationsController,
     OverviewController,
     PreferencesController,
+    SalesController,
     ProfileController,
     SocialController,
     WorkspacesController,
