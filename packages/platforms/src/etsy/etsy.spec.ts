@@ -157,6 +157,19 @@ describe('EtsyAdapter data', () => {
     });
   });
 
+  it('never records raw receipts — they carry buyers’ personal data', async () => {
+    const recorded: unknown[] = [];
+    const client = new HttpClient({
+      baseUrl: 'https://api.etsy.com',
+      fetch: (async () =>
+        new Response(JSON.stringify({ results: [] }), { status: 200 })) as unknown as typeof fetch,
+      record: (r) => void recorded.push(r.body),
+      sleep: async () => undefined,
+    });
+    for await (const page of adapter.listOrders(ctx(client, '345'), {})) void page;
+    expect(recorded.every((b) => b === null || b === undefined)).toBe(true);
+  });
+
   it('reads orders created since the given time', async () => {
     const { client, seen } = http({ '/v3/application/shops/345/receipts': [{ results: [] }] });
     const since = new Date('2026-11-01T00:00:00Z');

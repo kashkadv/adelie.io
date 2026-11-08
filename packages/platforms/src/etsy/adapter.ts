@@ -181,6 +181,8 @@ export class EtsyAdapter implements PlatformAdapter {
     ctx: AdapterContext,
     path: string,
     query: Record<string, string | number | undefined> = {},
+    /** Keep the body out of the raw-response log (it carries buyers' personal data). */
+    personal = false,
   ): Promise<T> {
     try {
       const { body } = await ctx.http.request<T>({
@@ -189,6 +191,7 @@ export class EtsyAdapter implements PlatformAdapter {
         headers: { 'x-api-key': this.apiKey, Authorization: `Bearer ${ctx.accessToken}` },
         bucket: 'etsy',
         signal: ctx.signal,
+        sensitive: personal,
       });
       return body;
     } catch (error) {
@@ -248,6 +251,8 @@ export class EtsyAdapter implements PlatformAdapter {
         ctx,
         `/shops/${shopId}/receipts`,
         { limit: PAGE, offset, min_created: minCreated },
+        // Receipts include buyers' names, emails and addresses: never stored, not even raw.
+        true,
       );
       const results = page.results ?? [];
       if (results.length) yield results.map(mapReceipt);
