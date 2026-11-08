@@ -1,7 +1,13 @@
-import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { SocialPlatform } from '@adelie/db';
 import {
   ETSY_API,
+  ETSY_WRITE_SCOPES,
   EtsyAdapter,
   HttpClient,
   InstagramAdapter,
@@ -29,6 +35,26 @@ export const PLATFORM_SLUGS: Record<SocialPlatform, string> = {
   TIKTOK: 'tiktok',
   ETSY: 'etsy',
 };
+
+/** Read-only or full access (ADR-0019; mirrors AccessLevel of @adelie/platforms). */
+type AccessLevel = 'read' | 'write';
+
+/** Scopes that make a connection "full access" (ADR-0019), per platform with access levels. */
+const WRITE_SCOPES: Partial<Record<SocialPlatform, string[]>> = { ETSY: ETSY_WRITE_SCOPES };
+
+/** The access a connection holds, or null for platforms without levels (always read-only). */
+export function accessOf(platform: SocialPlatform, scopes: string[]): AccessLevel | null {
+  const write = WRITE_SCOPES[platform];
+  if (!write) return null;
+  return write.every((s) => scopes.includes(s)) ? 'write' : 'read';
+}
+
+/** Validates a requested access level; `write` only where the platform offers it. */
+export function parseAccess(adapter: PlatformAdapter, value: unknown): AccessLevel {
+  if (value === undefined || value === null || value === 'read') return 'read';
+  if (value === 'write' && adapter.capabilities.accessLevels?.includes('write')) return 'write';
+  throw new BadRequestException('Unknown access level');
+}
 
 /** Roles that may connect accounts and create connect invitations (ADR-0007). */
 export const CONNECT_ROLES = ['OWNER', 'ADMIN', 'MANAGER'] as const;
@@ -99,15 +125,14 @@ export class ConnectService {
     connectedByUserId: string | null;
     /** The signed OAuth state: the PKCE verifier is derived from it. */
     state: string;
+    access?: AccessLevel;
   }): Promise<{ result: ConnectResult; connectionId?: string }> {
     const { slug, code } = input;
     const { platform, adapter, http } = this.adapterFor(slug);
-    const tokens = await adapter.exchangeCode(
-      code,
-      this.redirectUri(slug),
-      http,
-      pkceFor(input.state, config.auth.secret),
-    );
+    const tokens = await adapter.exchangeCode(code, this.redirectUri(slug), http, {
+      pkce: pkceFor(input.state, config.auth.secret),
+      access: input.access ?? 'read',
+    });
 
     // Diagnostics without secrets: how many accounts the grant covers.
     console.log(

@@ -29,6 +29,8 @@ export type SocialAccount = {
   syncRequested: boolean;
   /** When "Sync now" becomes available again; null = available. */
   manualSyncAt: string | null;
+  /** Read-only or full access (ADR-0019); null where the platform has no levels. */
+  access: 'read' | 'write' | null;
   /** The latest sync run, or null before the first one starts. */
   lastSync: {
     status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'REAUTHORIZATION_REQUIRED';
@@ -95,10 +97,11 @@ export function useProjectAccounts() {
 
   /** Sends the browser to the platform's consent page; it comes back to /connections?connect=… */
   const connect = useCallback(
-    async (platform: PlatformSlug) => {
+    async (platform: PlatformSlug, access?: 'read' | 'write') => {
       if (!base) return;
       const { url } = await api<{ url: string }>(`${base}/connections/${platform}`, {
         method: 'POST',
+        json: access ? { access } : {},
       });
       window.location.assign(url);
     },
@@ -150,6 +153,7 @@ export function useProjectAccounts() {
 export type Invitation = {
   id: string;
   platform: 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY';
+  access: 'read' | 'write';
   url: string;
   expiresAt: string;
   createdAt: string;
@@ -178,11 +182,11 @@ export function useProjectInvitations() {
 
   /** Creates an invitation and returns its link. */
   const create = useCallback(
-    async (platform: PlatformSlug) => {
+    async (platform: PlatformSlug, access?: 'read' | 'write') => {
       if (!base) throw new Error('No project');
       const invitation = await api<Invitation>(`${base}/invitations`, {
         method: 'POST',
-        json: { platform },
+        json: { platform, ...(access ? { access } : {}) },
       });
       setInvitations(await load());
       return invitation.url;

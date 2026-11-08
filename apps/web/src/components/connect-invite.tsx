@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, Lock, RefreshCw, XCircle } from 'lucide-react';
+import { CheckCircle2, Lock, PenLine, RefreshCw, XCircle } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { api } from '@/lib/api';
@@ -9,14 +9,20 @@ import { PlatformIcon } from './ui/platform-icon';
 
 type Invitation = {
   status: 'valid' | 'used' | 'revoked' | 'expired';
-  platform: 'pinterest' | 'instagram';
+  platform: 'pinterest' | 'instagram' | 'etsy';
+  /** Access the connection will ask for (ADR-0019). */
+  access: 'read' | 'write';
   workspace: string;
   project: string;
   invitedBy: string | null;
   expiresAt: string;
 };
 
-const PLATFORM_NAMES: Record<string, string> = { pinterest: 'Pinterest', instagram: 'Instagram' };
+const PLATFORM_NAMES: Record<string, string> = {
+  pinterest: 'Pinterest',
+  instagram: 'Instagram',
+  etsy: 'Etsy',
+};
 
 /**
  * Public page of a connect invitation (ADR-0012): says plainly who asks for what access before
@@ -112,8 +118,12 @@ export function ConnectInvite({ token }: { token: string }) {
           <div className="flex justify-between gap-4">
             <dt className="text-muted">{t('access')}</dt>
             <dd className="flex items-center gap-1.5 text-right font-medium">
-              <Lock size={14} aria-hidden="true" />
-              {t('readOnly')}
+              {invitation.access === 'write' ? (
+                <PenLine size={14} aria-hidden="true" />
+              ) : (
+                <Lock size={14} aria-hidden="true" />
+              )}
+              {invitation.access === 'write' ? t('fullAccess') : t('readOnly')}
             </dd>
           </div>
           <div className="flex justify-between gap-4">
@@ -124,7 +134,12 @@ export function ConnectInvite({ token }: { token: string }) {
           </div>
         </dl>
 
-        <p className="text-sm text-muted">{t(`explain.${invitation.platform}`, { platform })}</p>
+        <p className="text-sm text-muted">
+          {t(
+            `explain.${invitation.platform === 'etsy' && invitation.access === 'write' ? 'etsyWrite' : invitation.platform}`,
+            { platform },
+          )}
+        </p>
 
         {startFailed && (
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">

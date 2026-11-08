@@ -349,6 +349,28 @@
     "groups": {
       "promotion": "Promotion",
       "sales": "Sales"
+    },
+    "changeAccess": "Change access",
+    "accessLevel": {
+      "read": "Read-only",
+      "write": "Full access"
+    },
+    "accessDialog": {
+      "title": "Connect {platform}",
+      "changeTitle": "Access to {platform}",
+      "lead": "What Adelie may do with this account.",
+      "read": {
+        "title": "Read-only",
+        "etsy": "Shop, products and orders — for analytics. Adelie changes nothing."
+      },
+      "write": {
+        "title": "Full access",
+        "etsy": "Everything in read-only, plus editing and creating products — only when you do it in Adelie yourself. Adelie cannot delete products or change orders or shop settings."
+      },
+      "current": "current",
+      "changeLater": "You can change access any time from the connection’s “⋯” menu — the platform asks for consent again.",
+      "continue": "Continue to {platform}",
+      "close": "Close"
     }
   },
   "Invite": {
@@ -363,7 +385,8 @@
     "explain": {
       "pinterest": "You will sign in on Pinterest and confirm access there. Adelie can only read profile, boards, pins and their statistics — it cannot post, edit or delete anything. Access can be revoked at any time in your Pinterest settings.",
       "instagram": "You will sign in with Meta (Facebook / Instagram) and choose your professional Instagram account. Adelie can only read the profile, posts and their statistics — it cannot post, edit, delete or read messages. Access can be revoked at any time in your Instagram or Facebook settings.",
-      "etsy": "You will sign in to Etsy and confirm access there. Adelie can only read your shop, products and orders (amounts, items, country) — not buyers’ names, addresses or emails. It cannot change, publish or delete anything. You can revoke access any time in your Etsy settings."
+      "etsy": "You will sign in to Etsy and confirm access there. Adelie can only read your shop, products and orders (amounts, items, country) — not buyers’ names, addresses or emails. It cannot change, publish or delete anything. You can revoke access any time in your Etsy settings.",
+      "etsyWrite": "You will sign in to Etsy and confirm access there. Adelie can read your shop, products and orders (not buyers’ names, addresses or emails) and edit or create products — only when a project member does it in Adelie. It cannot delete products or change orders or shop settings. You can revoke access any time in your Etsy settings."
     },
     "continue": "Continue to {platform}",
     "startFailed": "Could not start the connection. Please try again.",
@@ -395,7 +418,8 @@
         "title": "Something went wrong",
         "text": "The account could not be connected. Please try again a bit later."
       }
-    }
+    },
+    "fullAccess": "Full access"
   },
   "Content": {
     "title": "Content",

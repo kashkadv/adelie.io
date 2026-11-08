@@ -39,3 +39,4 @@
 - [ADR-0016](decisions/0016-user-preferences.md) — Налаштування інтерфейсу користувача (прийнято)
 - [ADR-0017](decisions/0017-instagram-post-daily.md) — Щоденні метрики публікацій Instagram із різниці знімків (прийнято)
 - [ADR-0018](decisions/0018-promotion-and-sales.md) — Джерела даних: просування й продажі (прийнято)
+- [ADR-0019](decisions/0019-connection-access-levels.md) — Рівні доступу підключень (прийнято)

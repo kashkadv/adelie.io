@@ -144,6 +144,17 @@ export interface Pkce {
   challenge: string;
 }
 
+/**
+ * Access a connection asks for (ADR-0019): `read` — data only; `write` — also changes made on the
+ * user's explicit action (e.g. editing Etsy listings). Platforms without levels are always `read`.
+ */
+export type AccessLevel = 'read' | 'write';
+
+export interface AuthorizeOptions {
+  pkce?: Pkce;
+  access?: AccessLevel;
+}
+
 export interface AccountMetricsQuery {
   from: string;
   to: string;
@@ -169,6 +180,8 @@ export interface PlatformCapabilities {
    * lifetime totals (ADR-0017). Platforms with `getPostMetrics` never need this.
    */
   postDailyFromSnapshots?: boolean;
+  /** Access levels a connection can choose (ADR-0019); absent = read only. */
+  accessLevels?: AccessLevel[];
 }
 
 export interface PlatformAdapter {
@@ -176,9 +189,15 @@ export interface PlatformAdapter {
   readonly capabilities: PlatformCapabilities;
 
   /** URL to send the user to for consent. `state` must be verified on callback (CSRF). */
-  authorizeUrl(state: string, redirectUri: string, pkce?: Pkce): string;
-  exchangeCode(code: string, redirectUri: string, http: HttpClient, pkce?: Pkce): Promise<TokenSet>;
-  refreshToken(refreshToken: string, http: HttpClient): Promise<TokenSet>;
+  authorizeUrl(state: string, redirectUri: string, options?: AuthorizeOptions): string;
+  exchangeCode(
+    code: string,
+    redirectUri: string,
+    http: HttpClient,
+    options?: AuthorizeOptions,
+  ): Promise<TokenSet>;
+  /** `scopes`: what the connection holds now — for platforms that do not echo them (Etsy). */
+  refreshToken(refreshToken: string, http: HttpClient, scopes?: string[]): Promise<TokenSet>;
 
   getAccount(ctx: AdapterContext): Promise<AccountData>;
   listBoards?(ctx: AdapterContext): AsyncIterable<BoardData[]>;

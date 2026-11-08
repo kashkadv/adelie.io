@@ -31,7 +31,9 @@ const header = (init: RequestInit, name: string) => (init.headers as Record<stri
 
 describe('EtsyAdapter OAuth', () => {
   it('asks for read-only shop scopes with PKCE', () => {
-    const url = new URL(adapter.authorizeUrl('st', 'https://api/social/etsy/callback', PKCE));
+    const url = new URL(
+      adapter.authorizeUrl('st', 'https://api/social/etsy/callback', { pkce: PKCE }),
+    );
     expect(url.origin + url.pathname).toBe('https://www.etsy.com/oauth/connect');
     expect(Object.fromEntries(url.searchParams)).toEqual({
       response_type: 'code',
@@ -44,13 +46,27 @@ describe('EtsyAdapter OAuth', () => {
     });
   });
 
+  it('full access adds editing listings — never deleting them', async () => {
+    const url = new URL(adapter.authorizeUrl('st', 'https://cb', { pkce: PKCE, access: 'write' }));
+    expect(url.searchParams.get('scope')).toBe('shops_r listings_r transactions_r listings_w');
+    const { client } = http({
+      '/v3/public/oauth/token': [{ access_token: '1.T', expires_in: 3600 }],
+    });
+    const tokens = await adapter.exchangeCode('C', 'https://cb', client, {
+      pkce: PKCE,
+      access: 'write',
+    });
+    expect(tokens.scopes).toContain('listings_w');
+    expect(tokens.scopes).not.toContain('listings_d');
+  });
+
   it('exchanges the code with the verifier', async () => {
     const { client, seen } = http({
       '/v3/public/oauth/token': [
         { access_token: '12.T', refresh_token: '12.R', expires_in: 3600, token_type: 'Bearer' },
       ],
     });
-    const tokens = await adapter.exchangeCode('CODE', 'https://cb', client, PKCE);
+    const tokens = await adapter.exchangeCode('CODE', 'https://cb', client, { pkce: PKCE });
     expect(tokens).toMatchObject({ accessToken: '12.T', refreshToken: '12.R' });
     const body = new URLSearchParams(String(seen[0]!.init.body));
     expect(body.get('code_verifier')).toBe(PKCE.verifier);

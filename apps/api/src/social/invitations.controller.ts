@@ -19,7 +19,7 @@ import {
   WorkspaceRoles,
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
-import { CONNECT_ROLES, ConnectService, PLATFORM_SLUGS } from './connect.service.js';
+import { CONNECT_ROLES, ConnectService, PLATFORM_SLUGS, parseAccess } from './connect.service.js';
 import {
   INVITATION_TTL_MS,
   generateInvitationToken,
@@ -61,11 +61,12 @@ export class InvitationsController {
   @WorkspaceRoles(...CONNECT_ROLES)
   async create(
     @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Body() body: { platform?: string },
+    @Body() body: { platform?: string; access?: unknown },
     @Req() request: { workspace: WorkspaceRequestContext },
     @Session() session: UserSession,
   ) {
-    const { platform } = this.connector.adapterFor(body?.platform ?? '');
+    const { platform, adapter } = this.connector.adapterFor(body?.platform ?? '');
+    const access = parseAccess(adapter, body?.access);
     await this.visibleProject(request.workspace, projectId);
     const token = generateInvitationToken();
     const tokenHash = hashInvitationToken(token);
@@ -78,8 +79,9 @@ export class InvitationsController {
         tokenEncrypted: this.connector.cipher.encrypt(token, invitationAad(tokenHash)),
         createdByUserId: session.user.id,
         expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
+        access,
       },
-      select: { id: true, platform: true, expiresAt: true, createdAt: true },
+      select: { id: true, platform: true, access: true, expiresAt: true, createdAt: true },
     });
     return { ...invitation, url: this.link(token) };
   }
@@ -105,6 +107,7 @@ export class InvitationsController {
       select: {
         id: true,
         platform: true,
+        access: true,
         tokenHash: true,
         tokenEncrypted: true,
         expiresAt: true,
@@ -165,6 +168,7 @@ export class InvitationsController {
     return {
       status: invitationStatus(inv),
       platform: PLATFORM_SLUGS[inv.platform],
+      access: inv.access,
       workspace: inv.project.workspace.name,
       project: inv.project.name,
       invitedBy: inv.createdBy?.name ?? null,
@@ -190,11 +194,10 @@ export class InvitationsController {
       config.auth.secret,
     );
     return {
-      url: adapter.authorizeUrl(
-        state,
-        this.connector.redirectUri(slug),
-        pkceFor(state, config.auth.secret),
-      ),
+      url: adapter.authorizeUrl(state, this.connector.redirectUri(slug), {
+        pkce: pkceFor(state, config.auth.secret),
+        access: inv.access === 'write' ? 'write' : 'read',
+      }),
     };
   }
 }

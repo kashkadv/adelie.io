@@ -4,12 +4,13 @@
 import { AdapterError } from '../errors.js';
 import { HttpStatusError, type HttpClient } from '../http.js';
 import type {
+  AccessLevel,
   AccountData,
   AdapterContext,
+  AuthorizeOptions,
   MetricPoint,
   OrderData,
   PlatformAdapter,
-  Pkce,
   PostsPage,
   ProductData,
   TokenSet,
@@ -27,6 +28,13 @@ export const ETSY_API = 'https://api.etsy.com';
 export const ETSY_AUTHORIZE_URL = 'https://www.etsy.com/oauth/connect';
 /** Read the shop, its listings (all states) and its orders. */
 export const ETSY_SCOPES = ['shops_r', 'listings_r', 'transactions_r'];
+/**
+ * Full access (ADR-0019) adds editing and creating listings — never deleting them (`listings_d`)
+ * and never touching orders or the shop's settings.
+ */
+export const ETSY_WRITE_SCOPES = ['listings_w'];
+export const etsyScopes = (access: AccessLevel = 'read') =>
+  access === 'write' ? [...ETSY_SCOPES, ...ETSY_WRITE_SCOPES] : ETSY_SCOPES;
 /** Listing states a shop owner can see (`listings_r`). */
 const LISTING_STATES = ['active', 'inactive', 'sold_out', 'draft', 'expired'] as const;
 const PAGE = 100;
@@ -66,7 +74,12 @@ interface TokenResponse {
 export class EtsyAdapter implements PlatformAdapter {
   readonly platform = 'ETSY' as const;
   // No account analytics: orders carry their own history (all of it, from the first sync).
-  readonly capabilities = { historyDays: 1, accountDimensions: [], hasBoards: false };
+  readonly capabilities = {
+    historyDays: 1,
+    accountDimensions: [],
+    hasBoards: false,
+    accessLevels: ['read', 'write'] as AccessLevel[],
+  };
 
   constructor(
     private readonly app: { keystring: string; sharedSecret: string },
@@ -78,27 +91,28 @@ export class EtsyAdapter implements PlatformAdapter {
     return `${this.app.keystring}:${this.app.sharedSecret}`;
   }
 
-  authorizeUrl(state: string, redirectUri: string, pkce?: Pkce): string {
+  authorizeUrl(state: string, redirectUri: string, options: AuthorizeOptions = {}): string {
+    const { pkce } = options;
     if (!pkce) throw new AdapterError('INVALID', 'Etsy requires PKCE');
     const url = new URL(ETSY_AUTHORIZE_URL);
     url.searchParams.set('response_type', 'code');
     url.searchParams.set('client_id', this.app.keystring);
     url.searchParams.set('redirect_uri', redirectUri);
-    url.searchParams.set('scope', ETSY_SCOPES.join(' '));
+    url.searchParams.set('scope', etsyScopes(options.access).join(' '));
     url.searchParams.set('state', state);
     url.searchParams.set('code_challenge', pkce.challenge);
     url.searchParams.set('code_challenge_method', 'S256');
     return url.toString();
   }
 
-  private tokens(body: TokenResponse, now = Date.now()): TokenSet {
+  private tokens(body: TokenResponse, scopes: string[], now = Date.now()): TokenSet {
     return {
       accessToken: body.access_token,
       refreshToken: body.refresh_token,
       accessTokenExpiresAt: new Date(now + (body.expires_in ?? 3600) * 1000),
       refreshTokenExpiresAt: new Date(now + REFRESH_TOKEN_DAYS * 86_400_000),
       // Etsy does not echo the granted scopes; the consent screen grants all requested ones.
-      scopes: ETSY_SCOPES,
+      scopes,
     };
   }
 
@@ -106,8 +120,9 @@ export class EtsyAdapter implements PlatformAdapter {
     code: string,
     redirectUri: string,
     http: HttpClient,
-    pkce?: Pkce,
+    options: AuthorizeOptions = {},
   ): Promise<TokenSet> {
+    const { pkce } = options;
     if (!pkce) throw new AdapterError('INVALID', 'Etsy requires PKCE');
     try {
       const { body } = await http.request<TokenResponse>({
@@ -122,7 +137,7 @@ export class EtsyAdapter implements PlatformAdapter {
         },
         sensitive: true,
       });
-      return this.tokens(body);
+      return this.tokens(body, etsyScopes(options.access));
     } catch (error) {
       if (error instanceof HttpStatusError) {
         throw new AdapterError('INVALID', `Etsy token request failed (${error.status})`, {
@@ -133,7 +148,12 @@ export class EtsyAdapter implements PlatformAdapter {
     }
   }
 
-  async refreshToken(refreshToken: string, http: HttpClient): Promise<TokenSet> {
+  /** `scopes`: what the connection was granted — a refresh keeps the same access. */
+  async refreshToken(
+    refreshToken: string,
+    http: HttpClient,
+    scopes: string[] = ETSY_SCOPES,
+  ): Promise<TokenSet> {
     try {
       const { body } = await http.request<TokenResponse>({
         method: 'POST',
@@ -145,7 +165,7 @@ export class EtsyAdapter implements PlatformAdapter {
         },
         sensitive: true,
       });
-      return this.tokens(body);
+      return this.tokens(body, scopes);
     } catch (error) {
       // invalid_grant: the refresh token expired (90 days) or access was revoked.
       if (error instanceof HttpStatusError && error.status >= 400 && error.status < 500) {

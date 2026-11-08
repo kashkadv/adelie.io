@@ -10,7 +10,9 @@ import {
   Eye,
   EyeOff,
   Link2,
+  Lock,
   MoreHorizontal,
+  PenLine,
   Plug,
   Plus,
   RefreshCw,
@@ -32,6 +34,7 @@ import {
   type SocialAccount,
 } from './accounts-data';
 import { PlatformIcon } from '../ui/platform-icon';
+import { AccessDialog, type AccessLevel } from './access-dialog';
 import { EmptyState, PageHeader } from './page-header';
 
 type ConnectResult = 'connected' | 'denied' | 'expired' | 'alreadyConnected' | 'error';
@@ -54,7 +57,7 @@ function useConnectResult(): [ConnectResult | null, string, () => void] {
   return [result, platform, () => setResult(null)];
 }
 
-type RowAction = 'disconnect' | 'remove' | 'reconnect' | 'hide' | 'unhide' | 'sync';
+type RowAction = 'disconnect' | 'remove' | 'reconnect' | 'hide' | 'unhide' | 'sync' | 'access';
 
 const accountName = (a: SocialAccount) => a.displayName || a.username || a.externalId;
 /** What the user types to confirm deletion (the API checks the same value). */
@@ -136,6 +139,7 @@ function RowMenu({
           className="glass glass-strong animate-rise absolute top-full right-0 z-50 mt-2 w-60 rounded-2xl p-2"
         >
           {account.status === 'ACTIVE' && item('sync', t('syncNow'), false, syncNote)}
+          {account.status !== 'REVOKED' && account.access && item('access', t('changeAccess'))}
           {disconnected ? item('reconnect', t('reconnect')) : item('disconnect', t('disconnect'))}
           {hidden ? item('unhide', t('unhide')) : item('hide', t('hide'))}
           <div className="my-1 h-px bg-line" />
@@ -216,6 +220,16 @@ function AccountRow({
                   {t(`roles.${role}`)}
                 </span>
               ))}
+              {account.access && (
+                <span className="flex shrink-0 items-center gap-1 rounded-full bg-hover px-1.5 text-xs leading-4">
+                  {account.access === 'write' ? (
+                    <PenLine size={11} aria-hidden="true" />
+                  ) : (
+                    <Lock size={11} aria-hidden="true" />
+                  )}
+                  {t(`accessLevel.${account.access}`)}
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -294,10 +308,12 @@ const CONNECTABLE: {
   key: 'PINTEREST' | 'INSTAGRAM' | 'ETSY';
   slug: PlatformSlug;
   group: 'promotion' | 'sales';
+  /** Read-only or full access is chosen first (ADR-0019). */
+  levels?: true;
 }[] = [
   { key: 'PINTEREST', slug: 'pinterest', group: 'promotion' },
   { key: 'INSTAGRAM', slug: 'instagram', group: 'promotion' },
-  { key: 'ETSY', slug: 'etsy', group: 'sales' },
+  { key: 'ETSY', slug: 'etsy', group: 'sales', levels: true },
 ];
 /** Listed as "soon", so the menu shows where Adelie is going. */
 const SOON: { group: 'promotion' | 'sales'; name: string }[] = [
@@ -311,12 +327,15 @@ function ConnectMenu({
   connecting,
   onConnect,
   onInvite,
+  onChooseAccess,
 }: {
   canConnect: boolean;
   connecting: boolean;
   onConnect: (slug: PlatformSlug) => void;
   /** Creates a connect invitation for the platform and copies its link (ADR-0012). */
   onInvite: (slug: PlatformSlug) => void;
+  /** Platforms with access levels open the access dialog instead (ADR-0019). */
+  onChooseAccess: (key: 'ETSY', slug: PlatformSlug) => void;
 }) {
   const t = useTranslations('Accounts');
   const [open, setOpen] = useState(false);
@@ -376,14 +395,15 @@ function ConnectMenu({
                   {t('groups.sales')}
                 </p>
               )}
-              {CONNECTABLE.filter((c) => c.group === group).map(({ key, slug }) => (
+              {CONNECTABLE.filter((c) => c.group === group).map(({ key, slug, levels }) => (
                 <div key={key}>
                   <button
                     type="button"
                     role="menuitem"
                     onClick={() => {
                       setOpen(false);
-                      onConnect(slug);
+                      if (levels) onChooseAccess(key as 'ETSY', slug);
+                      else onConnect(slug);
                     }}
                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-hover"
                   >
@@ -391,18 +411,20 @@ function ConnectMenu({
                     <span className="flex-1">{t(`platforms.${key}`)}</span>
                     <ArrowRight size={14} className="text-muted" aria-hidden="true" />
                   </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setOpen(false);
-                      onInvite(slug);
-                    }}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs text-muted hover:bg-hover hover:text-foreground"
-                  >
-                    <Link2 size={16} strokeWidth={1.75} className="ml-px" aria-hidden="true" />
-                    <span className="flex-1">{t('copyInvite')}</span>
-                  </button>
+                  {!levels && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setOpen(false);
+                        onInvite(slug);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs text-muted hover:bg-hover hover:text-foreground"
+                    >
+                      <Link2 size={16} strokeWidth={1.75} className="ml-px" aria-hidden="true" />
+                      <span className="flex-1">{t('copyInvite')}</span>
+                    </button>
+                  )}
                 </div>
               ))}
               {SOON.filter((s) => s.group === group).map(({ name }) => (
@@ -453,9 +475,19 @@ export function Accounts() {
   const [dialogError, setDialogError] = useState<string | undefined>();
 
   function onRowAction(account: SocialAccount, action: RowAction) {
-    if (action === 'reconnect') {
-      return void onConnect(account.platform.toLowerCase() as PlatformSlug);
+    const slug = account.platform.toLowerCase() as PlatformSlug;
+    if (account.platform === 'ETSY' && (action === 'reconnect' || action === 'access')) {
+      // Changing access is reconnecting with another scope set: the platform asks again.
+      const current = account.access ?? 'read';
+      return setAccessFor({
+        key: 'ETSY',
+        slug,
+        initial: action === 'access' ? (current === 'read' ? 'write' : 'read') : current,
+        current: action === 'access' ? current : undefined,
+      });
     }
+    if (action === 'reconnect') return void onConnect(slug);
+    if (action === 'access') return;
     if (action === 'sync') {
       requestSync(account.id).catch(() => setNotice('actionFailed'));
       return;
@@ -489,9 +521,16 @@ export function Accounts() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const format = useFormatter();
 
-  async function onInvite(slug: PlatformSlug) {
+  const [accessFor, setAccessFor] = useState<{
+    key: 'ETSY';
+    slug: PlatformSlug;
+    initial: AccessLevel;
+    current?: AccessLevel;
+  } | null>(null);
+
+  async function onInvite(slug: PlatformSlug, access?: AccessLevel) {
     try {
-      const url = await createInvitation(slug);
+      const url = await createInvitation(slug, access);
       await navigator.clipboard.writeText(url);
       setNotice('inviteCopied');
     } catch {
@@ -508,11 +547,11 @@ export function Accounts() {
   const [connecting, setConnecting] = useState(false);
   const [startError, setStartError] = useState(false);
 
-  async function onConnect(slug: PlatformSlug) {
+  async function onConnect(slug: PlatformSlug, access?: AccessLevel) {
     setConnecting(true);
     setStartError(false);
     try {
-      await connect(slug);
+      await connect(slug, access);
     } catch {
       setStartError(true);
       setConnecting(false);
@@ -531,9 +570,27 @@ export function Accounts() {
             connecting={connecting}
             onConnect={onConnect}
             onInvite={onInvite}
+            onChooseAccess={(key, slug) => setAccessFor({ key, slug, initial: 'read' })}
           />
         }
       />
+
+      {accessFor && (
+        <AccessDialog
+          platform={accessFor.key}
+          initial={accessFor.initial}
+          current={accessFor.current}
+          onClose={() => setAccessFor(null)}
+          onConnect={(access) => {
+            setAccessFor(null);
+            void onConnect(accessFor.slug, access);
+          }}
+          onInvite={(access) => {
+            setAccessFor(null);
+            void onInvite(accessFor.slug, access);
+          }}
+        />
+      )}
 
       {(result || startError) && (
         <div
@@ -685,6 +742,11 @@ export function Accounts() {
                           name: inv.createdBy,
                         })
                       : t('invitationNoName', { platform: t(`platforms.${inv.platform}`) })}
+                    {inv.platform === 'ETSY' && (
+                      <span className="ml-2 rounded-full bg-hover px-1.5 text-xs font-normal">
+                        {t(`accessLevel.${inv.access}`)}
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-muted">
                     {t('invitationExpires', {

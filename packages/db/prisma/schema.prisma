@@ -273,6 +273,8 @@ model ConnectInvitation {
   revokedAt       DateTime?
   /// The connection created through this invitation.
   connectionId    String?        @db.Uuid
+  /// Access the connection will ask for (ADR-0019): "read" or "write".
+  access          String         @default("read")
   createdAt       DateTime       @default(now())
 
   @@index([projectId])

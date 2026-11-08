@@ -11,6 +11,8 @@ export interface OAuthState {
   workspaceId: string;
   projectId: string;
   platform: string;
+  /** Access the connection asks for (ADR-0019); absent = read. */
+  access?: 'read' | 'write';
   /** Random nonce: two states are never equal. */
   nonce: string;
   /** Expiry, ms since epoch. */

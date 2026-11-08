@@ -28,7 +28,13 @@ import {
   WorkspaceRoles,
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
-import { CONNECT_ROLES, ConnectService, type ConnectResult } from './connect.service.js';
+import {
+  CONNECT_ROLES,
+  ConnectService,
+  accessOf,
+  parseAccess,
+  type ConnectResult,
+} from './connect.service.js';
 import { invitationStatus } from './invitation-token.js';
 import { nextManualSync } from './manual-sync.js';
 import { createState, pkceFor, verifyState, type OAuthState } from './oauth-state.js';
@@ -80,7 +86,7 @@ export class SocialController {
         hiddenAt: true,
         lastSyncedAt: true,
         syncRequestedAt: true,
-        connection: { select: { status: true } },
+        connection: { select: { status: true, scopes: true } },
         syncRuns: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -97,6 +103,8 @@ export class SocialController {
         // "Sync now" is available again from this moment (null = now).
         manualSyncAt: nextManualSync(lastSyncedAt, new Date())?.toISOString() ?? null,
         status: connection.status,
+        // Read-only or full access (ADR-0019); null where the platform has no levels.
+        access: accessOf(a.platform, connection.scopes),
         lastSync: syncRuns[0] ?? null,
       }),
     );
@@ -237,10 +245,12 @@ export class SocialController {
   async start(
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('platform') slug: string,
+    @Body() body: { access?: unknown } | undefined,
     @Req() request: { workspace: WorkspaceRequestContext },
     @Session() session: UserSession,
   ) {
     const { adapter } = this.connector.adapterFor(slug);
+    const access = parseAccess(adapter, body?.access);
     await this.visibleProject(request.workspace, projectId);
     const state = createState(
       {
@@ -248,15 +258,15 @@ export class SocialController {
         workspaceId: request.workspace.workspaceId,
         projectId,
         platform: slug,
+        access,
       },
       config.auth.secret,
     );
     return {
-      url: adapter.authorizeUrl(
-        state,
-        this.connector.redirectUri(slug),
-        pkceFor(state, config.auth.secret),
-      ),
+      url: adapter.authorizeUrl(state, this.connector.redirectUri(slug), {
+        pkce: pkceFor(state, config.auth.secret),
+        access,
+      }),
     };
   }
 
@@ -323,6 +333,7 @@ export class SocialController {
       projectId,
       connectedByUserId: userId!,
       state: rawState,
+      access: state.access,
     });
     return result;
   }
@@ -352,6 +363,7 @@ export class SocialController {
       // Audit: the member who sent the invitation.
       connectedByUserId: invitation.createdByUserId,
       state: rawState,
+      access: invitation.access === 'write' ? 'write' : 'read',
     });
     if (result === 'connected') {
       // Single use. Conditional, so two parallel callbacks cannot both consume it.

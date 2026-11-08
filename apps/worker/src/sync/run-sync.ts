@@ -146,6 +146,7 @@ export async function runSync(
     const tokens = await adapter.refreshToken(
       refreshToken,
       new HttpClient({ baseUrl: platform!.baseUrl }),
+      connection.scopes,
     );
     await storeTokens(tokens);
   }
