@@ -1,6 +1,15 @@
 'use client';
 
-import { ArrowDown, ArrowUp, RefreshCw, ReceiptText, Search, X } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronUp,
+  MoreHorizontal,
+  RefreshCw,
+  ReceiptText,
+  Search,
+  X,
+} from 'lucide-react';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -67,35 +76,69 @@ function MoneyCard({ money }: { money: Money[] | null }) {
   const t = useTranslations('Sales.orders.money');
   const format = useMoney();
   const m = money?.[0];
+  /** Cells with parts show only their total until opened. */
+  const [open, setOpen] = useState<string | null>(null);
   const cell = (
     label: string,
     value: number,
     opts: { hint?: string; parts?: { label: string; value: number }[]; strong?: boolean } = {},
-  ) => (
-    <div
-      className={`min-w-0 rounded-2xl px-4 py-3 ${opts.strong ? 'bg-accent text-accent-foreground' : 'bg-hover'}`}
-    >
-      <p className={`flex items-center gap-1 text-xs ${opts.strong ? 'opacity-80' : 'text-muted'}`}>
-        {label}
-        {opts.hint && <InfoTip text={opts.hint} />}
-      </p>
-      <p className="tabular mt-1 font-display text-lg font-semibold whitespace-nowrap">
-        {format(value, m!.currency)}
-      </p>
-      {opts.parts && (
-        <ul className="mt-1.5 space-y-0.5 text-[11px] text-muted">
-          {opts.parts
-            .filter((p) => p.value !== 0)
-            .map((p) => (
+  ) => {
+    const parts = opts.parts?.filter((p) => p.value !== 0) ?? [];
+    const expanded = open === label;
+    const body = (
+      <>
+        <p
+          className={`flex items-center gap-1 text-xs ${opts.strong ? 'opacity-80' : 'text-muted'}`}
+        >
+          {label}
+          {opts.hint && <InfoTip text={opts.hint} />}
+          {parts.length > 0 && (
+            <span className="ml-auto text-muted" aria-hidden="true">
+              {expanded ? <ChevronUp size={15} /> : <MoreHorizontal size={15} />}
+            </span>
+          )}
+        </p>
+        <p className="tabular mt-1 font-display text-lg font-semibold whitespace-nowrap">
+          {format(value, m!.currency)}
+        </p>
+        {expanded && (
+          <ul className="mt-1.5 space-y-0.5 text-[11px] text-muted">
+            {parts.map((p) => (
               <li key={p.label} className="flex justify-between gap-2">
-                <span className="truncate">{p.label}</span>
+                <span className="truncate" title={p.label}>
+                  {p.label}
+                </span>
                 <span className="tabular whitespace-nowrap">{format(p.value, m!.currency)}</span>
               </li>
             ))}
-        </ul>
-      )}
-    </div>
-  );
+          </ul>
+        )}
+      </>
+    );
+    const cls = `min-w-0 rounded-2xl px-4 py-3 text-left ${
+      opts.strong ? 'bg-accent text-accent-foreground' : 'bg-hover'
+    }`;
+    return parts.length > 0 ? (
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        title={expanded ? t('collapse') : t('expand')}
+        onClick={() => setOpen(expanded ? null : label)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setOpen(expanded ? null : label);
+          }
+        }}
+        className={`${cls} transition-colors hover:bg-[var(--field-focus)]`}
+      >
+        {body}
+      </div>
+    ) : (
+      <div className={cls}>{body}</div>
+    );
+  };
   return (
     <section
       className="card animate-rise mb-4 rounded-[24px] p-5"

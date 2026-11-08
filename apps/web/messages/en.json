@@ -688,7 +688,9 @@
         "adsHint": "Etsy Ads (promotion in Etsy search) and Offsite Ads.",
         "other": "Other",
         "net": "Net revenue",
-        "otherHint": "Other Etsy ledger entries: credits from Etsy, adjustments, older service types."
+        "otherHint": "Other Etsy ledger entries: credits from Etsy, adjustments, older service types.",
+        "expand": "Show the breakdown",
+        "collapse": "Collapse"
       },
       "columns": {
         "date": "Date",
