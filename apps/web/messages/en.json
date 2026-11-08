@@ -593,7 +593,8 @@
       "engagements": "Likes, comments, saves and shares together."
     },
     "leadsToProduct": "Leads to product",
-    "leadsTo": "Leads to"
+    "leadsTo": "Leads to",
+    "linkInText": "Link from the description"
   },
   "Sales": {
     "shop": "Shop",

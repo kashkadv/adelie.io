@@ -25,8 +25,16 @@ type Detail = {
   asOf: string | null;
   metrics: { key: string; value: number | null; dataStatus: SeriesPoint['status']; date: string }[];
   daily: { from: string; to: string; series: Record<string, Omit<SeriesPoint, 'date'>[]> } | null;
-  /** Where the post leads, and the shop product behind it (ADR-0018). */
-  link: string | null;
+  /** Shop products the post leads to, and its other links (ADR-0018). */
+  linkedProducts: {
+    id: string;
+    title: string;
+    imageUrl: string | null;
+    url: string | null;
+    price: number | null;
+    currency: string | null;
+  }[];
+  otherLinks: { key: string; url: string; source: 'link' | 'text' }[];
   linkedProduct: {
     id: string;
     title: string;
@@ -37,9 +45,12 @@ type Detail = {
   } | null;
 };
 
-const linkHost = (url: string) => {
+/** "gushka.ua/rugs/karpaty" — host and path, without scheme, www and query. */
+const linkLabel = (url: string) => {
   try {
-    return new URL(url).hostname.replace(/^www\./, '');
+    const u = new URL(/^https?:/i.test(url) ? url : `https://${url}`);
+    const path = u.pathname.replace(/\/+$/, '');
+    return `${u.hostname.replace(/^www\./, '')}${path.length > 30 ? `${path.slice(0, 30)}…` : path}`;
   } catch {
     return url;
   }
@@ -275,19 +286,21 @@ export function PostDialog({
                       {description}
                     </p>
                   )}
-                  {/* Where the post leads: a shop product (promotion → sales) or just a site. */}
-                  {detail.linkedProduct ? (
+                  {/* Where the post leads: shop products (promotion → sales) and other links —
+                      from its own link and from its text (ADR-0018). */}
+                  {detail.linkedProducts.map((product) => (
                     <a
-                      href={detail.linkedProduct.url ?? detail.link ?? undefined}
+                      key={product.id}
+                      href={product.url ?? undefined}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-4 flex items-center gap-3 rounded-2xl border border-line p-2 pr-3 hover:bg-hover"
                     >
                       <span className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-hover">
-                        {detail.linkedProduct.imageUrl && (
+                        {product.imageUrl && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={detail.linkedProduct.imageUrl}
+                            src={product.imageUrl}
                             alt=""
                             className="h-full w-full object-cover"
                           />
@@ -295,29 +308,30 @@ export function PostDialog({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-xs text-muted">{t('leadsToProduct')}</span>
-                        <span className="block truncate text-sm font-medium">
-                          {detail.linkedProduct.title}
-                        </span>
+                        <span className="block truncate text-sm font-medium">{product.title}</span>
                       </span>
                       <span className="tabular shrink-0 text-sm">
-                        {money(detail.linkedProduct.price, detail.linkedProduct.currency)}
+                        {money(product.price, product.currency)}
                       </span>
                     </a>
-                  ) : (
-                    detail.link && (
-                      <a
-                        href={detail.link}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-4 inline-flex max-w-full items-center gap-1.5 text-sm text-muted hover:text-foreground"
-                      >
-                        <span className="shrink-0">{t('leadsTo')}</span>
-                        <span className="truncate font-medium text-foreground">
-                          {linkHost(detail.link)}
-                        </span>
-                        <ArrowUpRight size={14} className="shrink-0" aria-hidden="true" />
-                      </a>
-                    )
+                  ))}
+                  {detail.otherLinks.length > 0 && (
+                    <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+                      <span>{t('leadsTo')}</span>
+                      {detail.otherLinks.map((l) => (
+                        <a
+                          key={l.key}
+                          href={/^https?:/i.test(l.url) ? l.url : `https://${l.url}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={l.source === 'text' ? t('linkInText') : undefined}
+                          className="inline-flex max-w-full items-center gap-1 font-medium text-foreground hover:underline"
+                        >
+                          <span className="truncate">{linkLabel(l.url)}</span>
+                          <ArrowUpRight size={14} className="shrink-0" aria-hidden="true" />
+                        </a>
+                      ))}
+                    </p>
                   )}
                 </div>
               </div>

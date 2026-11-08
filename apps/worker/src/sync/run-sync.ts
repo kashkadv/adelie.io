@@ -6,7 +6,7 @@ import {
   AdapterError,
   HttpClient,
   isAdapterError,
-  productLinkKey,
+  postLinks,
   type AdapterContext,
   type MetricPoint,
   type PlatformAdapter,
@@ -445,7 +445,6 @@ export async function runSync(
             thumbnailUrl: p.thumbnailUrl ?? null,
             publishedAt: p.publishedAt ?? null,
             link: p.link ?? null,
-            linkKey: productLinkKey(p.link),
           };
           const post = await prisma.socialPost.upsert({
             where: { accountId_externalId: { accountId: account.id, externalId: p.externalId } },
@@ -461,6 +460,20 @@ export async function runSync(
           });
           postIds.set(p.externalId, post.id);
           count('posts');
+          // Links of the post: its own and those in its text (ADR-0018), replaced as a whole.
+          const links = postLinks(p);
+          await prisma.$transaction([
+            prisma.socialPostLink.deleteMany({ where: { postId: post.id } }),
+            prisma.socialPostLink.createMany({
+              data: links.map((l) => ({
+                postId: post.id,
+                workspaceId: account.workspaceId,
+                projectId: account.projectId,
+                ...l,
+              })),
+            }),
+          ]);
+          count('postLinks', links.length);
           if (fromSnapshots) {
             const isNew =
               !baselined.has(post.id) && !!lastSync && !!p.publishedAt && p.publishedAt >= lastSync;

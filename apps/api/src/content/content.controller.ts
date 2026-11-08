@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Prisma } from '@adelie/db';
+import { productKeys } from '@adelie/platforms';
 import { PrismaService } from '../prisma.service.js';
 import { PERIOD_METRICS, periodMetrics, sortByPeriod, type PeriodValues } from './period.js';
 import { visibleProjectsWhere } from '../workspaces/project-visibility.js';
@@ -54,7 +55,7 @@ const POST_SELECT = {
   publishedAt: true,
   dailyTo: true,
   link: true,
-  linkKey: true,
+  links: { select: { key: true, url: true, source: true } },
   board: { select: { id: true, name: true } },
   account: { select: { id: true, username: true, platform: true } },
   latest: {
@@ -135,17 +136,15 @@ export class ContentController {
       throw new BadRequestException('Unknown leads filter');
     }
     const products = await this.projectProducts(projectId, request.workspace.workspaceId);
-    const productKeys = [...products.keys()];
+    const knownKeys = [...products.keys()];
+    const toProduct = { links: { some: { key: { in: knownKeys } } } };
     const leadsWhere: Prisma.SocialPostWhereInput =
       leads === 'product'
-        ? { linkKey: { in: productKeys } }
+        ? toProduct
         : leads === 'site'
-          ? {
-              link: { not: null },
-              OR: [{ linkKey: null }, { linkKey: { notIn: productKeys } }],
-            }
+          ? { links: { some: {} }, NOT: toProduct }
           : leads === 'none'
-            ? { link: null }
+            ? { links: { none: {} } }
             : {};
 
     const where: Prisma.SocialPostWhereInput = {
@@ -173,11 +172,12 @@ export class ContentController {
           : {},
       ],
     };
-    const withProducts = <T extends { items: { linkKey: string | null }[] }>(page: T) => ({
+    const withProducts = <T extends { items: { links: { key: string }[] }[] }>(page: T) => ({
       ...page,
-      items: page.items.map(({ linkKey, ...item }) => ({
+      items: page.items.map(({ links, ...item }) => ({
         ...item,
-        linkedProduct: (linkKey && products.get(linkKey)) || null,
+        // The first shop product among the post's links.
+        linkedProduct: links.map((l) => products.get(l.key)).find(Boolean) ?? null,
       })),
     });
 
@@ -237,7 +237,7 @@ export class ContentController {
     });
   }
 
-  /** The project's shop products by link key (`etsy:<listing>`), for "leads to a product". */
+  /** The project's shop products by every key they are linked by (ADR-0018). */
   private async projectProducts(projectId: string, workspaceId: string) {
     const rows = await this.prisma.client.shopProduct.findMany({
       where: {
@@ -250,15 +250,17 @@ export class ContentController {
         externalId: true,
         title: true,
         imageUrl: true,
+        url: true,
         account: { select: { platform: true } },
       },
     });
-    return new Map(
-      rows.map(({ externalId, account, ...p }) => [
-        `${account.platform.toLowerCase()}:${externalId}`,
-        p,
-      ]),
-    );
+    const map = new Map<string, { id: string; title: string; imageUrl: string | null }>();
+    for (const { externalId, account, url, ...p } of rows) {
+      for (const key of productKeys({ platform: account.platform, externalId, url })) {
+        map.set(key, p);
+      }
+    }
+    return map;
   }
 
   /**
@@ -386,8 +388,6 @@ export class ContentController {
       select: {
         ...POST_SELECT,
         dailyFrom: true,
-        link: true,
-        linkKey: true,
         account: { select: { id: true, username: true, displayName: true, platform: true } },
       },
     });
@@ -428,31 +428,25 @@ export class ContentController {
       daily = { from, to, series };
     }
 
-    // The product the post leads to (pin link → shop product, ADR-0018).
-    const [linkPlatform, linkExternalId] = post.linkKey?.split(':') ?? [];
-    const linkedProduct =
-      linkPlatform && linkExternalId
-        ? await db.shopProduct.findFirst({
-            where: {
-              projectId,
-              workspaceId: request.workspace.workspaceId,
-              externalId: linkExternalId,
-              account: { platform: linkPlatform.toUpperCase() as 'ETSY', hiddenAt: null },
-            },
-            select: {
-              id: true,
-              title: true,
-              imageUrl: true,
-              url: true,
-              price: true,
-              currency: true,
-            },
-          })
-        : null;
+    // Shop products among the post's links (its own link and its text, ADR-0018).
+    const products = await this.projectProducts(projectId, request.workspace.workspaceId);
+    const linkedIds = [
+      ...new Set(post.links.map((l) => products.get(l.key)?.id).filter((id): id is string => !!id)),
+    ];
+    const linkedProducts = linkedIds.length
+      ? await db.shopProduct.findMany({
+          where: { id: { in: linkedIds } },
+          select: { id: true, title: true, imageUrl: true, url: true, price: true, currency: true },
+        })
+      : [];
+    const linkedProduct = linkedProducts[0] ?? null;
 
     return {
       ...rest,
       linkedProduct,
+      linkedProducts,
+      /** Links that lead elsewhere (not to a shop product). */
+      otherLinks: post.links.filter((l) => !products.has(l.key)),
       dataStatus: latest?.dataStatus ?? null,
       asOf: latest?.asOfDate ?? null,
       metrics: snapshots.map((m) => ({

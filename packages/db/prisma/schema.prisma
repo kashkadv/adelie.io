@@ -383,8 +383,6 @@ model SocialPost {
   publishedAt  DateTime?
   /// Where the post leads (Pinterest pin link).
   link         String?
-  /// The product the link points to, e.g. "etsy:123" (ADR-0018); matches ShopProduct by platform + externalId.
-  linkKey      String?
   /// Days covered by PostMetricDaily (ADR-0013): inside this range a missing day means zero activity.
   dailyFrom    DateTime?       @db.Date
   dailyTo      DateTime?       @db.Date
@@ -394,10 +392,10 @@ model SocialPost {
   metricValues PostMetricValue[]
   dailyValues  PostMetricDaily[]
   latest       PostMetricsLatest?
+  links        SocialPostLink[]
 
   @@unique([accountId, externalId])
   @@index([accountId, publishedAt])
-  @@index([projectId, linkKey])
   @@index([boardId])
   @@map("social_post")
 }
@@ -762,4 +760,23 @@ model ShopProductChange {
 
   @@index([productId, createdAt])
   @@map("shop_product_change")
+}
+
+/// Links of a post (ADR-0018): its own link (Pinterest) and URLs in its text (pin description,
+/// Instagram caption). `key` is what the link points to — `etsy:<listing>` or `url:<host><path>` —
+/// and matches shop products (by platform id, or by product page URL for sites).
+model SocialPostLink {
+  id          String     @id @default(uuid(7)) @db.Uuid
+  postId      String     @db.Uuid
+  post        SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  workspaceId String     @db.Uuid
+  projectId   String     @db.Uuid
+  url         String
+  key         String
+  /// link | text
+  source      String
+
+  @@unique([postId, key])
+  @@index([projectId, key])
+  @@map("social_post_link")
 }

@@ -17,6 +17,7 @@ import {
 import type { Prisma } from '@adelie/db';
 import {
   isAdapterError,
+  productKeys,
   productChangeErrors,
   type ProductChanges,
   type ProductEditable,
@@ -251,7 +252,17 @@ export class SalesController {
         where: {
           projectId,
           workspaceId: request.workspace.workspaceId,
-          linkKey: `${product.account.platform.toLowerCase()}:${product.externalId}`,
+          links: {
+            some: {
+              key: {
+                in: productKeys({
+                  platform: product.account.platform,
+                  externalId: product.externalId,
+                  url: product.url,
+                }),
+              },
+            },
+          },
           account: { hiddenAt: null, connection: { status: { not: 'REVOKED' } } },
         },
         orderBy: { publishedAt: { sort: 'desc', nulls: 'last' } },
@@ -517,22 +528,26 @@ export class SalesController {
         },
       }),
     ]);
-    // Posts that lead to each product (pin links, ADR-0018).
-    const keyOf = (p: { account: { platform: string }; id: string; externalId: string }) =>
-      `${p.account.platform.toLowerCase()}:${p.externalId}`;
-    const leading = products.length
-      ? await db.socialPost.groupBy({
-          by: ['linkKey'],
+    // Posts that lead to each product: their own link or a link in their text (ADR-0018).
+    const keysOf = (p: { account: { platform: string }; externalId: string; url: string | null }) =>
+      productKeys({ platform: p.account.platform, externalId: p.externalId, url: p.url });
+    const allKeys = [...new Set(products.flatMap(keysOf))];
+    const links = allKeys.length
+      ? await db.socialPostLink.findMany({
           where: {
             projectId,
             workspaceId: request.workspace.workspaceId,
-            linkKey: { in: products.map(keyOf) },
-            account: { hiddenAt: null, connection: { status: { not: 'REVOKED' } } },
+            key: { in: allKeys },
+            post: { account: { hiddenAt: null, connection: { status: { not: 'REVOKED' } } } },
           },
-          _count: { _all: true },
+          select: { key: true, postId: true },
         })
       : [];
-    const posts = new Map(leading.map((g) => [g.linkKey, g._count._all]));
+    const postsByKey = new Map<string, Set<string>>();
+    for (const l of links)
+      postsByKey.set(l.key, (postsByKey.get(l.key) ?? new Set()).add(l.postId));
+    const postsOf = (p: Parameters<typeof keysOf>[0]) =>
+      new Set(keysOf(p).flatMap((k) => [...(postsByKey.get(k) ?? [])])).size;
     const sold = new Map<string, { units: number; revenue: number }>();
     for (const l of lines) {
       if (!countsAsSale(l.order.status)) continue;
@@ -547,7 +562,7 @@ export class SalesController {
         ...p,
         sold: sold.get(p.id)?.units ?? 0,
         revenue: sold.get(p.id)?.revenue ?? 0,
-        posts: posts.get(keyOf({ ...p, externalId })) ?? 0,
+        posts: postsOf({ ...p, externalId }),
       })),
     };
   }
