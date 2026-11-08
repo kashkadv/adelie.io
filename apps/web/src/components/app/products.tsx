@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, ExternalLink, Package, Search, X } from 'lucide-react';
+import { ArrowDown, ExternalLink, Package, Pin, Search, X } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -25,6 +25,8 @@ type Product = {
   listedAt: string | null;
   sold: number;
   revenue: number;
+  /** Posts (pins) leading to the product. */
+  posts: number;
 };
 type Response = { period: { from: string; to: string } | null; items: Product[] };
 
@@ -251,6 +253,15 @@ export function Products() {
                       {p.state !== 'active' && (
                         <span className="rounded-full border border-line px-1.5 leading-4">
                           {t(`states.${p.state as (typeof STATES)[number]}`)}
+                        </span>
+                      )}
+                      {p.posts > 0 && (
+                        <span
+                          className="flex items-center gap-1 rounded-full bg-hover px-1.5 leading-4 text-foreground"
+                          title={t('products.postsHint')}
+                        >
+                          <Pin size={11} aria-hidden="true" />
+                          {t('products.posts', { count: p.posts })}
                         </span>
                       )}
                       {p.listedAt &&

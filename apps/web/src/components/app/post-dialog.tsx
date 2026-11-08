@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, ExternalLink, Play, X } from 'lucide-react';
+import { ArrowUpRight, ChevronLeft, ChevronRight, ExternalLink, Play, X } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
 import { Segmented } from '../ui/segmented';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
+import { useMoney } from './sales-data';
 
 type Platform = 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK';
 type Detail = {
@@ -24,6 +25,24 @@ type Detail = {
   asOf: string | null;
   metrics: { key: string; value: number | null; dataStatus: SeriesPoint['status']; date: string }[];
   daily: { from: string; to: string; series: Record<string, Omit<SeriesPoint, 'date'>[]> } | null;
+  /** Where the post leads, and the shop product behind it (ADR-0018). */
+  link: string | null;
+  linkedProduct: {
+    id: string;
+    title: string;
+    imageUrl: string | null;
+    url: string | null;
+    price: number | null;
+    currency: string | null;
+  } | null;
+};
+
+const linkHost = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 };
 
 /** Display order of post metrics per platform; anything else the platform sends comes after. */
@@ -80,6 +99,7 @@ export function PostDialog({
   const t = useTranslations('Post');
   const tContent = useTranslations('Content');
   const format = useFormatter();
+  const money = useMoney();
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
   // The loaded post is kept with its id: while the next one loads, the old one is not shown.
@@ -271,6 +291,50 @@ export function PostDialog({
                     <p className="mt-4 max-h-48 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-line text-muted">
                       {description}
                     </p>
+                  )}
+                  {/* Where the post leads: a shop product (promotion → sales) or just a site. */}
+                  {detail.linkedProduct ? (
+                    <a
+                      href={detail.linkedProduct.url ?? detail.link ?? undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-4 flex items-center gap-3 rounded-2xl border border-line p-2 pr-3 hover:bg-hover"
+                    >
+                      <span className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-hover">
+                        {detail.linkedProduct.imageUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={detail.linkedProduct.imageUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs text-muted">{t('leadsToProduct')}</span>
+                        <span className="block truncate text-sm font-medium">
+                          {detail.linkedProduct.title}
+                        </span>
+                      </span>
+                      <span className="tabular shrink-0 text-sm">
+                        {money(detail.linkedProduct.price, detail.linkedProduct.currency)}
+                      </span>
+                    </a>
+                  ) : (
+                    detail.link && (
+                      <a
+                        href={detail.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-4 inline-flex max-w-full items-center gap-1.5 text-sm text-muted hover:text-foreground"
+                      >
+                        <span className="shrink-0">{t('leadsTo')}</span>
+                        <span className="truncate font-medium text-foreground">
+                          {linkHost(detail.link)}
+                        </span>
+                        <ArrowUpRight size={14} className="shrink-0" aria-hidden="true" />
+                      </a>
+                    )
                   )}
                 </div>
               </div>

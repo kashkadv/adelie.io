@@ -379,6 +379,10 @@ model SocialPost {
   description  String?
   thumbnailUrl String?
   publishedAt  DateTime?
+  /// Where the post leads (Pinterest pin link).
+  link         String?
+  /// The product the link points to, e.g. "etsy:123" (ADR-0018); matches ShopProduct by platform + externalId.
+  linkKey      String?
   /// Days covered by PostMetricDaily (ADR-0013): inside this range a missing day means zero activity.
   dailyFrom    DateTime?       @db.Date
   dailyTo      DateTime?       @db.Date
@@ -391,6 +395,7 @@ model SocialPost {
 
   @@unique([accountId, externalId])
   @@index([accountId, publishedAt])
+  @@index([projectId, linkKey])
   @@index([boardId])
   @@map("social_post")
 }

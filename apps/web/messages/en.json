@@ -569,7 +569,9 @@
       "views": "How many times the post was played or displayed.",
       "reach": "How many different accounts saw the post at least once.",
       "engagements": "Likes, comments, saves and shares together."
-    }
+    },
+    "leadsToProduct": "Leads to product",
+    "leadsTo": "Leads to"
   },
   "Sales": {
     "shop": "Shop",
@@ -610,7 +612,9 @@
         "favorers": "How many people favorited the product on Etsy — lifetime.",
         "sold": "Units sold in the chosen period.",
         "revenue": "Earned for the units sold in the period — price × quantity, without tax and shipping."
-      }
+      },
+      "posts": "{count, plural, one {# pin leads here} other {# pins lead here}}",
+      "postsHint": "Pins whose link leads to this product."
     },
     "orders": {
       "title": "Orders",

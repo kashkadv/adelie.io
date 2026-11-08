@@ -329,6 +329,8 @@ export class ContentController {
       select: {
         ...POST_SELECT,
         dailyFrom: true,
+        link: true,
+        linkKey: true,
         account: { select: { id: true, username: true, displayName: true, platform: true } },
       },
     });
@@ -369,8 +371,31 @@ export class ContentController {
       daily = { from, to, series };
     }
 
+    // The product the post leads to (pin link → shop product, ADR-0018).
+    const [linkPlatform, linkExternalId] = post.linkKey?.split(':') ?? [];
+    const linkedProduct =
+      linkPlatform && linkExternalId
+        ? await db.shopProduct.findFirst({
+            where: {
+              projectId,
+              workspaceId: request.workspace.workspaceId,
+              externalId: linkExternalId,
+              account: { platform: linkPlatform.toUpperCase() as 'ETSY', hiddenAt: null },
+            },
+            select: {
+              id: true,
+              title: true,
+              imageUrl: true,
+              url: true,
+              price: true,
+              currency: true,
+            },
+          })
+        : null;
+
     return {
       ...rest,
+      linkedProduct,
       dataStatus: latest?.dataStatus ?? null,
       asOf: latest?.asOfDate ?? null,
       metrics: snapshots.map((m) => ({

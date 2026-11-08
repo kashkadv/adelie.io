@@ -54,6 +54,8 @@ export interface PostData {
   thumbnailUrl?: string;
   publishedAt?: Date;
   boardExternalId?: string;
+  /** Where the post leads (Pinterest: the pin's destination link). */
+  link?: string;
   /** false = someone else's post saved by this account (e.g. a Pinterest repin); default true. */
   isOwn?: boolean;
 }

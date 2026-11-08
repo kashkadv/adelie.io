@@ -148,6 +148,7 @@ export function mapPin(raw: PinterestPin): PostData {
     thumbnailUrl: thumbnail(raw),
     publishedAt: raw.created_at ? new Date(raw.created_at) : undefined,
     boardExternalId: raw.board_id,
+    link: raw.link || undefined,
     isOwn: raw.is_owner !== false,
   };
 }

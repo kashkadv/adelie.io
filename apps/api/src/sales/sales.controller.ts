@@ -108,6 +108,7 @@ export class SalesController {
         take: 2000,
         select: {
           id: true,
+          externalId: true,
           title: true,
           url: true,
           imageUrl: true,
@@ -129,6 +130,22 @@ export class SalesController {
         select: { productId: true, quantity: true, price: true },
       }),
     ]);
+    // Posts that lead to each product (pin links, ADR-0018).
+    const keyOf = (p: { account: { platform: string }; id: string; externalId: string }) =>
+      `${p.account.platform.toLowerCase()}:${p.externalId}`;
+    const leading = products.length
+      ? await db.socialPost.groupBy({
+          by: ['linkKey'],
+          where: {
+            projectId,
+            workspaceId: request.workspace.workspaceId,
+            linkKey: { in: products.map(keyOf) },
+            account: { hiddenAt: null, connection: { status: { not: 'REVOKED' } } },
+          },
+          _count: { _all: true },
+        })
+      : [];
+    const posts = new Map(leading.map((g) => [g.linkKey, g._count._all]));
     const sold = new Map<string, { units: number; revenue: number }>();
     for (const l of lines) {
       const s = sold.get(l.productId!) ?? { units: 0, revenue: 0 };
@@ -138,10 +155,11 @@ export class SalesController {
     }
     return {
       period: period ? { from: period.from, to: period.to } : null,
-      items: products.map((p) => ({
+      items: products.map(({ externalId, ...p }) => ({
         ...p,
         sold: sold.get(p.id)?.units ?? 0,
         revenue: sold.get(p.id)?.revenue ?? 0,
+        posts: posts.get(keyOf({ ...p, externalId })) ?? 0,
       })),
     };
   }

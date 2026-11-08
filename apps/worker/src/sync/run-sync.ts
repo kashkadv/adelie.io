@@ -6,6 +6,7 @@ import {
   AdapterError,
   HttpClient,
   isAdapterError,
+  productLinkKey,
   type AdapterContext,
   type MetricPoint,
   type PlatformAdapter,
@@ -441,6 +442,8 @@ export async function runSync(
             description: p.description ?? null,
             thumbnailUrl: p.thumbnailUrl ?? null,
             publishedAt: p.publishedAt ?? null,
+            link: p.link ?? null,
+            linkKey: productLinkKey(p.link),
           };
           const post = await prisma.socialPost.upsert({
             where: { accountId_externalId: { accountId: account.id, externalId: p.externalId } },
