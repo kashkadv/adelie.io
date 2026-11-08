@@ -411,6 +411,39 @@ h3 {
   justify-content: center;
 }
 
+/* Group title (Promotion, Sales): small caps text; collapsed — a short hairline instead. */
+.sidebar .nav-group {
+  display: flex;
+  height: 20px;
+  align-items: center;
+  margin-top: 6px;
+  padding-left: 14px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sidebar .nav-group::before {
+  content: '';
+  width: 0;
+  height: 1px;
+  background: var(--line);
+  transition: width 320ms var(--ease-soft);
+}
+
+:root[data-sidebar='collapsed'] .sidebar .nav-group {
+  padding-left: 12px;
+}
+
+:root[data-sidebar='collapsed'] .sidebar .nav-group::before {
+  width: 20px;
+}
+
+.sidebar-drawer .sidebar .nav-group::before {
+  width: 0;
+}
+
 /* Tooltip with the item name, only when the sidebar is collapsed. */
 .sidebar [data-tip] {
   position: relative;

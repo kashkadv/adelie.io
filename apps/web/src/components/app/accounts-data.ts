@@ -93,7 +93,7 @@ export function useProjectAccounts() {
     [base, reload],
   );
 
-  /** Sends the browser to the platform's consent page; it comes back to /accounts?connect=… */
+  /** Sends the browser to the platform's consent page; it comes back to /connections?connect=… */
   const connect = useCallback(
     async (platform: PlatformSlug) => {
       if (!base) return;

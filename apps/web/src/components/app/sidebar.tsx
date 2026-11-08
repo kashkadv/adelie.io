@@ -4,9 +4,11 @@ import {
   FileChartColumn,
   Images,
   LayoutDashboard,
+  Package,
   PanelLeftClose,
+  PlugZap,
+  ReceiptText,
   Settings,
-  Users,
   type LucideIcon,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -15,14 +17,31 @@ import { usePathname } from 'next/navigation';
 import { isSidebarCollapsed, setSidebarCollapsed } from '@/lib/theme';
 import type { ReactNode } from 'react';
 
-type NavKey = 'overview' | 'accounts' | 'content' | 'reports' | 'settings';
+type NavKey =
+  'overview' | 'content' | 'products' | 'orders' | 'reports' | 'connections' | 'settings';
+type NavItem = { key: NavKey; href: string; icon: LucideIcon };
 
-const NAV: { key: NavKey; href: string; icon: LucideIcon }[] = [
-  { key: 'overview', href: '/', icon: LayoutDashboard },
-  { key: 'accounts', href: '/accounts', icon: Users },
-  { key: 'content', href: '/content', icon: Images },
-  { key: 'reports', href: '/reports', icon: FileChartColumn },
-  { key: 'settings', href: '/settings', icon: Settings },
+/**
+ * Sections by the question they answer (ADR-0018): Promotion — "where am I seen and what comes of
+ * it?", Sales — "what do people buy?". Connections are set-up, not a place for analysis.
+ */
+const NAV: { group?: 'promotion' | 'sales'; items: NavItem[] }[] = [
+  { items: [{ key: 'overview', href: '/', icon: LayoutDashboard }] },
+  { group: 'promotion', items: [{ key: 'content', href: '/content', icon: Images }] },
+  {
+    group: 'sales',
+    items: [
+      { key: 'products', href: '/products', icon: Package },
+      { key: 'orders', href: '/orders', icon: ReceiptText },
+    ],
+  },
+  {
+    items: [
+      { key: 'reports', href: '/reports', icon: FileChartColumn },
+      { key: 'connections', href: '/connections', icon: PlugZap },
+      { key: 'settings', href: '/settings', icon: Settings },
+    ],
+  },
 ];
 
 /**
@@ -47,28 +66,38 @@ export function Sidebar({
       {header}
 
       <nav className="flex flex-1 flex-col gap-2.5" aria-label={t('main')}>
-        {NAV.map(({ key, href, icon: Icon }) => {
-          const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
-          return (
-            <Link
-              key={key}
-              href={href}
-              onClick={onNavigate}
-              aria-current={active ? 'page' : undefined}
-              data-tip={t(key)}
-              className={`flex h-11 items-center rounded-2xl pr-3 text-sm transition-[background-color,color,box-shadow] duration-300 ease-(--ease-soft) ${
-                active
-                  ? 'bg-accent font-medium text-accent-foreground shadow-[0_8px_24px_-10px_var(--shadow)]'
-                  : 'text-muted hover:bg-hover hover:text-foreground'
-              }`}
-            >
-              <span className="slot">
-                <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
-              </span>
-              <span className="label">{t(key)}</span>
-            </Link>
-          );
-        })}
+        {NAV.flatMap(({ group, items }, i) => [
+          ...(group || i > 0
+            ? [
+                // Group title; collapsed, only a hairline marks where a group starts.
+                <p key={`g${i}`} className="nav-group" role="presentation">
+                  {group && <span className="label">{t(`groups.${group}`)}</span>}
+                </p>,
+              ]
+            : []),
+          ...items.map(({ key, href, icon: Icon }) => {
+            const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+            return (
+              <Link
+                key={key}
+                href={href}
+                onClick={onNavigate}
+                aria-current={active ? 'page' : undefined}
+                data-tip={t(key)}
+                className={`flex h-11 items-center rounded-2xl pr-3 text-sm transition-[background-color,color,box-shadow] duration-300 ease-(--ease-soft) ${
+                  active
+                    ? 'bg-accent font-medium text-accent-foreground shadow-[0_8px_24px_-10px_var(--shadow)]'
+                    : 'text-muted hover:bg-hover hover:text-foreground'
+                }`}
+              >
+                <span className="slot">
+                  <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
+                </span>
+                <span className="label">{t(key)}</span>
+              </Link>
+            );
+          }),
+        ])}
       </nav>
 
       {collapsible && (

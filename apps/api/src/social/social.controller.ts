@@ -256,7 +256,7 @@ export class SocialController {
 
   /**
    * OAuth redirect target (PRD §12: GET /social/:platform/callback). Signed-in flow → back to
-   * /accounts; invitation flow (no Adelie session needed) → the public result page.
+   * /connections; invitation flow (no Adelie session needed) → the public result page.
    */
   @Get('social/:platform/callback')
   @OptionalAuth()
@@ -272,7 +272,7 @@ export class SocialController {
       res.redirect(
         viaInvitation
           ? `${config.webUrl}/connect/result?connect=${result}&platform=${encodeURIComponent(slug)}`
-          : `${config.webUrl}/accounts?connect=${result}&platform=${encodeURIComponent(slug)}`,
+          : `${config.webUrl}/connections?connect=${result}&platform=${encodeURIComponent(slug)}`,
       );
 
     // Diagnostics without secrets: which parameters the platform sent back (names only).

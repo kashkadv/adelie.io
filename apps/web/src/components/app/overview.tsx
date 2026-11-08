@@ -210,7 +210,7 @@ export function Overview() {
       {/* Connection problems are shown in the app only for now (ADR-0011). */}
       {needsReauth.length > 0 && (
         <Link
-          href="/accounts"
+          href="/connections"
           className="animate-rise mb-6 flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300"
         >
           <AlertTriangle size={18} className="shrink-0" aria-hidden="true" />

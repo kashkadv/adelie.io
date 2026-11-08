@@ -46,7 +46,7 @@ export function NewProjectDialog({ onClose }: { onClose: () => void }) {
       });
       await reloadWorkspace(created.id);
       onClose();
-      router.push('/accounts');
+      router.push('/connections');
     } catch (e) {
       const body = e instanceof ApiError ? (e.body as { errors?: { name?: string } } | null) : null;
       setError(t(`errors.${body?.errors?.name === 'tooLong' ? 'tooLong' : 'failed'}`));

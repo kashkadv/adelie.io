@@ -33,9 +33,11 @@
   "Nav": {
     "main": "Main navigation",
     "overview": "Overview",
-    "accounts": "Accounts",
     "content": "Content",
+    "products": "Products",
+    "orders": "Orders",
     "reports": "Reports",
+    "connections": "Connections",
     "settings": "Settings",
     "projects": "Projects",
     "newProject": "New project",
@@ -45,7 +47,11 @@
     "expand": "Expand sidebar",
     "toggleSidebar": "Collapse or expand the sidebar",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "groups": {
+      "promotion": "Promotion",
+      "sales": "Sales"
+    }
   },
   "Overview": {
     "title": "Overview",
@@ -125,6 +131,16 @@
       "title": "Reports",
       "subtitle": "Snapshots to share with clients",
       "text": "Build a report for a period and share it by a secret link — no sign-in needed for the reader."
+    },
+    "products": {
+      "title": "Products",
+      "subtitle": "What you sell — across the project’s shops",
+      "text": "Products from connected shops will be here — Etsy, later Shopify and your website: sales, revenue and the posts that lead to each product."
+    },
+    "orders": {
+      "title": "Orders",
+      "subtitle": "What people buy from you — across the project’s shops",
+      "text": "Orders from connected shops by day will be here: amounts, platform fees and net revenue."
     }
   },
   "Profile": {
@@ -245,9 +261,9 @@
     }
   },
   "Accounts": {
-    "title": "Accounts",
-    "subtitle": "Social accounts connected to this project",
-    "connectTitle": "Connect account",
+    "title": "Connections",
+    "subtitle": "Platforms Adelie gets the project’s data from — for promotion and sales",
+    "connectTitle": "Connect",
     "soon": "Soon",
     "platforms": {
       "PINTEREST": "Pinterest",
@@ -280,9 +296,8 @@
       "partialHint": "Some steps were skipped because the platform did not allow them; everything else is up to date. Adelie tries again with the next sync.",
       "failedHint": "Adelie could not reach the platform. It will retry automatically within an hour; nothing needs to be done."
     },
-    "platformsTitle": "Platforms",
-    "emptyTitle": "No accounts yet",
-    "emptyText": "Connect a social account with the button in the top-right corner — Adelie starts collecting its data right away.",
+    "emptyTitle": "Nothing connected yet",
+    "emptyText": "Connect a social network with the button in the top right — Adelie starts collecting its data right away. Shops are coming soon: Etsy, Shopify, your website.",
     "copyInvite": "Copy invitation link",
     "inviteCopied": "Invitation link copied — valid for 7 days, single use.",
     "inviteFailed": "Could not create the invitation.",
@@ -324,7 +339,16 @@
     "showDisconnected": "Show disconnected",
     "showHidden": "Show hidden",
     "hideHidden": "Don't show hidden",
-    "noMatches": "No accounts match the filters."
+    "noMatches": "No accounts match the filters.",
+    "roles": {
+      "content": "Posts",
+      "ads": "Ads",
+      "sales": "Sales"
+    },
+    "groups": {
+      "promotion": "Promotion",
+      "sales": "Sales"
+    }
   },
   "Invite": {
     "title": "Connect {platform} to Adelie",

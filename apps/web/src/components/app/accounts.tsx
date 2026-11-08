@@ -202,9 +202,20 @@ function AccountRow({
                 <EyeOff size={14} className="shrink-0 text-muted" aria-label={t('hiddenBadge')} />
               )}
             </p>
-            <p className="truncate text-sm text-muted">
-              {t(`platforms.${account.platform}`)}
-              {account.username ? ` · @${account.username}` : ''}
+            <p className="flex min-w-0 items-center gap-2 text-sm text-muted">
+              <span className="truncate">
+                {t(`platforms.${account.platform}`)}
+                {account.username ? ` · @${account.username}` : ''}
+              </span>
+              {/* What this connection gives (ADR-0018). */}
+              {ROLES[account.platform].map((role) => (
+                <span
+                  key={role}
+                  className="shrink-0 rounded-full border border-line px-1.5 text-xs leading-4"
+                >
+                  {t(`roles.${role}`)}
+                </span>
+              ))}
             </p>
           </div>
         </div>
@@ -270,10 +281,23 @@ function AccountRow({
   );
 }
 
-/** Platforms that can be connected now (ADR-0004); TikTok is listed as "soon". */
+/** What each connection gives (ADR-0018): its data shows up in Promotion, Sales or both. */
+const ROLES: Record<SocialAccount['platform'], ('content' | 'ads' | 'sales')[]> = {
+  PINTEREST: ['content'],
+  INSTAGRAM: ['content'],
+  TIKTOK: ['content'],
+};
+
+/** Platforms that can be connected now (ADR-0004), grouped by the section they feed (ADR-0018). */
 const CONNECTABLE: { key: 'PINTEREST' | 'INSTAGRAM'; slug: PlatformSlug }[] = [
   { key: 'PINTEREST', slug: 'pinterest' },
   { key: 'INSTAGRAM', slug: 'instagram' },
+];
+/** Listed as "soon", so the menu shows where Adelie is going. */
+const SOON: { group: 'promotion' | 'sales'; name: string }[] = [
+  { group: 'promotion', name: 'TikTok' },
+  { group: 'sales', name: 'Etsy' },
+  { group: 'sales', name: 'Shopify' },
 ];
 
 /** "+ Connect account" button with a glass menu of platforms (top-right of the Accounts page). */
@@ -337,7 +361,7 @@ function ConnectMenu({
           className="glass glass-strong animate-rise absolute top-full right-0 z-50 mt-2 w-72 rounded-2xl p-2"
         >
           <p className="flex items-center gap-1.5 px-3 pt-1 pb-2 text-xs tracking-wide text-muted uppercase">
-            {t('platformsTitle')}
+            {t('groups.promotion')}
             <InfoTip text={t('anotherAccountHint')} />
           </p>
           {CONNECTABLE.map(({ key, slug }) => (
@@ -369,16 +393,27 @@ function ConnectMenu({
               </button>
             </div>
           ))}
-          <div className="my-1 h-px bg-line" />
-          <div
-            role="menuitem"
-            aria-disabled="true"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted"
-          >
-            <span className="w-[18px]" aria-hidden="true" />
-            <span className="flex-1">{t('platforms.TIKTOK')}</span>
-            <span className="rounded-full border border-line px-2 text-xs">{t('soon')}</span>
-          </div>
+          {(['promotion', 'sales'] as const).map((group) => (
+            <div key={group}>
+              {group === 'sales' && (
+                <p className="mt-1 border-t border-line px-3 pt-3 pb-2 text-xs tracking-wide text-muted uppercase">
+                  {t('groups.sales')}
+                </p>
+              )}
+              {SOON.filter((s) => s.group === group).map(({ name }) => (
+                <div
+                  key={name}
+                  role="menuitem"
+                  aria-disabled="true"
+                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted"
+                >
+                  <span className="w-[18px]" aria-hidden="true" />
+                  <span className="flex-1">{name}</span>
+                  <span className="rounded-full border border-line px-2 text-xs">{t('soon')}</span>
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
       )}
     </div>
