@@ -738,6 +738,7 @@ export async function runSync(
           const key = { accountId: account.id, type: a.type, date: asDate(day(now())) };
           const data = {
             size: a.size,
+            sizeIsUpperBound: a.sizeIsUpperBound,
             groups: a.groups as unknown as Prisma.InputJsonValue,
             fetchedAt: now(),
           };

@@ -364,7 +364,7 @@ describe('Pinterest audience', () => {
     const a = mapAudience('engaged', {
       size: 12000,
       categories: [
-        { key: 'home_decor', name: 'Home decor', ratio: 0.4 },
+        { key: 'home_decor', name: 'Home decor', ratio: 0.4, index: 1.34 },
         { key: 'diy', name: 'DIY', ratio: 0.6 },
       ],
       demographics: {
@@ -378,7 +378,8 @@ describe('Pinterest audience', () => {
     });
     expect(a.size).toBe(12000);
     expect(a.groups['interests']?.map((s) => s.key)).toEqual(['diy', 'home_decor']);
-    expect(a.groups['ages']?.[0]).toEqual({ key: '25-34', name: '25-34', ratio: 0.41 });
+    expect(a.groups['ages']?.map((s) => s.key)).toEqual(['18-24', '25-34']);
+    expect(a.groups['interests']?.[1]).toMatchObject({ key: 'home_decor', index: 1.34 });
     expect(a.groups['devices']).toBeUndefined();
   });
 });

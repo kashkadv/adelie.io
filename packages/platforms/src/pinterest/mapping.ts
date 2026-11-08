@@ -242,6 +242,7 @@ interface PinterestAudienceItem {
   name?: string;
   ratio?: number;
   percent?: number;
+  index?: number;
 }
 
 /**
@@ -260,6 +261,7 @@ export function mapAudience(type: string, raw: Record<string, unknown>): Audienc
             : typeof i.percent === 'number'
               ? i.percent / 100
               : 0,
+        ...(typeof i.index === 'number' ? { index: i.index } : {}),
       }))
       .filter((s) => s.key && s.ratio > 0)
       .sort((a, b) => b.ratio - a.ratio);
@@ -267,10 +269,18 @@ export function mapAudience(type: string, raw: Record<string, unknown>): Audienc
   const demographics = (raw['demographics'] ?? {}) as Record<string, unknown>;
   for (const [name, list] of Object.entries(demographics)) {
     const s = shares(list);
+    // Ages read in their own order (18-24, 25-34, …), not by share.
+    if (name === 'ages') s.sort((a, b) => parseInt(a.key, 10) - parseInt(b.key, 10));
     if (s.length) groups[name] = s;
   }
   const interests = shares(raw['categories']);
   if (interests.length) groups['interests'] = interests;
   const size = raw['size'];
-  return { type, size: typeof size === 'number' ? size : null, groups };
+  return {
+    type,
+    // An empty audience (too few people for the platform to report) has no size either.
+    size: typeof size === 'number' && size > 0 ? size : null,
+    sizeIsUpperBound: raw['size_is_upper_bound'] === true,
+    groups,
+  };
 }

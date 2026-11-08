@@ -7,19 +7,27 @@ import { useState } from 'react';
 import { InfoTip } from '../ui/info-tip';
 import { Segmented } from '../ui/segmented';
 
-type Share = { key: string; name: string; ratio: number };
+type Share = { key: string; name: string; ratio: number; index?: number };
 export type Audience = {
   /** The connection lacks the permission: "update access". */
   missing: boolean;
-  items: { type: string; date: string; size: number | null; groups: Record<string, Share[]> }[];
+  items: {
+    type: string;
+    date: string;
+    size: number | null;
+    sizeIsUpperBound: boolean;
+    groups: Record<string, Share[]>;
+  }[];
 };
 
 /** Groups in display order; anything else the platform sends comes after. */
 const ORDER = ['ages', 'genders', 'countries', 'metros', 'devices', 'interests'];
 const KNOWN_GROUPS = new Set(ORDER);
-const KNOWN_SHARES: Record<string, string[]> = {
-  genders: ['female', 'male', 'unspecified'],
-  devices: ['mobile', 'web', 'tablet'],
+/** Translated shares: genders by key ("Unspecified & custom" → unspecified). */
+const shareKey = (group: string, s: Share): string | null => {
+  if (group !== 'genders') return null;
+  const k = s.key.toLowerCase();
+  return k.startsWith('female') ? 'female' : k.startsWith('male') ? 'male' : 'unspecified';
 };
 
 /**
@@ -32,18 +40,20 @@ export function AudienceSection({ audience }: { audience: Audience | null }) {
   const [chosen, setChosen] = useState<string | null>(null);
   if (!audience) return null;
 
-  const types = audience.items.map((i) => i.type);
-  const current =
-    audience.items.find((i) => i.type === (chosen ?? 'engaged')) ?? audience.items[0] ?? null;
+  // Audiences the platform had enough people for; an empty one is explained, not shown empty.
+  const withData = audience.items.filter((i) => Object.keys(i.groups).length > 0);
+  const empty = audience.items.filter((i) => !Object.keys(i.groups).length).map((i) => i.type);
+  const types = withData.map((i) => i.type);
+  const current = withData.find((i) => i.type === (chosen ?? 'engaged')) ?? withData[0] ?? null;
   const groups = current
     ? Object.keys(current.groups).sort(
         (a, b) => (ORDER.indexOf(a) + 1 || 99) - (ORDER.indexOf(b) + 1 || 99),
       )
     : [];
-  const label = (group: string, s: Share) =>
-    KNOWN_SHARES[group]?.includes(s.key.toLowerCase())
-      ? t(`shares.${group}.${s.key.toLowerCase()}` as 'shares.genders.female')
-      : s.name;
+  const label = (group: string, s: Share) => {
+    const k = shareKey(group, s);
+    return k ? t(`shares.genders.${k}` as 'shares.genders.female') : s.name;
+  };
 
   return (
     <section
@@ -80,14 +90,19 @@ export function AudienceSection({ audience }: { audience: Audience | null }) {
         <p className="px-1 text-sm text-muted">{t('pending')}</p>
       ) : (
         <>
-          {current.size !== null && (
-            <p className="mb-3 px-1 text-xs text-muted">
-              {t('size', { size: format.number(current.size, { notation: 'compact' }) })}
-            </p>
-          )}
+          <p className="mb-3 flex flex-wrap gap-x-3 px-1 text-xs text-muted">
+            {current.size !== null && (
+              <span>
+                {t(current.sizeIsUpperBound ? 'sizeUpTo' : 'size', {
+                  size: format.number(current.size, { notation: 'compact' }),
+                })}
+              </span>
+            )}
+            {empty.includes('engaged') && <span>{t('engagedEmpty')}</span>}
+          </p>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {groups.map((group) => {
-              const shares = current.groups[group]!.slice(0, 6);
+              const shares = current.groups[group]!.slice(0, group === 'interests' ? 8 : 6);
               const max = Math.max(...shares.map((s) => s.ratio));
               return (
                 <div key={group} className="rounded-2xl bg-hover p-4">
@@ -98,7 +113,20 @@ export function AudienceSection({ audience }: { audience: Audience | null }) {
                     {shares.map((s) => (
                       <li key={s.key} className="text-sm">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="truncate">{label(group, s)}</span>
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="truncate">{label(group, s)}</span>
+                            {/* Affinity vs the average platform user (interests). */}
+                            {s.index !== undefined && s.index >= 1.1 && (
+                              <span
+                                className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 text-[11px] leading-4 text-emerald-700 dark:text-emerald-300"
+                                title={t('indexHint', {
+                                  index: format.number(s.index, { maximumFractionDigits: 1 }),
+                                })}
+                              >
+                                ×{format.number(s.index, { maximumFractionDigits: 1 })}
+                              </span>
+                            )}
+                          </span>
                           <span className="tabular text-muted">
                             {format.number(s.ratio, { style: 'percent', maximumFractionDigits: 0 })}
                           </span>

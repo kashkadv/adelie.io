@@ -122,7 +122,7 @@
     },
     "audience": {
       "title": "Audience",
-      "hint": "Who your audience is — the platform’s data for the whole account: there are no demographics per pin. Shares, not exact counts; updated daily.",
+      "hint": "Who your audience is — the platform’s data for the whole account: there are no demographics per pin. Shares, not exact counts; updated daily. Interests: the share of the audience into a topic (topics overlap), ×N — how much more likely than the average on Pinterest.",
       "types": {
         "engaged": "Engaged",
         "total": "Total"
@@ -144,13 +144,11 @@
           "female": "Women",
           "male": "Men",
           "unspecified": "Unspecified"
-        },
-        "devices": {
-          "mobile": "Mobile",
-          "web": "Desktop",
-          "tablet": "Tablet"
         }
-      }
+      },
+      "sizeUpTo": "up to {size} people",
+      "engagedEmpty": "The engaged audience is still too small for Pinterest to report on.",
+      "indexHint": "This audience is {index}× as likely as the average Pinterest user to be into this."
     }
   },
   "MetricHints": {

@@ -105,7 +105,7 @@ export class OverviewController {
       where: { accountId: { in: allowed } },
       orderBy: { date: 'desc' },
       distinct: ['type'],
-      select: { type: true, date: true, size: true, groups: true },
+      select: { type: true, date: true, size: true, sizeIsUpperBound: true, groups: true },
     });
     return {
       missing: false,

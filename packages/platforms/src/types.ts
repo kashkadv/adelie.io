@@ -189,6 +189,8 @@ export interface AudienceShare {
   key: string;
   name: string;
   ratio: number;
+  /** Affinity vs the platform's average user (1.3 = 30% more likely), where given. */
+  index?: number;
 }
 
 /**
@@ -199,6 +201,8 @@ export interface AudienceData {
   /** e.g. `engaged` (people who interacted) or `total` (everyone reached). */
   type: string;
   size: number | null;
+  /** `size` is a ceiling ("up to 10k"), not an estimate. */
+  sizeIsUpperBound: boolean;
   groups: Record<string, AudienceShare[]>;
 }
 

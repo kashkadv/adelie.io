@@ -798,6 +798,8 @@ model AccountAudience {
   type        String
   date        DateTime      @db.Date
   size        Int?
+  /// `size` is a ceiling ("up to 10k"), not an estimate.
+  sizeIsUpperBound Boolean @default(false)
   groups      Json
   fetchedAt   DateTime
 
