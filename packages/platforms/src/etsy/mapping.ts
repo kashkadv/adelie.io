@@ -1,6 +1,13 @@
 // Pure mapping from Etsy Open API v3 responses to the adapter contract (ADR-0011, ADR-0018).
 // Shapes from the public-data PoC (docs/specs/pebble.md, 2026-11-08) and the v3 reference.
-import type { AccountData, Money, OrderData, ProductData } from '../types.js';
+import type {
+  AccountData,
+  LedgerCategory,
+  LedgerEntryData,
+  Money,
+  OrderData,
+  ProductData,
+} from '../types.js';
 
 /** Etsy money: `amount / divisor` in `currency_code`. */
 export interface EtsyMoney {
@@ -161,5 +168,73 @@ export function mapReceipt(raw: EtsyReceipt): OrderData {
       quantity: t.quantity ?? 1,
       price: money(t.price),
     })),
+  };
+}
+
+export interface EtsyLedgerEntry {
+  entry_id: number;
+  amount: number;
+  currency?: string;
+  created_timestamp?: number;
+  create_date?: number;
+  ledger_type?: string;
+  reference_type?: string | null;
+  reference_id?: string | number | null;
+}
+
+/**
+ * Etsy ledger types → our categories (seen on Gushka's shop, 2026-11-08). Payouts and settlement
+ * movements (DISBURSE, billing payments, recoupments) are money moving, not income or costs.
+ */
+const LEDGER_CATEGORIES: Record<string, LedgerCategory> = {
+  PAYMENT_GROSS: 'sales',
+  sales_tax: 'tax',
+  REFUND_GROSS: 'refund',
+  sales_tax_refund: 'refund',
+  transaction: 'transaction_fee',
+  transaction_refund: 'transaction_fee',
+  transaction_quantity: 'transaction_fee',
+  shipping_transaction: 'transaction_fee',
+  shipping_transaction_refund: 'transaction_fee',
+  PAYMENT_PROCESSING_FEE: 'processing_fee',
+  REFUND_PROCESSING_FEE: 'processing_fee',
+  prolist: 'ads',
+  offsite_ads_fee: 'ads',
+  offsite_ads_fee_refund: 'ads',
+  vat_seller_services: 'vat',
+  vat_seller_services_refund: 'vat',
+  vat_on_processing_fees: 'vat',
+  DISBURSE: 'payout',
+  DISBURSE2: 'payout',
+  billing_payment: 'payout',
+  RECOUP: 'payout',
+};
+
+export function ledgerCategory(type: string): LedgerCategory {
+  const known = LEDGER_CATEGORIES[type];
+  if (known) return known;
+  // Listing fees: listing, renew_*, auto_renew_* (and their refunds).
+  if (/^(auto_)?renew|^listing/.test(type)) return 'listing_fee';
+  if (/^vat/.test(type)) return 'vat';
+  if (/offsite|prolist/.test(type)) return 'ads';
+  if (/^DISBURSE/.test(type)) return 'payout';
+  return 'other';
+}
+
+/** A ledger entry. `payment_adjustments` (they name buyers' user ids) are deliberately not mapped. */
+export function mapLedgerEntry(raw: EtsyLedgerEntry): LedgerEntryData {
+  const type = raw.ledger_type ?? 'unknown';
+  return {
+    externalId: String(raw.entry_id),
+    occurredAt: seconds(raw.created_timestamp ?? raw.create_date) ?? new Date(0),
+    type,
+    category: ledgerCategory(type),
+    referenceType: raw.reference_type ?? undefined,
+    referenceId:
+      raw.reference_id === null || raw.reference_id === undefined
+        ? undefined
+        : String(raw.reference_id),
+    amount: raw.amount,
+    currency: raw.currency ?? 'USD',
   };
 }

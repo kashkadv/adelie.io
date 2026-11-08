@@ -16,7 +16,7 @@ import {
   WorkspaceAccessGuard,
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
-import { netRevenue, ordersByDay } from './sales.js';
+import { moneyFlow, netRevenue, ordersByDay } from './sales.js';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
@@ -182,7 +182,16 @@ export class SalesController {
       ...(period ? { orderedAt: { gte: period.gte, lt: period.lt } } : {}),
     };
     const db = this.prisma.client;
-    const [all, rows] = await Promise.all([
+    const [ledger, all, rows] = await Promise.all([
+      // What stays with the shop: the payment account's movements in the period.
+      db.shopLedgerEntry.groupBy({
+        by: ['currency', 'category'],
+        where: {
+          ...this.where(projectId, request.workspace, query['accountId']),
+          ...(period ? { occurredAt: { gte: period.gte, lt: period.lt } } : {}),
+        },
+        _sum: { amount: true },
+      }),
       db.shopOrder.findMany({
         where,
         select: {
@@ -270,6 +279,13 @@ export class SalesController {
           : [],
       seriesCurrency: main,
       countries: [...countries.values()].sort((a, b) => b.orders - a.orders),
+      money: moneyFlow(
+        ledger.map((g) => ({
+          currency: g.currency,
+          category: g.category,
+          amount: g._sum.amount ?? 0,
+        })),
+      ),
       items: rows.map((o) => ({ ...o, revenue: netRevenue(o) })),
     };
   }

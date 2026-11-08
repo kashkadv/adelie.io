@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { netRevenue, ordersByDay, salesOverview } from './sales.js';
+import { moneyFlow, netRevenue, ordersByDay, salesOverview } from './sales.js';
 
 describe('sales', () => {
   it('revenue leaves out the sales tax the platform remits', () => {
@@ -57,5 +57,29 @@ describe('salesOverview', () => {
       { key: 'DE', value: 1 },
     ]);
     expect(r.series).toHaveLength(30);
+  });
+});
+
+describe('moneyFlow', () => {
+  it('sales without tax, minus refunds, fees, VAT and ads; payouts left out', () => {
+    const row = (category: string, amount: number) => ({ currency: 'USD', category, amount });
+    const [usd] = moneyFlow([
+      row('sales', 364116),
+      row('tax', -24116),
+      row('refund', -36500),
+      row('transaction_fee', -19752),
+      row('processing_fee', -19965),
+      row('listing_fee', -7200),
+      row('vat', -12157),
+      row('ads', -13912),
+      row('payout', -258606),
+    ]);
+    expect(usd).toMatchObject({
+      sales: 340000,
+      refunds: -36500,
+      feesTotal: -59074,
+      ads: -13912,
+      net: 340000 - 36500 - 59074 - 13912,
+    });
   });
 });

@@ -324,6 +324,7 @@ model SocialAccount {
   syncRuns     SyncRun[]
   products     ShopProduct[]
   orders       ShopOrder[]
+  ledger       ShopLedgerEntry[]
 
   @@unique([workspaceId, platform, externalId])
   @@index([projectId])
@@ -715,4 +716,28 @@ model ShopOrderItem {
   @@unique([orderId, externalId])
   @@index([productId])
   @@map("shop_order_item")
+}
+
+/// Money movements of a shop's payment account (Etsy ledger): sales, taxes, refunds, fees, ads,
+/// payouts. `amount` in minor units of `currency`, signed as the platform reports it.
+model ShopLedgerEntry {
+  id            String        @id @default(uuid(7)) @db.Uuid
+  workspaceId   String        @db.Uuid
+  projectId     String        @db.Uuid
+  accountId     String        @db.Uuid
+  account       SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  externalId    String
+  occurredAt    DateTime
+  /// The platform's own type, e.g. `transaction`, `prolist`, `PAYMENT_GROSS`.
+  type          String
+  /// Our grouping: sales, tax, refund, transaction_fee, processing_fee, listing_fee, ads, vat, payout, other.
+  category      String
+  referenceType String?
+  referenceId   String?
+  amount        Int
+  currency      String
+
+  @@unique([accountId, externalId])
+  @@index([projectId, occurredAt])
+  @@map("shop_ledger_entry")
 }

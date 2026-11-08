@@ -1,5 +1,51 @@
 // Pure sales helpers (ADR-0018). Unit-tested.
 
+/** Ledger categories in the order of the money card; payouts are money moving, never shown. */
+export const MONEY_CATEGORIES = [
+  'sales',
+  'tax',
+  'refund',
+  'transaction_fee',
+  'processing_fee',
+  'listing_fee',
+  'ads',
+  'vat',
+  'other',
+] as const;
+
+/**
+ * What stays with the shop, per currency: sums per category and the net (all of them together).
+ * Sales are shown without the sales tax the platform remits.
+ */
+export function moneyFlow(rows: { currency: string; category: string; amount: number }[]) {
+  const byCurrency = new Map<string, Record<string, number>>();
+  for (const r of rows) {
+    if (!(MONEY_CATEGORIES as readonly string[]).includes(r.category)) continue;
+    const sums = byCurrency.get(r.currency) ?? {};
+    sums[r.category] = (sums[r.category] ?? 0) + r.amount;
+    byCurrency.set(r.currency, sums);
+  }
+  return [...byCurrency].map(([currency, s]) => {
+    const get = (k: string) => s[k] ?? 0;
+    const fees = get('transaction_fee') + get('processing_fee') + get('listing_fee');
+    return {
+      currency,
+      sales: get('sales') + get('tax'),
+      refunds: get('refund'),
+      fees: {
+        transaction: get('transaction_fee'),
+        processing: get('processing_fee'),
+        listing: get('listing_fee'),
+        vat: get('vat'),
+      },
+      feesTotal: fees + get('vat'),
+      ads: get('ads'),
+      other: get('other'),
+      net: MONEY_CATEGORIES.reduce((n, k) => n + get(k), 0),
+    };
+  });
+}
+
 const DAY_MS = 86_400_000;
 const day = (d: Date) => d.toISOString().slice(0, 10);
 

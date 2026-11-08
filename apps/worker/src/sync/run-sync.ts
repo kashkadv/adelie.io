@@ -51,6 +51,8 @@ type StepOutcome = 'ok' | 'skipped';
 
 /** Orders re-read on every sync after the first: status and shipping change after the sale. */
 const ORDER_REFRESH_DAYS = 30;
+/** Ledger entries re-read on every sync after the first (refunds and fee corrections come late). */
+const LEDGER_REFRESH_DAYS = 62;
 
 /** Runs one sync. Never throws for expected platform conditions; the SyncRun records the outcome. */
 export async function runSync(
@@ -668,6 +670,47 @@ export async function runSync(
               });
             });
             count('orders');
+          }
+        }
+      });
+    }
+
+    if (adapter.listLedger) {
+      await step('ledger', async () => {
+        // First sync: from the first order (whole history); then the last two months, which
+        // covers late entries (refunds, fee corrections).
+        const first = await prisma.shopOrder.findFirst({
+          where: { accountId: account.id },
+          orderBy: { orderedAt: 'asc' },
+          select: { orderedAt: true },
+        });
+        const since =
+          job.kind === 'INITIAL' || !account.lastSuccessfulSyncAt
+            ? (first?.orderedAt ?? new Date(now().getTime() - 365 * 86_400_000))
+            : new Date(now().getTime() - LEDGER_REFRESH_DAYS * 86_400_000);
+        for await (const page of adapter.listLedger!(ctx(), { since })) {
+          for (const e of page) {
+            const data = {
+              occurredAt: e.occurredAt,
+              type: e.type,
+              category: e.category,
+              referenceType: e.referenceType ?? null,
+              referenceId: e.referenceId ?? null,
+              amount: e.amount,
+              currency: e.currency,
+            };
+            await prisma.shopLedgerEntry.upsert({
+              where: { accountId_externalId: { accountId: account.id, externalId: e.externalId } },
+              create: {
+                workspaceId: account.workspaceId,
+                projectId: account.projectId,
+                accountId: account.id,
+                externalId: e.externalId,
+                ...data,
+              },
+              update: data,
+            });
+            count('ledgerEntries');
           }
         }
       });

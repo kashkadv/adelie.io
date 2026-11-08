@@ -3,7 +3,7 @@ import { HttpClient } from '../http.js';
 import { isAdapterError } from '../errors.js';
 import type { ProductData } from '../types.js';
 import { EtsyAdapter } from './adapter.js';
-import { mapReceipt, money, unescapeHtml } from './mapping.js';
+import { ledgerCategory, mapReceipt, money, unescapeHtml } from './mapping.js';
 
 const TODAY = '2026-11-08';
 const PKCE = { verifier: 'v'.repeat(43), challenge: 'c'.repeat(43) };
@@ -175,6 +175,46 @@ describe('EtsyAdapter data', () => {
     const since = new Date('2026-11-01T00:00:00Z');
     for await (const page of adapter.listOrders(ctx(client, '345'), { since })) void page;
     expect(seen[0]!.url.searchParams.get('min_created')).toBe(String(since.getTime() / 1000));
+  });
+});
+
+describe('Etsy ledger', () => {
+  it('groups ledger types into sales, taxes, refunds, fees, ads and payouts', () => {
+    expect(ledgerCategory('PAYMENT_GROSS')).toBe('sales');
+    expect(ledgerCategory('sales_tax')).toBe('tax');
+    expect(ledgerCategory('REFUND_GROSS')).toBe('refund');
+    expect(ledgerCategory('transaction')).toBe('transaction_fee');
+    expect(ledgerCategory('PAYMENT_PROCESSING_FEE')).toBe('processing_fee');
+    expect(ledgerCategory('auto_renew_expired')).toBe('listing_fee');
+    expect(ledgerCategory('renew_sold_auto')).toBe('listing_fee');
+    expect(ledgerCategory('prolist')).toBe('ads');
+    expect(ledgerCategory('vat_on_processing_fees')).toBe('vat');
+    expect(ledgerCategory('DISBURSE2')).toBe('payout');
+    expect(ledgerCategory('something_new')).toBe('other');
+  });
+
+  it('reads the ledger in windows of at most 31 days, never recording it raw', async () => {
+    const seen: URL[] = [];
+    const recorded: unknown[] = [];
+    const client = new HttpClient({
+      baseUrl: 'https://api.etsy.com',
+      fetch: (async (input: URL | string) => {
+        seen.push(new URL(String(input)));
+        return new Response(JSON.stringify({ results: [] }), { status: 200 });
+      }) as unknown as typeof fetch,
+      record: (r) => void recorded.push(r),
+      sleep: async () => undefined,
+    });
+    const since = new Date(Date.now() - 70 * 86_400_000);
+    const ctx = { accessToken: 'T', accountExternalId: '345', http: client };
+    for await (const page of adapter.listLedger(ctx, { since })) void page;
+    expect(seen).toHaveLength(3);
+    for (const u of seen) {
+      const span =
+        Number(u.searchParams.get('max_created')) - Number(u.searchParams.get('min_created'));
+      expect(span).toBeLessThanOrEqual(31 * 86_400);
+    }
+    expect(recorded).toHaveLength(0);
   });
 });
 

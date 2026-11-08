@@ -8,6 +8,7 @@ import type {
   AccountData,
   AdapterContext,
   AuthorizeOptions,
+  LedgerEntryData,
   MetricPoint,
   OrderData,
   PlatformAdapter,
@@ -16,9 +17,11 @@ import type {
   TokenSet,
 } from '../types.js';
 import {
+  mapLedgerEntry,
   mapListing,
   mapReceipt,
   mapShop,
+  type EtsyLedgerEntry,
   type EtsyListing,
   type EtsyReceipt,
   type EtsyShop,
@@ -38,6 +41,8 @@ export const etsyScopes = (access: AccessLevel = 'read') =>
 /** Listing states a shop owner can see (`listings_r`). */
 const LISTING_STATES = ['active', 'inactive', 'sold_out', 'draft', 'expired'] as const;
 const PAGE = 100;
+/** The ledger endpoint accepts at most 31 days per request. */
+const LEDGER_WINDOW_S = 31 * 86_400;
 /** Etsy refresh tokens live 90 days; access tokens an hour. */
 const REFRESH_TOKEN_DAYS = 90;
 
@@ -240,6 +245,31 @@ export class EtsyAdapter implements PlatformAdapter {
         if (results.length < PAGE) break;
         await this.pause();
       }
+    }
+  }
+
+  /**
+   * The payment account's ledger since `since`, newest window first. Etsy allows at most 31 days
+   * per request. Kept out of the raw-response log: adjustments name buyers' user ids.
+   */
+  async *listLedger(ctx: AdapterContext, query: { since: Date }): AsyncIterable<LedgerEntryData[]> {
+    const shopId = await this.shopId(ctx);
+    const start = Math.floor(query.since.getTime() / 1000);
+    for (let end = Math.floor(Date.now() / 1000); end > start; end -= LEDGER_WINDOW_S) {
+      const min = Math.max(start, end - LEDGER_WINDOW_S + 1);
+      for (let offset = 0; ; offset += PAGE) {
+        const page = await this.get<{ results?: EtsyLedgerEntry[] }>(
+          ctx,
+          `/shops/${shopId}/payment-account/ledger-entries`,
+          { min_created: min, max_created: end, limit: PAGE, offset },
+          true,
+        );
+        const results = page.results ?? [];
+        if (results.length) yield results.map(mapLedgerEntry);
+        if (results.length < PAGE) break;
+        await this.pause();
+      }
+      await this.pause();
     }
   }
 

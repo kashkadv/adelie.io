@@ -29,6 +29,16 @@ type Order = {
     product: { id: string; imageUrl: string | null; title: string } | null;
   }[];
 };
+type Money = {
+  currency: string;
+  sales: number;
+  refunds: number;
+  fees: { transaction: number; processing: number; listing: number; vat: number };
+  feesTotal: number;
+  ads: number;
+  other: number;
+  net: number;
+};
 type Totals = { currency: string; orders: number; units: number; revenue: number; tax: number };
 type Response = {
   period: { from: string; to: string } | null;
@@ -38,8 +48,66 @@ type Response = {
   series: { date: string; revenue: number; orders: number }[];
   seriesCurrency: string | null;
   countries: { country: string; orders: number }[];
+  /** What stays with the shop, per currency (payment-account ledger). */
+  money: Money[];
   items: Order[];
 };
+
+/**
+ * What stays with the shop: sales without tax, minus refunds, platform fees (with their parts) and
+ * the platform's own ads — from the payment account's ledger.
+ */
+function MoneyCard({ money }: { money: Money[] | null }) {
+  const t = useTranslations('Sales.orders.money');
+  const format = useMoney();
+  const m = money?.[0];
+  const row = (label: string, value: number, opts: { sub?: boolean; hint?: string } = {}) => (
+    <li
+      className={`flex items-center gap-2 px-1 ${opts.sub ? 'pl-4 text-xs text-muted' : 'text-sm'}`}
+    >
+      <span className="flex flex-1 items-center gap-1.5">
+        {label}
+        {opts.hint && <InfoTip text={opts.hint} />}
+      </span>
+      <span className={`tabular ${value < 0 && !opts.sub ? 'text-muted' : ''}`}>
+        {format(value, m!.currency)}
+      </span>
+    </li>
+  );
+  return (
+    <section className="card animate-rise rounded-[24px] p-5" style={{ animationDelay: '240ms' }}>
+      <h2 className="mb-4 flex items-center gap-1.5 px-1 text-lg font-semibold">
+        {t('title')}
+        <InfoTip text={t('hint')} />
+      </h2>
+      {!money ? (
+        <p className="px-1 text-sm text-muted">…</p>
+      ) : !m ? (
+        <p className="px-1 text-sm text-muted">{t('none')}</p>
+      ) : (
+        <>
+          <ul className="space-y-2.5">
+            {row(t('sales'), m.sales, { hint: t('salesHint') })}
+            {m.refunds !== 0 && row(t('refunds'), m.refunds)}
+            {row(t('fees'), m.feesTotal, { hint: t('feesHint') })}
+            {m.fees.transaction !== 0 && row(t('transaction'), m.fees.transaction, { sub: true })}
+            {m.fees.processing !== 0 && row(t('processing'), m.fees.processing, { sub: true })}
+            {m.fees.listing !== 0 && row(t('listing'), m.fees.listing, { sub: true })}
+            {m.fees.vat !== 0 && row(t('vat'), m.fees.vat, { sub: true })}
+            {m.ads !== 0 && row(t('ads'), m.ads, { hint: t('adsHint') })}
+            {m.other !== 0 && row(t('other'), m.other)}
+          </ul>
+          <div className="mt-4 flex items-center justify-between border-t border-line px-1 pt-3">
+            <span className="text-sm font-semibold">{t('net')}</span>
+            <span className="tabular font-display text-xl font-semibold">
+              {format(m.net, m.currency)}
+            </span>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
 
 /** Long periods read better by month than by day. */
 const MONTHLY_AFTER_DAYS = 120;
@@ -237,7 +305,90 @@ export function Orders() {
             <p className="px-1 py-10 text-center text-sm text-muted">{t('orders.none')}</p>
           )}
         </section>
+        <MoneyCard money={shown?.money ?? null} />
+      </div>
 
+      <div className="grid items-start gap-4 xl:grid-cols-3">
+        <section
+          className="card animate-rise rounded-[24px] xl:col-span-2"
+          style={{ animationDelay: '280ms' }}
+        >
+          <h2 className="border-b border-line px-5 py-4 text-lg font-semibold">
+            {t('orders.list')}
+          </h2>
+          {!shown ? (
+            <p className="px-5 py-10 text-center text-sm text-muted">…</p>
+          ) : orders.length === 0 ? (
+            <p className="px-5 py-14 text-center text-sm text-muted">{t('orders.none')}</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {orders.map((o) => {
+                const first = o.items[0];
+                const units = o.items.reduce((n, i) => n + i.quantity, 0);
+                return (
+                  <li key={o.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3">
+                    <span className="tabular w-24 shrink-0 text-sm text-muted">
+                      {format.dateTime(new Date(o.orderedAt), {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
+                    <div className="flex min-w-0 flex-1 basis-60 items-center gap-3">
+                      <span className="flex shrink-0 -space-x-3">
+                        {o.items.slice(0, 3).map((i) => (
+                          <span
+                            key={i.id}
+                            className="h-10 w-10 overflow-hidden rounded-lg border-2 border-[var(--surface,transparent)] bg-hover"
+                          >
+                            {i.product?.imageUrl && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={i.product.imageUrl}
+                                alt=""
+                                loading="lazy"
+                                className="h-full w-full object-cover"
+                              />
+                            )}
+                          </span>
+                        ))}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm">
+                          {first?.title ?? first?.product?.title ?? t('orders.noTitle')}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {t('orders.units', { count: units })}
+                          {o.items.length > 1 &&
+                            ` · ${t('orders.more', { count: o.items.length - 1 })}`}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="w-32 shrink-0 truncate text-sm text-muted">
+                      {o.country ? countryName(o.country) : '—'}
+                    </span>
+                    <span className="tabular w-28 shrink-0 text-right text-sm font-medium">
+                      {money(o.revenue, o.currency)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {shown && orders.length < shown.total && (
+            <div className="border-t border-line p-3 text-center">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm text-muted hover:bg-hover hover:text-foreground"
+              >
+                {loadingMore && <RefreshCw size={14} className="animate-spin" aria-hidden="true" />}
+                {tc('loadMore', { count: shown.total - orders.length })}
+              </button>
+            </div>
+          )}
+        </section>
         <section
           className="card animate-rise rounded-[24px] p-5"
           style={{ animationDelay: '240ms' }}
@@ -265,82 +416,6 @@ export function Orders() {
           )}
         </section>
       </div>
-
-      <section className="card animate-rise rounded-[24px]" style={{ animationDelay: '280ms' }}>
-        <h2 className="border-b border-line px-5 py-4 text-lg font-semibold">{t('orders.list')}</h2>
-        {!shown ? (
-          <p className="px-5 py-10 text-center text-sm text-muted">…</p>
-        ) : orders.length === 0 ? (
-          <p className="px-5 py-14 text-center text-sm text-muted">{t('orders.none')}</p>
-        ) : (
-          <ul className="divide-y divide-line">
-            {orders.map((o) => {
-              const first = o.items[0];
-              const units = o.items.reduce((n, i) => n + i.quantity, 0);
-              return (
-                <li key={o.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3">
-                  <span className="tabular w-24 shrink-0 text-sm text-muted">
-                    {format.dateTime(new Date(o.orderedAt), {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </span>
-                  <div className="flex min-w-0 flex-1 basis-60 items-center gap-3">
-                    <span className="flex shrink-0 -space-x-3">
-                      {o.items.slice(0, 3).map((i) => (
-                        <span
-                          key={i.id}
-                          className="h-10 w-10 overflow-hidden rounded-lg border-2 border-[var(--surface,transparent)] bg-hover"
-                        >
-                          {i.product?.imageUrl && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={i.product.imageUrl}
-                              alt=""
-                              loading="lazy"
-                              className="h-full w-full object-cover"
-                            />
-                          )}
-                        </span>
-                      ))}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm">
-                        {first?.title ?? first?.product?.title ?? t('orders.noTitle')}
-                      </p>
-                      <p className="text-xs text-muted">
-                        {t('orders.units', { count: units })}
-                        {o.items.length > 1 &&
-                          ` · ${t('orders.more', { count: o.items.length - 1 })}`}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="w-32 shrink-0 truncate text-sm text-muted">
-                    {o.country ? countryName(o.country) : '—'}
-                  </span>
-                  <span className="tabular w-28 shrink-0 text-right text-sm font-medium">
-                    {money(o.revenue, o.currency)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {shown && orders.length < shown.total && (
-          <div className="border-t border-line p-3 text-center">
-            <button
-              type="button"
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm text-muted hover:bg-hover hover:text-foreground"
-            >
-              {loadingMore && <RefreshCw size={14} className="animate-spin" aria-hidden="true" />}
-              {tc('loadMore', { count: shown.total - orders.length })}
-            </button>
-          </div>
-        )}
-      </section>
     </>
   );
 }

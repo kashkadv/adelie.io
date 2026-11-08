@@ -657,7 +657,25 @@
       "none": "No orders in this period.",
       "noTitle": "Untitled product",
       "units": "{count, plural, one {# unit} other {# units}}",
-      "more": "{count, plural, one {# more product} other {# more products}}"
+      "more": "{count, plural, one {# more product} other {# more products}}",
+      "money": {
+        "title": "What stays with the shop",
+        "hint": "From the Etsy payment ledger for the period: sales without tax, minus refunds, Etsy fees and Etsy ads. Payouts to the bank are money moving, not costs, so they are not shown.",
+        "none": "No money movements in this period.",
+        "sales": "Sales",
+        "salesHint": "What buyers paid, without the sales tax Etsy remits itself.",
+        "refunds": "Refunds to buyers",
+        "fees": "Etsy fees",
+        "feesHint": "What Etsy charges for its services: transaction fees, payment processing, listing and renewal fees, and VAT on them.",
+        "transaction": "transaction",
+        "processing": "payment processing",
+        "listing": "listing and renewals",
+        "vat": "VAT on Etsy services",
+        "ads": "Etsy ads",
+        "adsHint": "Etsy Ads (promotion in Etsy search) and Offsite Ads.",
+        "other": "Other",
+        "net": "Net revenue"
+      }
     }
   }
 }

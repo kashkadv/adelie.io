@@ -140,6 +140,31 @@ export interface OrderData {
   items: OrderItemData[];
 }
 
+/** Our grouping of shop money movements (ADR-0018). */
+export type LedgerCategory =
+  | 'sales'
+  | 'tax'
+  | 'refund'
+  | 'transaction_fee'
+  | 'processing_fee'
+  | 'listing_fee'
+  | 'ads'
+  | 'vat'
+  | 'payout'
+  | 'other';
+
+/** One movement of the shop's payment account. Signed minor units, as the platform reports. */
+export interface LedgerEntryData {
+  externalId: string;
+  occurredAt: Date;
+  type: string;
+  category: LedgerCategory;
+  referenceType?: string;
+  referenceId?: string;
+  amount: number;
+  currency: string;
+}
+
 /** PKCE (RFC 7636) for platforms that require it (Etsy). */
 export interface Pkce {
   verifier: string;
@@ -211,4 +236,6 @@ export interface PlatformAdapter {
   listProducts?(ctx: AdapterContext): AsyncIterable<ProductData[]>;
   /** Points of sale: orders created since `since` (all of them when absent), in pages. */
   listOrders?(ctx: AdapterContext, query: { since?: Date }): AsyncIterable<OrderData[]>;
+  /** Points of sale: the payment account's movements since `since`, in pages. */
+  listLedger?(ctx: AdapterContext, query: { since: Date }): AsyncIterable<LedgerEntryData[]>;
 }
