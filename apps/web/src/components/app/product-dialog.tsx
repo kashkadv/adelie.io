@@ -155,7 +155,7 @@ export function ProductDialog({
     : [];
 
   return (
-    <PanelSheet labelledBy={titleId} panelRef={panel}>
+    <PanelSheet labelledBy={titleId} panelRef={panel} onClose={onClose} closeLabel={t('close')}>
       <div className="flex items-center gap-1 border-b border-line px-4 py-2.5">
         <span className="flex-1 truncate px-2 text-sm text-muted">
           {detail &&

@@ -43,7 +43,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
       <WorkspaceProvider>
         <div className="flex h-dvh flex-col px-3 pb-3 md:px-8 md:pb-8">
           {/* Top bar (base layer) */}
-          <header className="relative z-50 flex h-16 shrink-0 items-center md:h-[88px]">
+          <header className="flex h-16 shrink-0 items-center md:h-[88px]">
             <button
               type="button"
               className="icon-btn md:hidden"
@@ -116,8 +116,12 @@ export function AppFrame({ children }: { children: ReactNode }) {
               <main className="content-panel h-full overflow-y-auto rounded-[32px]">
                 <div className="w-full p-5 md:p-8">{children}</div>
               </main>
-              {/* Detail sheets (post, product) open here, exactly over the panel. */}
-              <div id={PANEL_LAYER_ID} className="pointer-events-none absolute inset-0 z-40" />
+              {/* Marks the panel's place: detail sheets (post, product) open exactly over it. */}
+              <div
+                id={PANEL_LAYER_ID}
+                className="pointer-events-none absolute inset-0"
+                aria-hidden="true"
+              />
             </div>
           </div>
         </div>
