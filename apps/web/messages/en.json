@@ -734,7 +734,8 @@
         "description": "Description",
         "tags": "Tags",
         "price": "Price",
-        "quantity": "Quantity"
+        "quantity": "Quantity",
+        "variations": "Variations"
       },
       "tagsHint": "Up to 13 tags, each up to 20 characters: letters, digits, spaces, hyphen and apostrophe. Enter or comma adds a tag.",
       "addTag": "Add a tag",
@@ -747,7 +748,8 @@
         "tagTooLong": "A tag is up to 20 characters.",
         "tagInvalid": "A tag may contain only letters, digits, spaces, hyphen and apostrophe.",
         "priceInvalid": "Price starts at 0.20.",
-        "quantityInvalid": "Quantity is a whole number from 0 to 999."
+        "quantityInvalid": "Quantity is a whole number from 0 to 999.",
+        "noVariationOnSale": "At least one variation must stay on sale."
       },
       "reasons": {
         "role": "Products can be edited by an owner, admin or manager.",
@@ -768,7 +770,15 @@
       "rejected": "Etsy did not accept the change. {message}",
       "failed": "Could not save. Try again.",
       "history": "Changes made in Adelie",
-      "failedBadge": "failed"
+      "failedBadge": "failed",
+      "variationsHint": "Price, quantity and “on sale” per variation. When price or quantity is shared on Etsy, one field changes it for all variations.",
+      "sharedPrice": "Price for all variations",
+      "sharedQuantity": "Quantity for all variations",
+      "variationPrice": "Price: {variation}",
+      "variationQuantity": "Quantity: {variation}",
+      "onSale": "On sale",
+      "nowOnSale": "now on sale",
+      "nowOffSale": "taken off sale"
     },
     "card": {
       "close": "Close",

@@ -15,6 +15,7 @@ import type {
   PostsPage,
   ProductChanges,
   ProductEditable,
+  ProductVariation,
   ProductData,
   TokenSet,
 } from '../types.js';
@@ -54,10 +55,20 @@ const REFRESH_TOKEN_DAYS = 90;
 
 const v3 = (path: string) => `/v3/application${path}`;
 
+interface EtsyPropertyValue {
+  property_id: number;
+  property_name?: string | null;
+  scale_id?: number | null;
+  value_ids?: number[];
+  values?: string[];
+}
+
 interface EtsyInventory {
   products?: {
+    product_id?: number;
+    is_deleted?: boolean;
     sku?: string;
-    property_values?: unknown[];
+    property_values?: EtsyPropertyValue[];
     offerings?: {
       price?: { amount: number; divisor: number; currency_code: string };
       quantity?: number;
@@ -259,7 +270,7 @@ export class EtsyAdapter implements PlatformAdapter {
       ctx,
       `/listings/${listingId}`,
     );
-    return {
+    const base = {
       title: unescapeHtml(raw.title ?? ''),
       description: unescapeHtml(raw.description ?? ''),
       tags: (raw.tags ?? []).map(unescapeHtml),
@@ -267,6 +278,16 @@ export class EtsyAdapter implements PlatformAdapter {
       price: money(raw.price),
       quantity: typeof raw.quantity === 'number' ? raw.quantity : null,
       state: raw.state ?? 'active',
+    };
+    if (!raw.has_variations) {
+      return { ...base, variations: [], priceVaries: false, quantityVaries: false };
+    }
+    const inventory = await this.get<EtsyInventory>(ctx, `/listings/${listingId}/inventory`);
+    return {
+      ...base,
+      variations: liveProducts(inventory).map(toVariation),
+      priceVaries: (inventory.price_on_property ?? []).length > 0,
+      quantityVaries: (inventory.quantity_on_property ?? []).length > 0,
     };
   }
 
@@ -280,7 +301,10 @@ export class EtsyAdapter implements PlatformAdapter {
     listingId: string,
     changes: ProductChanges,
   ): Promise<ProductEditable> {
-    if (productChangeErrors(changes).length) {
+    // "On sale" is checked on the whole inventory below, not on a partial list of changes.
+    const { variations: varied, ...rest } = changes;
+    const check = { ...rest, variations: varied?.map(({ enabled: _enabled, ...v }) => v) };
+    if (productChangeErrors(check).length) {
       throw new AdapterError('INVALID', 'The change breaks Etsy listing rules');
     }
     const shopId = await this.shopId(ctx);
@@ -292,36 +316,61 @@ export class EtsyAdapter implements PlatformAdapter {
       await this.send(ctx, 'PATCH', `/shops/${shopId}/listings/${listingId}`, { form });
     }
 
-    if (changes.price !== undefined || changes.quantity !== undefined) {
+    if (
+      changes.price !== undefined ||
+      changes.quantity !== undefined ||
+      changes.variations !== undefined
+    ) {
       const inventory = await this.get<EtsyInventory>(ctx, `/listings/${listingId}/inventory`);
-      const products = inventory.products ?? [];
-      const offering = products[0]?.offerings?.filter((o) => !o.is_deleted)[0];
-      if (products.length !== 1 || !offering) {
-        throw new AdapterError('NOT_AVAILABLE', 'Listings with variations are edited on Etsy');
+      const products = liveProducts(inventory);
+      if (!products.length) throw new AdapterError('INVALID', 'The listing has no inventory');
+      const byId = new Map((changes.variations ?? []).map((v) => [v.id, v]));
+      const single = products.length === 1 && !(products[0]!.property_values ?? []).length;
+      if (!single && (changes.price !== undefined || changes.quantity !== undefined)) {
+        throw new AdapterError('NOT_AVAILABLE', 'Listings with variations change per variation');
       }
-      const currency = offering.price?.currency_code ?? 'USD';
-      const price =
-        changes.price !== undefined
-          ? changes.price / 10 ** minorDigits(currency)
-          : (offering.price?.amount ?? 0) / (offering.price?.divisor ?? 100);
+      if (
+        products.every(
+          (p) => !(byId.get(String(p.product_id))?.enabled ?? liveOffering(p)!.is_enabled ?? true),
+        )
+      ) {
+        throw new AdapterError('INVALID', 'At least one variation must stay on sale');
+      }
+      // Everything not changed is sent back exactly as it was (Etsy replaces the whole inventory).
       await this.send(ctx, 'PUT', `/listings/${listingId}/inventory`, {
         json: {
-          products: [
-            {
-              sku: products[0]!.sku ?? '',
-              property_values: products[0]!.property_values ?? [],
+          products: products.map((p) => {
+            const offering = liveOffering(p)!;
+            const change = byId.get(String(p.product_id));
+            const currency = offering.price?.currency_code ?? 'USD';
+            const minor =
+              (single ? changes.price : change?.price) ??
+              Math.round(
+                ((offering.price?.amount ?? 0) / (offering.price?.divisor ?? 100)) *
+                  10 ** minorDigits(currency),
+              );
+            return {
+              sku: p.sku ?? '',
+              property_values: (p.property_values ?? []).map((v) => ({
+                property_id: v.property_id,
+                property_name: v.property_name ?? undefined,
+                scale_id: v.scale_id ?? null,
+                value_ids: v.value_ids ?? [],
+                values: v.values ?? [],
+              })),
               offerings: [
                 {
-                  price,
-                  quantity: changes.quantity ?? offering.quantity ?? 0,
-                  is_enabled: offering.is_enabled ?? true,
+                  price: minor / 10 ** minorDigits(currency),
+                  quantity:
+                    (single ? changes.quantity : change?.quantity) ?? offering.quantity ?? 0,
+                  is_enabled: change?.enabled ?? offering.is_enabled ?? true,
                   ...(offering.readiness_state_id
                     ? { readiness_state_id: offering.readiness_state_id }
                     : {}),
                 },
               ],
-            },
-          ],
+            };
+          }),
           price_on_property: inventory.price_on_property ?? [],
           quantity_on_property: inventory.quantity_on_property ?? [],
           sku_on_property: inventory.sku_on_property ?? [],
@@ -425,4 +474,25 @@ export class EtsyAdapter implements PlatformAdapter {
       await this.pause();
     }
   }
+}
+
+const liveProducts = (inventory: EtsyInventory) =>
+  (inventory.products ?? []).filter((p) => !p.is_deleted && liveOffering(p));
+
+function liveOffering(p: NonNullable<EtsyInventory['products']>[number]) {
+  return p.offerings?.find((o) => !o.is_deleted);
+}
+
+function toVariation(p: NonNullable<EtsyInventory['products']>[number]): ProductVariation {
+  const o = liveOffering(p)!;
+  return {
+    id: String(p.product_id ?? ''),
+    options: (p.property_values ?? []).map((v) => ({
+      name: unescapeHtml(v.property_name ?? ''),
+      value: unescapeHtml((v.values ?? []).join(', ')),
+    })),
+    price: money(o.price),
+    quantity: typeof o.quantity === 'number' ? o.quantity : null,
+    enabled: o.is_enabled ?? true,
+  };
 }

@@ -140,16 +140,38 @@ export interface OrderData {
   items: OrderItemData[];
 }
 
+/** One variation of a product (e.g. a colour): its options, price, quantity, on sale or not. */
+export interface ProductVariation {
+  id: string;
+  options: { name: string; value: string }[];
+  price: Money | null;
+  quantity: number | null;
+  enabled: boolean;
+}
+
 /** A product as it is on the platform right now, for editing (ADR-0019). */
 export interface ProductEditable {
   title: string;
   description: string;
   tags: string[];
-  /** With variations, price and quantity live per variation: not editable here. */
   hasVariations: boolean;
+  /** Without variations: the price and quantity. With them: the listing's summary values. */
   price: Money | null;
   quantity: number | null;
   state: string;
+  /** Empty without variations. */
+  variations: ProductVariation[];
+  /** Whether each variation has its own price / quantity (otherwise one value for all). */
+  priceVaries: boolean;
+  quantityVaries: boolean;
+}
+
+/** A change to one variation; absent fields stay. Price in minor units. */
+export interface VariationChange {
+  id: string;
+  price?: number;
+  quantity?: number;
+  enabled?: boolean;
 }
 
 /** Changes to a product; absent fields stay as they are. Price in minor units of its currency. */
@@ -159,6 +181,7 @@ export interface ProductChanges {
   tags?: string[];
   price?: number;
   quantity?: number;
+  variations?: VariationChange[];
 }
 
 /** Our grouping of shop money movements (ADR-0018). */

@@ -358,7 +358,7 @@ describe('Etsy product editing', () => {
     expect(after.title).toBe('Wool rug 2"');
   });
 
-  it('price of a listing with variations is edited on Etsy', async () => {
+  it('a listing with variations changes per variation, not with one price', async () => {
     const { client } = http({
       '/v3/application/listings/7/inventory': [
         { products: [{ offerings: [{ quantity: 1 }] }, { offerings: [{ quantity: 2 }] }] },
@@ -385,5 +385,99 @@ describe('Etsy order payments', () => {
     const ctx = { accessToken: 'T', accountExternalId: '345', http: client };
     expect(await adapter.getOrderPaymentIds(ctx, '99')).toEqual(['11', '12']);
     expect(recorded).toHaveLength(0);
+  });
+});
+
+describe('Etsy variations', () => {
+  const ctx = (client: HttpClient) => ({
+    accessToken: 'T',
+    accountExternalId: '345',
+    http: client,
+  });
+  const usd = (amount: number) => ({ amount, divisor: 100, currency_code: 'USD' });
+  const variant = (id: number, color: string, price: number) => ({
+    product_id: id,
+    sku: 'S',
+    is_deleted: false,
+    property_values: [
+      {
+        property_id: 200,
+        property_name: 'Primary color',
+        scale_id: null,
+        scale_name: null,
+        value_ids: [id * 10],
+        values: [color],
+      },
+    ],
+    offerings: [
+      {
+        price: usd(price),
+        quantity: 2,
+        is_enabled: true,
+        is_deleted: false,
+        readiness_state_id: 5,
+      },
+    ],
+  });
+  const inventory = {
+    products: [variant(1, 'Natural', 22500), variant(2, 'Brown', 24000)],
+    price_on_property: [200],
+    quantity_on_property: [],
+    sku_on_property: [],
+  };
+  const listing = {
+    listing_id: 7,
+    title: 'Pillow',
+    tags: [],
+    has_variations: true,
+    state: 'active',
+  };
+
+  it('reads each variation with its options, price, quantity and state', async () => {
+    const { client } = http({
+      '/v3/application/listings/7': [listing],
+      '/v3/application/listings/7/inventory': [inventory],
+    });
+    const p = await adapter.getProductForEdit(ctx(client), '7');
+    expect(p).toMatchObject({ hasVariations: true, priceVaries: true, quantityVaries: false });
+    expect(p.variations[1]).toEqual({
+      id: '2',
+      options: [{ name: 'Primary color', value: 'Brown' }],
+      price: { amount: 24000, currency: 'USD' },
+      quantity: 2,
+      enabled: true,
+    });
+  });
+
+  it('changes one variation and sends every other one back as it was', async () => {
+    const { client, seen } = http({
+      '/v3/application/listings/7/inventory': [inventory, {}, inventory],
+      '/v3/application/listings/7': [listing],
+    });
+    await adapter.updateProduct(ctx(client), '7', {
+      variations: [{ id: '2', price: 25000, enabled: false }],
+    });
+    const body = JSON.parse(String(seen.find((x) => x.init.method === 'PUT')!.init.body));
+    expect(body.price_on_property).toEqual([200]);
+    expect(body.products[0].offerings[0]).toEqual({
+      price: 225,
+      quantity: 2,
+      is_enabled: true,
+      readiness_state_id: 5,
+    });
+    expect(body.products[1].offerings[0]).toMatchObject({ price: 250, is_enabled: false });
+    expect(body.products[1].property_values[0]).toEqual({
+      property_id: 200,
+      property_name: 'Primary color',
+      scale_id: null,
+      value_ids: [20],
+      values: ['Brown'],
+    });
+  });
+
+  it('at least one variation stays on sale', () => {
+    expect(productChangeErrors({ variations: [{ enabled: false }, { enabled: false }] })).toEqual([
+      'noVariationOnSale',
+    ]);
   });
 });

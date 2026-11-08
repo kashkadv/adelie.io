@@ -251,7 +251,8 @@ export type ProductChangeError =
   | 'tagInvalid'
   | 'tagDuplicate'
   | 'priceInvalid'
-  | 'quantityInvalid';
+  | 'quantityInvalid'
+  | 'noVariationOnSale';
 
 /** Problems Etsy would reject a change for — checked before anything is sent. */
 export function productChangeErrors(changes: {
@@ -259,6 +260,7 @@ export function productChangeErrors(changes: {
   tags?: string[];
   price?: number;
   quantity?: number;
+  variations?: { price?: number; quantity?: number; enabled?: boolean }[];
 }): ProductChangeError[] {
   const errors: ProductChangeError[] = [];
   if (changes.title !== undefined) {
@@ -283,6 +285,23 @@ export function productChangeErrors(changes: {
       changes.quantity > ETSY_LIMITS.quantity)
   ) {
     errors.push('quantityInvalid');
+  }
+  if (changes.variations) {
+    const v = changes.variations;
+    if (v.some((x) => x.price !== undefined && (!Number.isInteger(x.price) || x.price < 20))) {
+      if (!errors.includes('priceInvalid')) errors.push('priceInvalid');
+    }
+    if (
+      v.some(
+        (x) =>
+          x.quantity !== undefined &&
+          (!Number.isInteger(x.quantity) || x.quantity < 0 || x.quantity > ETSY_LIMITS.quantity),
+      )
+    ) {
+      if (!errors.includes('quantityInvalid')) errors.push('quantityInvalid');
+    }
+    // Etsy needs at least one variation on sale.
+    if (v.length && v.every((x) => x.enabled === false)) errors.push('noVariationOnSale');
   }
   return errors;
 }

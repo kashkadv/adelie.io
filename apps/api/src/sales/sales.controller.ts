@@ -343,16 +343,38 @@ export class SalesController {
     const db = this.prisma.client;
     return this.connector.withAccount(product.accountId, async (adapter, ctx) => {
       const live = await adapter.getProductForEdit!(ctx, product.externalId);
+      // Requested values in the platform's comparable shape.
+      const asked = (c: ProductChanges, k: keyof ProductChanges) =>
+        k === 'variations' ? normalizeVariations(c.variations ?? []) : c[k];
       const conflict = (Object.keys(changes) as (keyof ProductChanges)[]).some(
-        (k) => k in expected && !same(valueOf(live, k), expected[k]),
+        (k) => k in expected && !same(valueOf(live, k), asked(expected, k)),
       );
       if (conflict) throw new ConflictException({ reason: 'changedOnPlatform', current: live });
 
       // Only what really differs from the platform is sent and recorded.
       const diff: Record<string, { from: unknown; to: unknown }> = {};
       for (const k of Object.keys(changes) as (keyof ProductChanges)[]) {
-        if (!same(valueOf(live, k), changes[k]))
-          diff[k] = { from: valueOf(live, k), to: changes[k] };
+        const from = valueOf(live, k);
+        const to = asked(changes, k);
+        if (same(from, to)) continue;
+        if (k === 'variations') {
+          // Only the variations that changed go to the history.
+          const before = from as VariationValue[];
+          const after = to as VariationValue[];
+          const changed = after.filter(
+            (v) =>
+              !same(
+                v,
+                before.find((b) => b.id === v.id),
+              ),
+          );
+          diff[k] = {
+            from: before.filter((b) => changed.some((c) => c.id === b.id)),
+            to: changed,
+          };
+        } else {
+          diff[k] = { from, to };
+        }
       }
       if (!Object.keys(diff).length)
         return { current: live, history: await this.history(product.id) };
@@ -713,9 +735,37 @@ export class SalesController {
   }
 }
 
+type VariationValue = {
+  id: string;
+  price: number | null;
+  quantity: number | null;
+  enabled: boolean;
+};
+
+/** Variations in a comparable shape: by id, price in minor units. */
+function normalizeVariations(
+  list: {
+    id: string;
+    price?: number | null | { amount: number };
+    quantity?: number | null;
+    enabled?: boolean;
+  }[],
+): VariationValue[] {
+  return list
+    .map((v) => ({
+      id: v.id,
+      price: typeof v.price === 'object' && v.price !== null ? v.price.amount : (v.price ?? null),
+      quantity: v.quantity ?? null,
+      enabled: v.enabled ?? true,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
 /** The editable value of a field as the platform has it (price in minor units). */
 function valueOf(p: ProductEditable, key: keyof ProductChanges): unknown {
-  return key === 'price' ? (p.price?.amount ?? null) : p[key];
+  if (key === 'price') return p.price?.amount ?? null;
+  if (key === 'variations') return normalizeVariations(p.variations);
+  return p[key];
 }
 
 function same(a: unknown, b: unknown): boolean {
@@ -739,5 +789,23 @@ function parseChanges(raw: unknown): ProductChanges {
   }
   if (typeof r['price'] === 'number') out.price = r['price'];
   if (typeof r['quantity'] === 'number') out.quantity = r['quantity'];
+  if (Array.isArray(r['variations'])) {
+    const list = (r['variations'] as Record<string, unknown>[]).filter(
+      (v) => v && typeof v['id'] === 'string',
+    );
+    out.variations = normalizeVariations(
+      list.map((v) => ({
+        id: v['id'] as string,
+        price: typeof v['price'] === 'number' ? v['price'] : null,
+        quantity: typeof v['quantity'] === 'number' ? v['quantity'] : null,
+        enabled: v['enabled'] !== false,
+      })),
+    ).map((v) => ({
+      id: v.id,
+      ...(v.price !== null ? { price: v.price } : {}),
+      ...(v.quantity !== null ? { quantity: v.quantity } : {}),
+      enabled: v.enabled,
+    }));
+  }
   return out;
 }

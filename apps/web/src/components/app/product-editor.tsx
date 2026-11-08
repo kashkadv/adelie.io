@@ -7,6 +7,7 @@ import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { api, ApiError } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
+import { Switch } from '../ui/switch';
 import { minorDigits, useMoney } from './sales-data';
 
 type Editable = {
@@ -17,8 +18,20 @@ type Editable = {
   price: { amount: number; currency: string } | null;
   quantity: number | null;
   state: string;
+  variations: {
+    id: string;
+    options: { name: string; value: string }[];
+    price: { amount: number; currency: string } | null;
+    quantity: number | null;
+    enabled: boolean;
+  }[];
+  /** Each variation has its own price / quantity; otherwise one value for all. */
+  priceVaries: boolean;
+  quantityVaries: boolean;
 };
-type Field = 'title' | 'description' | 'tags' | 'price' | 'quantity';
+type Field = 'title' | 'description' | 'tags' | 'price' | 'quantity' | 'variations';
+/** A variation as edited: price in minor units. */
+type Var = { id: string; price: number | null; quantity: number | null; enabled: boolean };
 type Change = {
   id: string;
   changes: Partial<Record<Field, { from: unknown; to: unknown }>>;
@@ -39,12 +52,13 @@ type Values = {
   tags: string[];
   price: number | null;
   quantity: number | null;
+  variations: Var[];
 };
 
 /** Etsy's limits (the API checks the same, packages/platforms etsy/mapping.ts). */
 const LIMITS = { title: 140, tags: 13, tag: 20, quantity: 999 };
 const TAG = /^[\p{L}\p{N}\s\-'™©®]+$/u;
-const FIELDS: Field[] = ['title', 'description', 'tags', 'price', 'quantity'];
+const FIELDS: Field[] = ['title', 'description', 'tags', 'price', 'quantity', 'variations'];
 
 const valuesOf = (p: Editable): Values => ({
   title: p.title,
@@ -52,7 +66,20 @@ const valuesOf = (p: Editable): Values => ({
   tags: p.tags,
   price: p.price?.amount ?? null,
   quantity: p.quantity,
+  // Sorted by id, like the API compares them.
+  variations: p.variations
+    .map((v) => ({
+      id: v.id,
+      price: v.price?.amount ?? null,
+      quantity: v.quantity,
+      enabled: v.enabled,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id)),
 });
+const priceTextOf = (minor: number | null, digits: number) =>
+  minor === null ? '' : (minor / 10 ** digits).toFixed(digits);
+const toMinor = (text: string, digits: number) =>
+  text.trim() ? Math.round(Number(text.replace(',', '.')) * 10 ** digits) : null;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Tags as chips: Enter or comma adds, Backspace in an empty input removes the last one. */
@@ -145,6 +172,8 @@ export function ProductEditor({
   const [loadFailed, setLoadFailed] = useState(false);
   const [values, setValues] = useState<Values | null>(null);
   const [priceText, setPriceText] = useState('');
+  /** Per-variation price as typed, by variation id. */
+  const [varPrices, setVarPrices] = useState<Record<string, string>>({});
   const [step, setStep] = useState<'edit' | 'review'>('edit');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
@@ -158,10 +187,14 @@ export function ProductEditor({
     setData(d);
     if (d.current) {
       setValues(valuesOf(d.current));
-      setPriceText(
-        d.current.price
-          ? (d.current.price.amount / 10 ** digitsOf(d.current)).toFixed(digitsOf(d.current))
-          : '',
+      setPriceText(priceTextOf(d.current.price?.amount ?? null, digitsOf(d.current)));
+      setVarPrices(
+        Object.fromEntries(
+          d.current.variations.map((v) => [
+            v.id,
+            priceTextOf(v.price?.amount ?? null, digitsOf(d.current!)),
+          ]),
+        ),
       );
     }
   }
@@ -192,10 +225,40 @@ export function ProductEditor({
   }, [onClose, saving]);
 
   const original = data?.current ? valuesOf(data.current) : null;
-  const priceMinor = priceText.trim()
-    ? Math.round(Number(priceText.replace(',', '.')) * 10 ** digits)
+  const priceMinor = toMinor(priceText, digits);
+  const edited: Values | null = values
+    ? {
+        ...values,
+        price: priceMinor,
+        variations: values.variations.map((v) => ({
+          ...v,
+          price: toMinor(varPrices[v.id] ?? '', digits),
+        })),
+      }
     : null;
-  const edited: Values | null = values ? { ...values, price: priceMinor } : null;
+  const variationsOf = data?.current?.variations ?? [];
+  const optionsOf = (id: string) =>
+    variationsOf
+      .find((v) => v.id === id)
+      ?.options.map((o) => o.value)
+      .join(' · ') ?? id;
+  /** One variation changed — or all of them, when the value is shared. */
+  const setVar = (id: string, patch: Partial<Var>) =>
+    values &&
+    setValues({
+      ...values,
+      variations: values.variations.map((v) =>
+        v.id === id || ('quantity' in patch && !data?.current?.quantityVaries)
+          ? { ...v, ...patch }
+          : v,
+      ),
+    });
+  const setVarPrice = (id: string, text: string) =>
+    setVarPrices((all) =>
+      data?.current?.priceVaries
+        ? { ...all, [id]: text }
+        : Object.fromEntries(Object.keys(all).map((k) => [k, text])),
+    );
   const changed = FIELDS.filter((f) => original && edited && !same(original[f], edited[f]));
 
   // Etsy's rules, shown under the field (rules.md §6: only errors there).
@@ -217,6 +280,24 @@ export function ProductEditor({
         edited.quantity > LIMITS.quantity)
     ) {
       errors.quantity = t('errors.quantityInvalid');
+    }
+  }
+  if (edited && changed.includes('variations')) {
+    const vs = edited.variations;
+    if (vs.some((v) => v.price === null || !(v.price >= 20))) {
+      errors.variations = t('errors.priceInvalid');
+    } else if (
+      vs.some(
+        (v) =>
+          v.quantity === null ||
+          !Number.isInteger(v.quantity) ||
+          v.quantity < 0 ||
+          v.quantity > LIMITS.quantity,
+      )
+    ) {
+      errors.variations = t('errors.quantityInvalid');
+    } else if (vs.every((v) => !v.enabled)) {
+      errors.variations = t('errors.noVariationOnSale');
     }
   }
   const valid = Object.keys(errors).length === 0;
@@ -269,9 +350,7 @@ export function ProductEditor({
     <span className="mb-1.5 flex items-center justify-between gap-2 px-3.5 text-sm text-muted">
       <span className="flex items-center gap-1.5">
         {t(`fields.${f}`)}
-        {(f === 'price' || f === 'quantity') && data?.current?.hasVariations && (
-          <InfoTip text={t('variations')} />
-        )}
+        {f === 'variations' && <InfoTip text={t('variationsHint')} />}
         {f === 'tags' && <InfoTip text={t('tagsHint')} />}
       </span>
       {extra && <span className="tabular text-xs">{extra}</span>}
@@ -372,35 +451,126 @@ export function ProductEditor({
                 />
                 {fieldError('tags')}
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <label className="block">
-                  {label('price', currency)}
-                  <input
-                    className="field tabular"
-                    inputMode="decimal"
-                    value={priceText}
-                    disabled={data.current?.hasVariations}
-                    onChange={(e) => setPriceText(e.target.value)}
-                  />
-                  {fieldError('price')}
-                </label>
-                <label className="block">
-                  {label('quantity')}
-                  <input
-                    className="field tabular"
-                    inputMode="numeric"
-                    value={values.quantity ?? ''}
-                    disabled={data.current?.hasVariations}
-                    onChange={(e) =>
-                      setValues({
-                        ...values,
-                        quantity: e.target.value === '' ? null : Number(e.target.value),
-                      })
-                    }
-                  />
-                  {fieldError('quantity')}
-                </label>
-              </div>
+              {data.current?.hasVariations ? (
+                <div>
+                  {label('variations', currency)}
+                  {/* A shared price or quantity is edited once for every variation. */}
+                  {(!data.current.priceVaries || !data.current.quantityVaries) && (
+                    <div className="mb-3 grid grid-cols-2 gap-4">
+                      {!data.current.priceVaries && (
+                        <label className="block">
+                          <span className="mb-1.5 block px-3.5 text-xs text-muted">
+                            {t('sharedPrice')}
+                          </span>
+                          <input
+                            className="field tabular"
+                            inputMode="decimal"
+                            value={varPrices[values.variations[0]?.id ?? ''] ?? ''}
+                            onChange={(e) =>
+                              setVarPrice(values.variations[0]?.id ?? '', e.target.value)
+                            }
+                          />
+                        </label>
+                      )}
+                      {!data.current.quantityVaries && (
+                        <label className="block">
+                          <span className="mb-1.5 block px-3.5 text-xs text-muted">
+                            {t('sharedQuantity')}
+                          </span>
+                          <input
+                            className="field tabular"
+                            inputMode="numeric"
+                            value={values.variations[0]?.quantity ?? ''}
+                            onChange={(e) =>
+                              setVar(values.variations[0]?.id ?? '', {
+                                quantity: e.target.value === '' ? null : Number(e.target.value),
+                              })
+                            }
+                          />
+                        </label>
+                      )}
+                    </div>
+                  )}
+                  <ul className="divide-y divide-line rounded-2xl border border-line">
+                    {values.variations.map((v) => (
+                      <li
+                        key={v.id}
+                        className={`flex flex-wrap items-center gap-3 px-3 py-2 text-sm ${
+                          v.enabled ? '' : 'text-muted'
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1 basis-40 truncate" title={optionsOf(v.id)}>
+                          {optionsOf(v.id)}
+                        </span>
+                        {data.current!.priceVaries ? (
+                          <input
+                            className="field tabular h-9 w-28 py-1 text-right"
+                            inputMode="decimal"
+                            aria-label={t('variationPrice', { variation: optionsOf(v.id) })}
+                            value={varPrices[v.id] ?? ''}
+                            onChange={(e) => setVarPrice(v.id, e.target.value)}
+                          />
+                        ) : (
+                          <span className="tabular w-28 text-right text-muted">
+                            {money(toMinor(varPrices[v.id] ?? '', digits), currency)}
+                          </span>
+                        )}
+                        {data.current!.quantityVaries ? (
+                          <input
+                            className="field tabular h-9 w-20 py-1 text-right"
+                            inputMode="numeric"
+                            aria-label={t('variationQuantity', { variation: optionsOf(v.id) })}
+                            value={v.quantity ?? ''}
+                            onChange={(e) =>
+                              setVar(v.id, {
+                                quantity: e.target.value === '' ? null : Number(e.target.value),
+                              })
+                            }
+                          />
+                        ) : (
+                          <span className="tabular w-20 text-right text-muted">
+                            {v.quantity ?? '—'}
+                          </span>
+                        )}
+                        <Switch
+                          checked={v.enabled}
+                          onChange={(on) => setVar(v.id, { enabled: on })}
+                          label={t('onSale')}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                  {fieldError('variations')}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <label className="block">
+                    {label('price', currency)}
+                    <input
+                      className="field tabular"
+                      inputMode="decimal"
+                      value={priceText}
+                      onChange={(e) => setPriceText(e.target.value)}
+                    />
+                    {fieldError('price')}
+                  </label>
+                  <label className="block">
+                    {label('quantity')}
+                    <input
+                      className="field tabular"
+                      inputMode="numeric"
+                      value={values.quantity ?? ''}
+                      onChange={(e) =>
+                        setValues({
+                          ...values,
+                          quantity: e.target.value === '' ? null : Number(e.target.value),
+                        })
+                      }
+                    />
+                    {fieldError('quantity')}
+                  </label>
+                </div>
+              )}
             </div>
           ) : (
             original &&
@@ -409,7 +579,46 @@ export function ProductEditor({
                 {changed.map((f) => (
                   <li key={f} className="rounded-2xl border border-line p-4">
                     <p className="mb-2 text-xs text-muted">{t(`fields.${f}`)}</p>
-                    {f === 'tags' ? (
+                    {f === 'variations' ? (
+                      <ul className="grid gap-1.5 text-sm">
+                        {edited.variations
+                          .filter(
+                            (v) =>
+                              !same(
+                                v,
+                                original.variations.find((o) => o.id === v.id),
+                              ),
+                          )
+                          .map((v) => {
+                            const o = original.variations.find((x) => x.id === v.id);
+                            return (
+                              <li key={v.id} className="flex flex-wrap gap-x-3">
+                                <span className="font-medium">{optionsOf(v.id)}</span>
+                                {o?.price !== v.price && (
+                                  <span>
+                                    <span className="text-muted line-through">
+                                      {money(o?.price ?? null, currency)}
+                                    </span>{' '}
+                                    → {money(v.price, currency)}
+                                  </span>
+                                )}
+                                {o?.quantity !== v.quantity && (
+                                  <span>
+                                    {t('fields.quantity')}:{' '}
+                                    <span className="text-muted line-through">
+                                      {o?.quantity ?? '—'}
+                                    </span>{' '}
+                                    → {v.quantity ?? '—'}
+                                  </span>
+                                )}
+                                {o?.enabled !== v.enabled && (
+                                  <span>{v.enabled ? t('nowOnSale') : t('nowOffSale')}</span>
+                                )}
+                              </li>
+                            );
+                          })}
+                      </ul>
+                    ) : f === 'tags' ? (
                       <div className="flex flex-wrap gap-1.5 text-xs">
                         {original.tags
                           .filter((x) => !edited.tags.includes(x))
