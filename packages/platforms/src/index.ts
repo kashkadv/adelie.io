@@ -1,5 +1,6 @@
 export * from './errors.js';
 export * from './http.js';
+export * from './features.js';
 export * from './links.js';
 export * from './types.js';
 export { PinterestAdapter, PINTEREST_API, PINTEREST_SCOPES } from './pinterest/adapter.js';

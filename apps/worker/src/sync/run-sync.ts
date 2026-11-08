@@ -5,6 +5,7 @@ import type { PrismaClient, Prisma } from '@adelie/db';
 import {
   AdapterError,
   HttpClient,
+  hasFeature,
   isAdapterError,
   postLinks,
   type AdapterContext,
@@ -725,6 +726,27 @@ export async function runSync(
             });
             count('ledgerEntries');
           }
+        }
+      });
+    }
+
+    // 3d. Audience (demographics, interests): only when the connection has the permission —
+    // a missing one is shown as "update access", not as a failing sync.
+    if (adapter.getAudience && hasFeature(adapter.platform, connection.scopes, 'audience')) {
+      await step('audience', async () => {
+        for (const a of await adapter.getAudience!(ctx())) {
+          const key = { accountId: account.id, type: a.type, date: asDate(day(now())) };
+          const data = {
+            size: a.size,
+            groups: a.groups as unknown as Prisma.InputJsonValue,
+            fetchedAt: now(),
+          };
+          await prisma.accountAudience.upsert({
+            where: { accountId_type_date: key },
+            create: { workspaceId: account.workspaceId, ...key, ...data },
+            update: data,
+          });
+          count('audiences');
         }
       });
     }

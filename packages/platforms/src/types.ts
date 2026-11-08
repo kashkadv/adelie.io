@@ -184,6 +184,24 @@ export interface ProductChanges {
   variations?: VariationChange[];
 }
 
+/** One share of an audience: an age group, a country, an interest… (ratio 0..1). */
+export interface AudienceShare {
+  key: string;
+  name: string;
+  ratio: number;
+}
+
+/**
+ * Who the account's audience is (account level — platforms give no demographics per post):
+ * groups such as `ages`, `genders`, `countries`, `metros`, `devices`, `interests`.
+ */
+export interface AudienceData {
+  /** e.g. `engaged` (people who interacted) or `total` (everyone reached). */
+  type: string;
+  size: number | null;
+  groups: Record<string, AudienceShare[]>;
+}
+
 /** Our grouping of shop money movements (ADR-0018). */
 export type LedgerCategory =
   | 'sales'
@@ -287,6 +305,8 @@ export interface PlatformAdapter {
     productExternalId: string,
     changes: ProductChanges,
   ): Promise<ProductEditable>;
+  /** Account audience (demographics, interests), when the connection has the permission. */
+  getAudience?(ctx: AdapterContext): Promise<AudienceData[]>;
   /** Points of sale: ids of the payments of an order — they key its ledger entries (Etsy). */
   getOrderPaymentIds?(ctx: AdapterContext, orderExternalId: string): Promise<string[]>;
   /** Points of sale: the payment account's movements since `since`, in pages. */

@@ -43,7 +43,7 @@ describe('PinterestAdapter OAuth', () => {
       client_id: '1635003',
       redirect_uri: 'http://localhost:4000/social/pinterest/callback',
       response_type: 'code',
-      scope: 'user_accounts:read,pins:read,boards:read',
+      scope: 'user_accounts:read,pins:read,boards:read,ads:read',
       state: 'st-123',
     });
   });
@@ -355,5 +355,30 @@ describe('mapping', () => {
     expect(mapPinMetrics({ id: '1', pin_metrics: { '90d': { impression: 1 } } }, TODAY)).toEqual(
       [],
     );
+  });
+});
+
+describe('Pinterest audience', () => {
+  it('maps demographics and interests into sorted shares', async () => {
+    const { mapAudience } = await import('./mapping.js');
+    const a = mapAudience('engaged', {
+      size: 12000,
+      categories: [
+        { key: 'home_decor', name: 'Home decor', ratio: 0.4 },
+        { key: 'diy', name: 'DIY', ratio: 0.6 },
+      ],
+      demographics: {
+        ages: [
+          { key: '25-34', name: '25-34', ratio: 0.41 },
+          { key: '18-24', name: '18-24', ratio: 0.2 },
+        ],
+        genders: [{ key: 'female', name: 'female', ratio: 0.8 }],
+        devices: [],
+      },
+    });
+    expect(a.size).toBe(12000);
+    expect(a.groups['interests']?.map((s) => s.key)).toEqual(['diy', 'home_decor']);
+    expect(a.groups['ages']?.[0]).toEqual({ key: '25-34', name: '25-34', ratio: 0.41 });
+    expect(a.groups['devices']).toBeUndefined();
   });
 });

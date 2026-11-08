@@ -40,3 +40,4 @@
 - [ADR-0017](decisions/0017-instagram-post-daily.md) — Щоденні метрики публікацій Instagram із різниці знімків (прийнято)
 - [ADR-0018](decisions/0018-promotion-and-sales.md) — Джерела даних: просування й продажі (прийнято)
 - [ADR-0019](decisions/0019-connection-access-levels.md) — Рівні доступу підключень (прийнято)
+- [ADR-0020](decisions/0020-connection-features-update-access.md) — Функції підключення й «Оновити доступ» (прийнято)

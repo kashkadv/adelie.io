@@ -23,6 +23,7 @@ import {
   snapshotMetric,
   type StoredValue,
 } from './aggregate.js';
+import { PLATFORM_FEATURES, hasFeature } from '@adelie/platforms';
 import { countsAsSale, salesOverview } from '../sales/sales.js';
 
 const PERIOD_DAYS = [7, 30, 90] as const;
@@ -85,6 +86,32 @@ const OVERVIEW: Record<
 @UseGuards(WorkspaceAccessGuard)
 export class OverviewController {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Who the audience is (account level), where the platform has an audience feature: the latest
+   * snapshot per type, or `missing` when the connection lacks the permission (update access).
+   */
+  private async audience(platform: Platform | undefined, accountIds: string[]) {
+    if (!platform || !PLATFORM_FEATURES[platform].some((f) => f.id === 'audience')) return null;
+    const connections = await this.prisma.client.socialAccount.findMany({
+      where: { id: { in: accountIds } },
+      select: { id: true, connection: { select: { scopes: true } } },
+    });
+    const allowed = connections
+      .filter((c) => hasFeature(platform, c.connection.scopes, 'audience'))
+      .map((c) => c.id);
+    if (!allowed.length) return { missing: true, items: [] };
+    const rows = await this.prisma.client.accountAudience.findMany({
+      where: { accountId: { in: allowed } },
+      orderBy: { date: 'desc' },
+      distinct: ['type'],
+      select: { type: true, date: true, size: true, groups: true },
+    });
+    return {
+      missing: false,
+      items: rows.map((r) => ({ ...r, date: r.date.toISOString().slice(0, 10) })),
+    };
+  }
 
   @Get()
   async get(
@@ -296,6 +323,10 @@ export class OverviewController {
       })),
       series: { id: view.series.id, points: dailySeries(values, view.series.key, current) },
       breakdown: { id: view.breakdown.id, items: breakdownItems },
+      audience: await this.audience(
+        platform,
+        accounts.map((a) => a.id),
+      ),
     };
   }
 }

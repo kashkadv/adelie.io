@@ -20,6 +20,7 @@ import { useProjectAccounts } from './accounts-data';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
 import { EmptyState, PageHeader } from './page-header';
 import { minorDigits, useMoney } from './sales-data';
+import { AudienceSection, type Audience } from './audience-section';
 import { useWorkspace } from './workspace-context';
 
 type Status = SeriesPoint['status'];
@@ -52,6 +53,8 @@ type OverviewData = {
   };
   /** Shops: the currency of money values. */
   currency?: string | null;
+  /** Who the audience is, where the platform has it (null elsewhere). */
+  audience?: Audience | null;
 };
 
 const PERIODS = [7, 30, 90] as const;
@@ -382,6 +385,8 @@ export function Overview() {
           </section>
         </div>
       )}
+
+      {hasAccounts && shown && <AudienceSection audience={shown.audience ?? null} />}
 
       {accounts && accounts.length === 0 && (
         <EmptyState

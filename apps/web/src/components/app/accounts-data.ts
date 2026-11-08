@@ -31,6 +31,8 @@ export type SocialAccount = {
   manualSyncAt: string | null;
   /** Read-only or full access (ADR-0019); null where the platform has no levels. */
   access: 'read' | 'write' | null;
+  /** Features this connection lacks a permission for (e.g. `audience`): "update access". */
+  missingFeatures: string[];
   /** The latest sync run, or null before the first one starts. */
   lastSync: {
     status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'REAUTHORIZATION_REQUIRED';

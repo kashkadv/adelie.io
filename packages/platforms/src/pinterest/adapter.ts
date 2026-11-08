@@ -5,6 +5,7 @@ import type {
   AccountData,
   AccountMetricsQuery,
   AdapterContext,
+  AudienceData,
   BoardData,
   MetricPoint,
   PlatformAdapter,
@@ -15,6 +16,7 @@ import type {
 import {
   mapAccount,
   mapAccountAnalytics,
+  mapAudience,
   mapBoard,
   mapPin,
   mapPinAnalytics,
@@ -24,10 +26,12 @@ import {
   type PinterestPin,
   type PinterestUserAccount,
 } from './mapping.js';
+import { requestedScopes } from '../features.js';
 
 export const PINTEREST_API = 'https://api.pinterest.com';
 export const PINTEREST_AUTHORIZE_URL = 'https://www.pinterest.com/oauth/';
-export const PINTEREST_SCOPES = ['user_accounts:read', 'pins:read', 'boards:read'] as const;
+/** Read-only scopes of every feature (features.ts): the profile, pins, boards; audience (ads:read). */
+export const PINTEREST_SCOPES = requestedScopes('PINTEREST');
 
 /** Account metrics we request (docs/integrations/pinterest.md; seeded in metric_definition). */
 export const PINTEREST_ACCOUNT_METRICS = [
@@ -53,6 +57,11 @@ export const PINTEREST_PIN_DAILY_METRICS = [
 /** Rate-limit buckets as Pinterest reports them (PoC 1): reads 1000/min, analytics 60/min. */
 const READ = 'org_read';
 const ANALYTICS = 'org_analytics';
+/** Audiences we read: ours → Pinterest's audience_insight_type. */
+const AUDIENCE_TYPES = [
+  ['engaged', 'YOUR_ENGAGED_AUDIENCE'],
+  ['total', 'YOUR_TOTAL_AUDIENCE'],
+] as const;
 
 const DIMENSION_SPLIT: Record<string, string> = { app_type: 'APP_TYPE' };
 
@@ -220,6 +229,33 @@ export class PinterestAdapter implements PlatformAdapter {
       yield { posts: pins.map(mapPin), metrics: pins.flatMap((p) => mapPinMetrics(p, today)) };
       bookmark = page.bookmark ?? undefined;
     } while (bookmark);
+  }
+
+  /**
+   * Audience insights of the account (needs `ads:read`): they belong to the business's ad account,
+   * which every business account has even without ads. Engaged audience (people who interacted)
+   * and total audience (everyone reached).
+   */
+  async getAudience(ctx: AdapterContext): Promise<AudienceData[]> {
+    const accounts = await this.get<{ items?: { id: string }[] }>(
+      ctx,
+      '/v5/ad_accounts',
+      { page_size: 25 },
+      READ,
+    );
+    const adAccount = accounts.items?.[0]?.id;
+    if (!adAccount) throw new AdapterError('NOT_AVAILABLE', 'No Pinterest ad account');
+    const out: AudienceData[] = [];
+    for (const [type, insight] of AUDIENCE_TYPES) {
+      const raw = await this.get<Record<string, unknown>>(
+        ctx,
+        `/v5/ad_accounts/${adAccount}/audience_insights`,
+        { audience_insight_type: insight },
+        ANALYTICS,
+      );
+      out.push(mapAudience(type, raw));
+    }
+    return out;
   }
 
   async getAccountMetrics(ctx: AdapterContext, query: AccountMetricsQuery): Promise<MetricPoint[]> {

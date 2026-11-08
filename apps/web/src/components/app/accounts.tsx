@@ -57,7 +57,8 @@ function useConnectResult(): [ConnectResult | null, string, () => void] {
   return [result, platform, () => setResult(null)];
 }
 
-type RowAction = 'disconnect' | 'remove' | 'reconnect' | 'hide' | 'unhide' | 'sync' | 'access';
+type RowAction =
+  'disconnect' | 'remove' | 'reconnect' | 'hide' | 'unhide' | 'sync' | 'access' | 'upgrade';
 
 const accountName = (a: SocialAccount) => a.displayName || a.username || a.externalId;
 /** What the user types to confirm deletion (the API checks the same value). */
@@ -140,6 +141,7 @@ function RowMenu({
         >
           {account.status === 'ACTIVE' && item('sync', t('syncNow'), false, syncNote)}
           {account.status !== 'REVOKED' && account.access && item('access', t('changeAccess'))}
+          {account.missingFeatures.length > 0 && item('upgrade', t('updateAccess.action'))}
           {disconnected ? item('reconnect', t('reconnect')) : item('disconnect', t('disconnect'))}
           {hidden ? item('unhide', t('unhide')) : item('hide', t('hide'))}
           <div className="my-1 h-px bg-line" />
@@ -266,6 +268,22 @@ function AccountRow({
               tone="warning"
               title={t(`sync.${syncNote}`)}
               text={t(`sync.${syncNote}Hint`)}
+            />
+          )}
+          {/* A feature needs a permission the connection lacks: update access, keep everything. */}
+          {account.missingFeatures.length > 0 && (
+            <InfoTip
+              tone="warning"
+              title={t('updateAccess.title')}
+              text={t('updateAccess.text', {
+                features: account.missingFeatures
+                  .map((f) =>
+                    t.has(`features.${f}` as 'features.audience')
+                      ? t(`features.${f}` as 'features.audience')
+                      : f,
+                  )
+                  .join(', '),
+              })}
             />
           )}
           <span
@@ -476,7 +494,10 @@ export function Accounts() {
 
   function onRowAction(account: SocialAccount, action: RowAction) {
     const slug = account.platform.toLowerCase() as PlatformSlug;
-    if (account.platform === 'ETSY' && (action === 'reconnect' || action === 'access')) {
+    if (
+      account.platform === 'ETSY' &&
+      (action === 'reconnect' || action === 'access' || action === 'upgrade')
+    ) {
       // Changing access is reconnecting with another scope set: the platform asks again.
       const current = account.access ?? 'read';
       return setAccessFor({
@@ -486,7 +507,8 @@ export function Accounts() {
         current: action === 'access' ? current : undefined,
       });
     }
-    if (action === 'reconnect') return void onConnect(slug);
+    // Updating access re-runs consent for the same account: the connection is updated in place.
+    if (action === 'reconnect' || action === 'upgrade') return void onConnect(slug);
     if (action === 'access') return;
     if (action === 'sync') {
       requestSync(account.id).catch(() => setNotice('actionFailed'));

@@ -326,6 +326,7 @@ model SocialAccount {
   products     ShopProduct[]
   orders       ShopOrder[]
   ledger       ShopLedgerEntry[]
+  audiences    AccountAudience[]
 
   @@unique([workspaceId, platform, externalId])
   @@index([projectId])
@@ -779,4 +780,23 @@ model SocialPostLink {
   @@unique([postId, key])
   @@index([projectId, key])
   @@map("social_post_link")
+}
+
+/// Who an account's audience is, as the platform reports it on a day (demographics, interests).
+/// Account level only — platforms give no demographics per post. `groups`: { ages: [{key, name,
+/// ratio}], genders: […], countries: […], interests: […] … }.
+model AccountAudience {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  workspaceId String        @db.Uuid
+  accountId   String        @db.Uuid
+  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// engaged | total
+  type        String
+  date        DateTime      @db.Date
+  size        Int?
+  groups      Json
+  fetchedAt   DateTime
+
+  @@unique([accountId, type, date])
+  @@map("account_audience")
 }

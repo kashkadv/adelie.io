@@ -4,6 +4,8 @@
 // with lowercase keys (impression, save, pin_click, outbound_click, comment, reaction, video_views…)
 // plus non-metric fields such as `last_updated`; `split_field=APP_TYPE` returns `web`/`mobile`/`tablet`.
 import type {
+  AudienceData,
+  AudienceShare,
   AccountData,
   BoardData,
   DataStatus,
@@ -231,4 +233,44 @@ export function mapPinAnalytics(
   postExternalId: string,
 ): MetricPoint[] {
   return mapAccountAnalytics(raw).map((p) => ({ ...p, scope: 'POST' as const, postExternalId }));
+}
+
+/** A raw audience-insights entry: Pinterest names its fields a little differently per group. */
+interface PinterestAudienceItem {
+  key?: string;
+  id?: string;
+  name?: string;
+  ratio?: number;
+  percent?: number;
+}
+
+/**
+ * Pinterest audience insights → groups of shares. Tolerant on purpose: demographics come as
+ * named lists (ages, genders, devices, metros, countries…) and interests as `categories`.
+ */
+export function mapAudience(type: string, raw: Record<string, unknown>): AudienceData {
+  const shares = (list: unknown): AudienceShare[] =>
+    (Array.isArray(list) ? (list as PinterestAudienceItem[]) : [])
+      .map((i) => ({
+        key: String(i.key ?? i.id ?? i.name ?? ''),
+        name: String(i.name ?? i.key ?? i.id ?? ''),
+        ratio:
+          typeof i.ratio === 'number'
+            ? i.ratio
+            : typeof i.percent === 'number'
+              ? i.percent / 100
+              : 0,
+      }))
+      .filter((s) => s.key && s.ratio > 0)
+      .sort((a, b) => b.ratio - a.ratio);
+  const groups: Record<string, AudienceShare[]> = {};
+  const demographics = (raw['demographics'] ?? {}) as Record<string, unknown>;
+  for (const [name, list] of Object.entries(demographics)) {
+    const s = shares(list);
+    if (s.length) groups[name] = s;
+  }
+  const interests = shares(raw['categories']);
+  if (interests.length) groups['interests'] = interests;
+  const size = raw['size'];
+  return { type, size: typeof size === 'number' ? size : null, groups };
 }

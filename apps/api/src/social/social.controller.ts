@@ -17,7 +17,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { isAdapterError } from '@adelie/platforms';
+import { isAdapterError, missingFeatures } from '@adelie/platforms';
 import { OptionalAuth, Session, type UserSession } from '@thallesp/nestjs-better-auth';
 import type { Response } from 'express';
 import { config } from '../config.js';
@@ -105,6 +105,9 @@ export class SocialController {
         status: connection.status,
         // Read-only or full access (ADR-0019); null where the platform has no levels.
         access: accessOf(a.platform, connection.scopes),
+        // Features this connection lacks a permission for: "update access" re-runs consent.
+        missingFeatures:
+          connection.status === 'ACTIVE' ? missingFeatures(a.platform, connection.scopes) : [],
         lastSync: syncRuns[0] ?? null,
       }),
     );

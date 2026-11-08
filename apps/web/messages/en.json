@@ -119,6 +119,38 @@
       "title": "Buyers’ countries",
       "other": "Other",
       "unknown": "Unknown"
+    },
+    "audience": {
+      "title": "Audience",
+      "hint": "Who your audience is — the platform’s data for the whole account: there are no demographics per pin. Shares, not exact counts; updated daily.",
+      "types": {
+        "engaged": "Engaged",
+        "total": "Total"
+      },
+      "size": "≈ {size} people",
+      "missing": "To see your audience’s age, gender, countries and interests, the connection needs an extra permission. History and other data stay.",
+      "updateAccess": "Update access",
+      "pending": "Data appears after the next sync.",
+      "groups": {
+        "ages": "Age",
+        "genders": "Gender",
+        "countries": "Countries",
+        "metros": "Cities",
+        "devices": "Devices",
+        "interests": "Interests"
+      },
+      "shares": {
+        "genders": {
+          "female": "Women",
+          "male": "Men",
+          "unspecified": "Unspecified"
+        },
+        "devices": {
+          "mobile": "Mobile",
+          "web": "Desktop",
+          "tablet": "Tablet"
+        }
+      }
     }
   },
   "MetricHints": {
@@ -376,6 +408,15 @@
       "changeLater": "You can change access any time from the connection’s “⋯” menu — the platform asks for consent again.",
       "continue": "Continue to {platform}",
       "close": "Close"
+    },
+    "updateAccess": {
+      "action": "Update access",
+      "title": "More data available",
+      "text": "Features “{features}” need an extra permission. “Update access” in the “⋯” menu — the platform asks for consent; the connection and all its history stay."
+    },
+    "features": {
+      "audience": "audience",
+      "core": "core data"
     }
   },
   "Invite": {
