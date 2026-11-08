@@ -1,5 +1,6 @@
-import { Overview } from '@/components/app/overview';
+import { SectionPlaceholder } from '@/components/app/section-placeholder';
 
-export default function OverviewPage() {
-  return <Overview />;
+/** Home: a space of widgets each person arranges (later); for now it says so. */
+export default function HomePage() {
+  return <SectionPlaceholder section="home" />;
 }

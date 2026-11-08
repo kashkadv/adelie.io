@@ -3,7 +3,8 @@
 import {
   FileChartColumn,
   Images,
-  LayoutDashboard,
+  ChartColumn,
+  House,
   Package,
   PanelLeftClose,
   PlugZap,
@@ -18,7 +19,14 @@ import { isSidebarCollapsed, setSidebarCollapsed } from '@/lib/theme';
 import type { ReactNode } from 'react';
 
 type NavKey =
-  'overview' | 'content' | 'products' | 'orders' | 'reports' | 'connections' | 'settings';
+  | 'home'
+  | 'statistics'
+  | 'content'
+  | 'products'
+  | 'orders'
+  | 'reports'
+  | 'connections'
+  | 'settings';
 type NavItem = { key: NavKey; href: string; icon: LucideIcon };
 
 /**
@@ -26,7 +34,12 @@ type NavItem = { key: NavKey; href: string; icon: LucideIcon };
  * it?", Sales — "what do people buy?". Connections are set-up, not a place for analysis.
  */
 const NAV: { group?: 'promotion' | 'sales'; items: NavItem[] }[] = [
-  { items: [{ key: 'overview', href: '/', icon: LayoutDashboard }] },
+  {
+    items: [
+      { key: 'home', href: '/', icon: House },
+      { key: 'statistics', href: '/statistics', icon: ChartColumn },
+    ],
+  },
   { group: 'promotion', items: [{ key: 'content', href: '/content', icon: Images }] },
   {
     group: 'sales',

@@ -1,14 +1,15 @@
 'use client';
 
-import { FileChartColumn, type LucideIcon } from 'lucide-react';
+import { FileChartColumn, House, type LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState, PageHeader } from './page-header';
 
 const ICONS: Record<Section, LucideIcon> = {
   reports: FileChartColumn,
+  home: House,
 };
 
-type Section = 'reports';
+type Section = 'reports' | 'home';
 
 /** Section page that has no functionality yet: title + explanation of what will be here. */
 export function SectionPlaceholder({ section }: { section: Section }) {

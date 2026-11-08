@@ -32,7 +32,8 @@
   },
   "Nav": {
     "main": "Main navigation",
-    "overview": "Overview",
+    "home": "Home",
+    "statistics": "Statistics",
     "content": "Content",
     "products": "Products",
     "orders": "Orders",
@@ -54,7 +55,7 @@
     }
   },
   "Overview": {
-    "title": "Overview",
+    "title": "Statistics",
     "subtitle": "Project {project}",
     "noData": "No data yet",
     "metrics": {
@@ -176,6 +177,11 @@
       "title": "Reports",
       "subtitle": "Snapshots to share with clients",
       "text": "Build a report for a period and share it by a secret link — no sign-in needed for the reader."
+    },
+    "home": {
+      "title": "Home",
+      "subtitle": "Your space in the project",
+      "text": "Your home page with widgets — sales, top posts, audience — that everyone arranges their own way. For now all numbers are in Statistics."
     }
   },
   "Profile": {
