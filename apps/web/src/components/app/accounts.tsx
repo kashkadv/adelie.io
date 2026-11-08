@@ -149,7 +149,9 @@ function RowMenu({
       {open && (
         <div
           role="menu"
-          className="glass glass-strong animate-rise absolute top-full right-0 z-50 mt-2 w-60 rounded-2xl p-2"
+          className={`glass glass-strong animate-rise absolute top-full right-0 z-50 mt-2 rounded-2xl p-2 transition-[width] duration-200 ${
+            upgradeOpen ? 'w-72' : 'w-60'
+          }`}
         >
           {account.status === 'ACTIVE' && item('sync', t('syncNow'), false, syncNote)}
           {account.status !== 'REVOKED' && account.access && item('access', t('changeAccess'))}
@@ -179,7 +181,7 @@ function RowMenu({
                       setOpen(false);
                       onAction('upgrade');
                     }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-hover"
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm whitespace-nowrap hover:bg-hover"
                   >
                     <ArrowRight size={14} className="text-muted" aria-hidden="true" />
                     {t('updateAccess.go', { platform: t(`platforms.${account.platform}`) })}
@@ -191,7 +193,7 @@ function RowMenu({
                       setOpen(false);
                       onAction('upgradeInvite');
                     }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-hover"
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm whitespace-nowrap hover:bg-hover"
                   >
                     <Link2 size={14} className="text-muted" aria-hidden="true" />
                     {t('updateAccess.copyLink')}
