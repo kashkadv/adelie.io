@@ -9,12 +9,15 @@ import {
   ETSY_API,
   ETSY_WRITE_SCOPES,
   EtsyAdapter,
+  AdapterError,
   HttpClient,
   InstagramAdapter,
+  isAdapterError,
   META_GRAPH_API,
   PINTEREST_API,
   PinterestAdapter,
   type AccountData,
+  type AdapterContext,
   type PlatformAdapter,
   type TokenSet,
 } from '@adelie/platforms';
@@ -106,6 +109,66 @@ export class ConnectService {
       adapter: new PinterestAdapter(config.pinterest),
       http: new HttpClient({ baseUrl: PINTEREST_API }),
     };
+  }
+
+  /**
+   * Runs `fn` with a connected account's live token (ADR-0019: writes made on a member's action).
+   * Refreshes an access token that is about to expire, and once more if the platform rejects it.
+   * Tokens never leave this method.
+   */
+  async withAccount<T>(
+    accountId: string,
+    fn: (adapter: PlatformAdapter, ctx: AdapterContext) => Promise<T>,
+  ): Promise<T> {
+    const account = await this.prisma.client.socialAccount.findUniqueOrThrow({
+      where: { id: accountId },
+      include: { connection: true },
+    });
+    const c = account.connection;
+    if (c.status !== 'ACTIVE')
+      throw new AdapterError('REAUTH_REQUIRED', 'Connection is not active');
+    const { adapter, http } = this.adapterFor(PLATFORM_SLUGS[account.platform]);
+    const aad = (field: 'access' | 'refresh') =>
+      socialTokenAad(account.workspaceId, account.platform, c.externalUserId, field);
+    let accessToken = this.cipher.decrypt(c.accessTokenEncrypted, aad('access'));
+
+    const refresh = async () => {
+      if (!c.refreshTokenEncrypted) throw new AdapterError('REAUTH_REQUIRED', 'No refresh token');
+      const tokens = await adapter.refreshToken(
+        this.cipher.decrypt(c.refreshTokenEncrypted, aad('refresh')),
+        http,
+        c.scopes,
+      );
+      accessToken = tokens.accessToken;
+      await this.prisma.client.socialConnection.update({
+        where: { id: c.id },
+        data: {
+          accessTokenEncrypted: this.cipher.encrypt(tokens.accessToken, aad('access')),
+          refreshTokenEncrypted: tokens.refreshToken
+            ? this.cipher.encrypt(tokens.refreshToken, aad('refresh'))
+            : c.refreshTokenEncrypted,
+          keyVersion: this.cipher.keyVersion,
+          accessTokenExpiresAt: tokens.accessTokenExpiresAt ?? null,
+          refreshTokenExpiresAt: tokens.refreshTokenExpiresAt ?? c.refreshTokenExpiresAt,
+        },
+      });
+    };
+
+    if (c.accessTokenExpiresAt && c.accessTokenExpiresAt.getTime() < Date.now() + 60_000) {
+      await refresh();
+    }
+    const ctx = (): AdapterContext => ({
+      accessToken,
+      accountExternalId: account.externalId,
+      http,
+    });
+    try {
+      return await fn(adapter, ctx());
+    } catch (error) {
+      if (!isAdapterError(error, 'TOKEN_EXPIRED')) throw error;
+      await refresh();
+      return fn(adapter, ctx());
+    }
   }
 
   redirectUri(slug: string): string {

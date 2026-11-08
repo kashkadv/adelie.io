@@ -13,12 +13,18 @@ import type {
   OrderData,
   PlatformAdapter,
   PostsPage,
+  ProductChanges,
+  ProductEditable,
   ProductData,
   TokenSet,
 } from '../types.js';
 import {
   mapLedgerEntry,
   mapListing,
+  minorDigits,
+  money,
+  productChangeErrors,
+  unescapeHtml,
   mapReceipt,
   mapShop,
   type EtsyLedgerEntry,
@@ -47,6 +53,23 @@ const LEDGER_WINDOW_S = 31 * 86_400;
 const REFRESH_TOKEN_DAYS = 90;
 
 const v3 = (path: string) => `/v3/application${path}`;
+
+interface EtsyInventory {
+  products?: {
+    sku?: string;
+    property_values?: unknown[];
+    offerings?: {
+      price?: { amount: number; divisor: number; currency_code: string };
+      quantity?: number;
+      is_enabled?: boolean;
+      is_deleted?: boolean;
+      readiness_state_id?: number;
+    }[];
+  }[];
+  price_on_property?: number[];
+  quantity_on_property?: number[];
+  sku_on_property?: number[];
+}
 
 function utcToday(): string {
   return new Date().toISOString().slice(0, 10);
@@ -206,6 +229,106 @@ export class EtsyAdapter implements PlatformAdapter {
 
   private pause() {
     return this.paceMs ? new Promise<void>((r) => setTimeout(r, this.paceMs)) : Promise.resolve();
+  }
+
+  /** A write (ADR-0019: only on a member's explicit action). Never recorded raw. */
+  private async send<T>(
+    ctx: AdapterContext,
+    method: 'PATCH' | 'PUT',
+    path: string,
+    body: { form?: Record<string, string>; json?: unknown },
+  ): Promise<T> {
+    try {
+      const { body: response } = await ctx.http.request<T>({
+        method,
+        path: v3(path),
+        ...body,
+        headers: { 'x-api-key': this.apiKey, Authorization: `Bearer ${ctx.accessToken}` },
+        bucket: 'etsy',
+        signal: ctx.signal,
+        sensitive: true,
+      });
+      return response;
+    } catch (error) {
+      throw etsyError(error);
+    }
+  }
+
+  async getProductForEdit(ctx: AdapterContext, listingId: string): Promise<ProductEditable> {
+    const raw = await this.get<EtsyListing & { description?: string; has_variations?: boolean }>(
+      ctx,
+      `/listings/${listingId}`,
+    );
+    return {
+      title: unescapeHtml(raw.title ?? ''),
+      description: unescapeHtml(raw.description ?? ''),
+      tags: (raw.tags ?? []).map(unescapeHtml),
+      hasVariations: !!raw.has_variations,
+      price: money(raw.price),
+      quantity: typeof raw.quantity === 'number' ? raw.quantity : null,
+      state: raw.state ?? 'active',
+    };
+  }
+
+  /**
+   * Changes a listing: title, description and tags through updateListing; price and quantity
+   * through its inventory — only for listings without variations (one product, one offering),
+   * everything else in the inventory is sent back as it was.
+   */
+  async updateProduct(
+    ctx: AdapterContext,
+    listingId: string,
+    changes: ProductChanges,
+  ): Promise<ProductEditable> {
+    if (productChangeErrors(changes).length) {
+      throw new AdapterError('INVALID', 'The change breaks Etsy listing rules');
+    }
+    const shopId = await this.shopId(ctx);
+    const form: Record<string, string> = {};
+    if (changes.title !== undefined) form['title'] = changes.title.trim();
+    if (changes.description !== undefined) form['description'] = changes.description;
+    if (changes.tags !== undefined) form['tags'] = changes.tags.map((t) => t.trim()).join(',');
+    if (Object.keys(form).length) {
+      await this.send(ctx, 'PATCH', `/shops/${shopId}/listings/${listingId}`, { form });
+    }
+
+    if (changes.price !== undefined || changes.quantity !== undefined) {
+      const inventory = await this.get<EtsyInventory>(ctx, `/listings/${listingId}/inventory`);
+      const products = inventory.products ?? [];
+      const offering = products[0]?.offerings?.filter((o) => !o.is_deleted)[0];
+      if (products.length !== 1 || !offering) {
+        throw new AdapterError('NOT_AVAILABLE', 'Listings with variations are edited on Etsy');
+      }
+      const currency = offering.price?.currency_code ?? 'USD';
+      const price =
+        changes.price !== undefined
+          ? changes.price / 10 ** minorDigits(currency)
+          : (offering.price?.amount ?? 0) / (offering.price?.divisor ?? 100);
+      await this.send(ctx, 'PUT', `/listings/${listingId}/inventory`, {
+        json: {
+          products: [
+            {
+              sku: products[0]!.sku ?? '',
+              property_values: products[0]!.property_values ?? [],
+              offerings: [
+                {
+                  price,
+                  quantity: changes.quantity ?? offering.quantity ?? 0,
+                  is_enabled: offering.is_enabled ?? true,
+                  ...(offering.readiness_state_id
+                    ? { readiness_state_id: offering.readiness_state_id }
+                    : {}),
+                },
+              ],
+            },
+          ],
+          price_on_property: inventory.price_on_property ?? [],
+          quantity_on_property: inventory.quantity_on_property ?? [],
+          sku_on_property: inventory.sku_on_property ?? [],
+        },
+      });
+    }
+    return this.getProductForEdit(ctx, listingId);
   }
 
   /** The shop: the one named in the context, or the token owner's shop (right after consent). */

@@ -140,6 +140,27 @@ export interface OrderData {
   items: OrderItemData[];
 }
 
+/** A product as it is on the platform right now, for editing (ADR-0019). */
+export interface ProductEditable {
+  title: string;
+  description: string;
+  tags: string[];
+  /** With variations, price and quantity live per variation: not editable here. */
+  hasVariations: boolean;
+  price: Money | null;
+  quantity: number | null;
+  state: string;
+}
+
+/** Changes to a product; absent fields stay as they are. Price in minor units of its currency. */
+export interface ProductChanges {
+  title?: string;
+  description?: string;
+  tags?: string[];
+  price?: number;
+  quantity?: number;
+}
+
 /** Our grouping of shop money movements (ADR-0018). */
 export type LedgerCategory =
   | 'sales'
@@ -236,6 +257,13 @@ export interface PlatformAdapter {
   listProducts?(ctx: AdapterContext): AsyncIterable<ProductData[]>;
   /** Points of sale: orders created since `since` (all of them when absent), in pages. */
   listOrders?(ctx: AdapterContext, query: { since?: Date }): AsyncIterable<OrderData[]>;
+  /** Points of sale with full access (ADR-0019): a product as it is now, and changing it. */
+  getProductForEdit?(ctx: AdapterContext, productExternalId: string): Promise<ProductEditable>;
+  updateProduct?(
+    ctx: AdapterContext,
+    productExternalId: string,
+    changes: ProductChanges,
+  ): Promise<ProductEditable>;
   /** Points of sale: the payment account's movements since `since`, in pages. */
   listLedger?(ctx: AdapterContext, query: { since: Date }): AsyncIterable<LedgerEntryData[]>;
 }

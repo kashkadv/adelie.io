@@ -1,19 +1,33 @@
 import {
   BadRequestException,
+  Body,
+  ConflictException,
   Controller,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
   ParseUUIDPipe,
+  Patch,
   Query,
   Req,
+  UnprocessableEntityException,
   UseGuards,
 } from '@nestjs/common';
 import type { Prisma } from '@adelie/db';
+import {
+  isAdapterError,
+  productChangeErrors,
+  type ProductChanges,
+  type ProductEditable,
+} from '@adelie/platforms';
+import { Session, type UserSession } from '@thallesp/nestjs-better-auth';
+import { CONNECT_ROLES, ConnectService, accessOf } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
 import { visibleProjectsWhere } from '../workspaces/project-visibility.js';
 import {
   WorkspaceAccessGuard,
+  WorkspaceRoles,
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
 import { moneyFlow, netRevenue, ordersByDay } from './sales.js';
@@ -37,7 +51,167 @@ const SHOP_WHERE = {
 @Controller('workspaces/:workspaceId/projects/:projectId/sales')
 @UseGuards(WorkspaceAccessGuard)
 export class SalesController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly connector: ConnectService,
+  ) {}
+
+  /** A product of a visible project's shop, with what is needed to edit it. */
+  private async editableProduct(
+    ctx: WorkspaceRequestContext,
+    projectId: string,
+    productId: string,
+  ) {
+    await this.visibleProject(ctx, projectId);
+    const product = await this.prisma.client.shopProduct.findFirst({
+      where: { id: productId, projectId, workspaceId: ctx.workspaceId, account: SHOP_WHERE },
+      select: {
+        id: true,
+        externalId: true,
+        state: true,
+        accountId: true,
+        account: {
+          select: { platform: true, connection: { select: { status: true, scopes: true } } },
+        },
+      },
+    });
+    if (!product) throw new NotFoundException();
+    const access = accessOf(product.account.platform, product.account.connection.scopes);
+    // Why a product cannot be edited here, or null when it can.
+    const reason = !(CONNECT_ROLES as readonly string[]).includes(ctx.role)
+      ? 'role'
+      : product.account.connection.status !== 'ACTIVE'
+        ? 'connection'
+        : access !== 'write'
+          ? 'readOnly'
+          : product.state === 'removed'
+            ? 'removed'
+            : null;
+    return { product, reason };
+  }
+
+  private history(productId: string) {
+    return this.prisma.client.shopProductChange.findMany({
+      where: { productId },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        changes: true,
+        status: true,
+        error: true,
+        createdAt: true,
+        user: { select: { name: true } },
+      },
+    });
+  }
+
+  /**
+   * A product as it is on the platform right now (never our copy: someone may have changed it in
+   * Etsy since the last sync), whether it can be edited here, and its change history.
+   */
+  @Get('products/:productId/edit')
+  async editForm(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const { product, reason } = await this.editableProduct(request.workspace, projectId, productId);
+    const current =
+      reason === null || reason === 'role' || reason === 'readOnly'
+        ? await this.connector
+            .withAccount(product.accountId, (adapter, ctx) =>
+              adapter.getProductForEdit!(ctx, product.externalId),
+            )
+            .catch(() => null)
+        : null;
+    return {
+      canEdit: reason === null && !!current,
+      reason,
+      current,
+      history: await this.history(product.id),
+    };
+  }
+
+  /**
+   * Changes a product on the platform (ADR-0019: full access, a member's explicit action).
+   * `expected` is what the person saw: if the platform has something else now, nothing is sent
+   * (409) — no silent overwrite of a change made in Etsy meanwhile.
+   */
+  @Patch('products/:productId')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async update(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Body() body: { changes?: unknown; expected?: unknown },
+    @Req() request: { workspace: WorkspaceRequestContext },
+    @Session() session: UserSession,
+  ) {
+    const { product, reason } = await this.editableProduct(request.workspace, projectId, productId);
+    if (reason) throw new ForbiddenException({ reason });
+    const changes = parseChanges(body?.changes);
+    const expected = parseChanges(body?.expected);
+    const errors = productChangeErrors(changes);
+    if (errors.length) throw new BadRequestException({ errors });
+
+    const db = this.prisma.client;
+    return this.connector.withAccount(product.accountId, async (adapter, ctx) => {
+      const live = await adapter.getProductForEdit!(ctx, product.externalId);
+      const conflict = (Object.keys(changes) as (keyof ProductChanges)[]).some(
+        (k) => k in expected && !same(valueOf(live, k), expected[k]),
+      );
+      if (conflict) throw new ConflictException({ reason: 'changedOnPlatform', current: live });
+
+      // Only what really differs from the platform is sent and recorded.
+      const diff: Record<string, { from: unknown; to: unknown }> = {};
+      for (const k of Object.keys(changes) as (keyof ProductChanges)[]) {
+        if (!same(valueOf(live, k), changes[k]))
+          diff[k] = { from: valueOf(live, k), to: changes[k] };
+      }
+      if (!Object.keys(diff).length)
+        return { current: live, history: await this.history(product.id) };
+      const send = Object.fromEntries(
+        Object.keys(diff).map((k) => [k, changes[k as keyof ProductChanges]]),
+      ) as ProductChanges;
+
+      const audit = {
+        workspaceId: request.workspace.workspaceId,
+        projectId,
+        productId: product.id,
+        userId: session.user.id,
+        changes: diff as Prisma.InputJsonValue,
+      };
+      let after: ProductEditable;
+      try {
+        after = await adapter.updateProduct!(ctx, product.externalId, send);
+      } catch (error) {
+        const message = isAdapterError(error)
+          ? `${error.message}${providerMessage(error.details.providerCode)}`
+          : 'Unexpected error';
+        await db.shopProductChange.create({ data: { ...audit, status: 'failed', error: message } });
+        if (isAdapterError(error, 'NOT_AVAILABLE')) {
+          throw new UnprocessableEntityException({ reason: 'variations' });
+        }
+        if (isAdapterError(error, 'INVALID')) {
+          throw new UnprocessableEntityException({ reason: 'rejected', message });
+        }
+        throw error;
+      }
+      await db.shopProductChange.create({ data: { ...audit, status: 'applied' } });
+      // Our copy follows at once (the next sync would do it too).
+      await db.shopProduct.update({
+        where: { id: product.id },
+        data: {
+          title: after.title,
+          tags: after.tags,
+          price: after.price?.amount ?? null,
+          currency: after.price?.currency ?? undefined,
+          quantity: after.quantity,
+        },
+      });
+      return { current: after, history: await this.history(product.id) };
+    });
+  }
 
   private async visibleProject(ctx: WorkspaceRequestContext, projectId: string) {
     const project = await this.prisma.client.project.findFirst({
@@ -289,4 +463,33 @@ export class SalesController {
       items: rows.map((o) => ({ ...o, revenue: netRevenue(o) })),
     };
   }
+}
+
+/** The editable value of a field as the platform has it (price in minor units). */
+function valueOf(p: ProductEditable, key: keyof ProductChanges): unknown {
+  return key === 'price' ? (p.price?.amount ?? null) : p[key];
+}
+
+function same(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** Etsy's own words, when it rejected a change (e.g. a word not allowed in a title). */
+function providerMessage(code: unknown): string {
+  const text = (code as { error?: unknown } | null)?.error;
+  return typeof text === 'string' ? `: ${text.slice(0, 300)}` : '';
+}
+
+/** Keeps only well-typed fields of a change request. */
+function parseChanges(raw: unknown): ProductChanges {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const out: ProductChanges = {};
+  if (typeof r['title'] === 'string') out.title = r['title'];
+  if (typeof r['description'] === 'string') out.description = r['description'];
+  if (Array.isArray(r['tags']) && r['tags'].every((t) => typeof t === 'string')) {
+    out.tags = (r['tags'] as string[]).map((t) => t.trim()).filter(Boolean);
+  }
+  if (typeof r['price'] === 'number') out.price = r['price'];
+  if (typeof r['quantity'] === 'number') out.quantity = r['quantity'];
+  return out;
 }

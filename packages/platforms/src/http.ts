@@ -23,12 +23,14 @@ export interface HttpClientOptions {
 }
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT';
   path: string;
   query?: Record<string, string | number | undefined>;
   headers?: Record<string, string>;
-  /** Form body (OAuth token requests). */
+  /** Form body (OAuth token requests, Etsy listing updates). */
   form?: Record<string, string>;
+  /** JSON body. */
+  json?: unknown;
   /** Rate-limit bucket this endpoint counts against, e.g. 'read' or 'analytics'. */
   bucket?: string;
   /** Do not record the body (e.g. OAuth token responses contain secrets). */
@@ -92,9 +94,14 @@ export class HttpClient {
           headers: {
             Accept: 'application/json',
             ...(opts.form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
+            ...(opts.json !== undefined ? { 'Content-Type': 'application/json' } : {}),
             ...opts.headers,
           },
-          body: opts.form ? new URLSearchParams(opts.form).toString() : undefined,
+          body: opts.form
+            ? new URLSearchParams(opts.form).toString()
+            : opts.json !== undefined
+              ? JSON.stringify(opts.json)
+              : undefined,
           signal: opts.signal
             ? AbortSignal.any([opts.signal, AbortSignal.timeout(this.timeoutMs)])
             : AbortSignal.timeout(this.timeoutMs),

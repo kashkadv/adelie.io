@@ -3,7 +3,7 @@ import { HttpClient } from '../http.js';
 import { isAdapterError } from '../errors.js';
 import type { ProductData } from '../types.js';
 import { EtsyAdapter } from './adapter.js';
-import { ledgerCategory, mapReceipt, money, unescapeHtml } from './mapping.js';
+import { ledgerCategory, mapReceipt, money, productChangeErrors, unescapeHtml } from './mapping.js';
 
 const TODAY = '2026-11-08';
 const PKCE = { verifier: 'v'.repeat(43), challenge: 'c'.repeat(43) };
@@ -272,5 +272,100 @@ describe('Etsy mapping', () => {
     });
     expect(JSON.stringify(order)).not.toContain('Jane');
     expect(JSON.stringify(order)).not.toContain('jane@');
+  });
+});
+
+describe('Etsy product editing', () => {
+  const ctx = (client: HttpClient) => ({
+    accessToken: 'T',
+    accountExternalId: '345',
+    http: client,
+  });
+  const listing = {
+    listing_id: 7,
+    title: 'Wool rug 2&quot;',
+    description: 'Soft',
+    tags: ['rug'],
+    has_variations: false,
+    state: 'active',
+    price: { amount: 4500, divisor: 100, currency_code: 'USD' },
+    quantity: 3,
+  };
+
+  it('checks Etsy rules before sending anything', () => {
+    expect(productChangeErrors({ title: ' ' })).toEqual(['titleEmpty']);
+    expect(
+      productChangeErrors({
+        tags: Array(14)
+          .fill('a')
+          .map((a, i) => a + i),
+      }),
+    ).toEqual(['tooManyTags']);
+    expect(productChangeErrors({ tags: ['wool rug', 'Wool Rug'] })).toEqual(['tagDuplicate']);
+    expect(productChangeErrors({ tags: ['rug!'] })).toEqual(['tagInvalid']);
+    expect(productChangeErrors({ price: 10, quantity: 1000 })).toEqual([
+      'priceInvalid',
+      'quantityInvalid',
+    ]);
+    expect(productChangeErrors({ title: 'Ok', tags: ['вовна', "kid's rug"], price: 4500 })).toEqual(
+      [],
+    );
+  });
+
+  it('title and tags go to updateListing; price and quantity to the inventory, the rest kept', async () => {
+    const { client, seen } = http({
+      '/v3/application/shops/345/listings/7': [{}],
+      '/v3/application/listings/7/inventory': [
+        {
+          products: [
+            {
+              sku: 'R1',
+              property_values: [],
+              offerings: [
+                {
+                  price: { amount: 4500, divisor: 100, currency_code: 'USD' },
+                  quantity: 3,
+                  is_enabled: true,
+                  readiness_state_id: 99,
+                },
+              ],
+            },
+          ],
+          price_on_property: [],
+          quantity_on_property: [],
+          sku_on_property: [],
+        },
+        {},
+      ],
+      '/v3/application/listings/7': [listing],
+    });
+    const after = await adapter.updateProduct(ctx(client), '7', {
+      title: 'Wool rug',
+      tags: ['rug', 'wool'],
+      price: 4999,
+      quantity: 5,
+    });
+    const patch = seen.find((s) => s.init.method === 'PATCH')!;
+    const form = new URLSearchParams(String(patch.init.body));
+    expect(form.get('title')).toBe('Wool rug');
+    expect(form.get('tags')).toBe('rug,wool');
+    const put = seen.find((s) => s.init.method === 'PUT')!;
+    expect(JSON.parse(String(put.init.body)).products[0]).toEqual({
+      sku: 'R1',
+      property_values: [],
+      offerings: [{ price: 49.99, quantity: 5, is_enabled: true, readiness_state_id: 99 }],
+    });
+    expect(after.title).toBe('Wool rug 2"');
+  });
+
+  it('price of a listing with variations is edited on Etsy', async () => {
+    const { client } = http({
+      '/v3/application/listings/7/inventory': [
+        { products: [{ offerings: [{ quantity: 1 }] }, { offerings: [{ quantity: 2 }] }] },
+      ],
+    });
+    await expect(adapter.updateProduct(ctx(client), '7', { price: 5000 })).rejects.toSatisfy((e) =>
+      isAdapterError(e, 'NOT_AVAILABLE'),
+    );
   });
 });

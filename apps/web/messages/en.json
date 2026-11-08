@@ -630,7 +630,8 @@
         "revenue": "Earned for the units sold in the period — price × quantity, without tax and shipping."
       },
       "posts": "{count, plural, one {# pin leads here} other {# pins lead here}}",
-      "postsHint": "Pins whose link leads to this product."
+      "postsHint": "Pins whose link leads to this product.",
+      "edit": "Edit"
     },
     "orders": {
       "title": "Orders",
@@ -676,6 +677,51 @@
         "other": "Other",
         "net": "Net revenue"
       }
+    },
+    "editor": {
+      "title": "Edit product",
+      "reviewTitle": "Review changes",
+      "close": "Close",
+      "fields": {
+        "title": "Title",
+        "description": "Description",
+        "tags": "Tags",
+        "price": "Price",
+        "quantity": "Quantity"
+      },
+      "tagsHint": "Up to 13 tags, each up to 20 characters: letters, digits, spaces, hyphen and apostrophe. Enter or comma adds a tag.",
+      "addTag": "Add a tag",
+      "removeTag": "Remove tag “{tag}”",
+      "variations": "This product has variations: their prices and quantities are changed on Etsy.",
+      "errors": {
+        "titleEmpty": "Title cannot be empty.",
+        "titleTooLong": "Etsy allows up to 140 characters.",
+        "tooManyTags": "Etsy allows up to 13 tags.",
+        "tagTooLong": "A tag is up to 20 characters.",
+        "tagInvalid": "A tag may contain only letters, digits, spaces, hyphen and apostrophe.",
+        "priceInvalid": "Price starts at 0.20.",
+        "quantityInvalid": "Quantity is a whole number from 0 to 999."
+      },
+      "reasons": {
+        "role": "Products can be edited by an owner, admin or manager.",
+        "connection": "The shop needs to be reconnected.",
+        "readOnly": "The shop is connected read-only — Adelie cannot change products.",
+        "removed": "This product is no longer in the shop."
+      },
+      "enableFullAccess": "Enable full access",
+      "loadFailed": "Could not get the product from Etsy. Try again.",
+      "changedCount": "{count, plural, one {# field changed} other {# fields changed}}",
+      "noChanges": "No changes yet",
+      "review": "Review changes",
+      "back": "Back",
+      "save": "Save to Etsy",
+      "saving": "Saving…",
+      "saved": "Saved to Etsy.",
+      "conflict": "The product was changed on Etsy while you were editing. The fresh version is shown — nothing was overwritten.",
+      "rejected": "Etsy did not accept the change. {message}",
+      "failed": "Could not save. Try again.",
+      "history": "Changes made in Adelie",
+      "failedBadge": "failed"
     }
   }
 }

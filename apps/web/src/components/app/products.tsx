@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, ExternalLink, Package, Pin, Search, X } from 'lucide-react';
+import { ArrowDown, ExternalLink, Package, PenLine, Pin, Search, X } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -9,6 +9,7 @@ import { PeriodControl, resolveRange, type DateRange, type RangeLabels } from '.
 import { FilterChip } from '../ui/filter-chip';
 import { InfoTip } from '../ui/info-tip';
 import { EmptyState, PageHeader } from './page-header';
+import { ProductEditor } from './product-editor';
 import { useMoney, useSalesBase, useShops } from './sales-data';
 
 type Product = {
@@ -48,6 +49,9 @@ export function Products() {
   const [sort, setSort] = useState<Column>('revenue');
   const [search, setSearch] = useState('');
   const [data, setData] = useState<{ key: string; value: Response } | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  /** Bumped after a save: the list reloads with the new values. */
+  const [version, setVersion] = useState(0);
 
   const range = resolveRange(period);
   const query = new URLSearchParams({
@@ -66,7 +70,7 @@ export function Products() {
     return () => {
       cancelled = true;
     };
-  }, [base, query]);
+  }, [base, query, version]);
   const shown = data?.key === key ? data.value : null;
 
   const states = useMemo(
@@ -219,7 +223,7 @@ export function Products() {
               </span>
             ))}
           </span>
-          <span className="w-8" />
+          <span className="w-16" />
         </div>
         {!shown ? (
           <p className="px-5 py-10 text-center text-sm text-muted">…</p>
@@ -289,7 +293,18 @@ export function Products() {
                     </div>
                   ))}
                 </dl>
-                <span className="w-8 shrink-0">
+                <span className="flex w-16 shrink-0 justify-end">
+                  {p.state !== 'removed' && (
+                    <button
+                      type="button"
+                      onClick={() => setEditing(p.id)}
+                      className="icon-btn h-8 w-8"
+                      aria-label={t('products.edit')}
+                      title={t('products.edit')}
+                    >
+                      <PenLine size={15} aria-hidden="true" />
+                    </button>
+                  )}
                   {p.url && (
                     <a
                       href={p.url}
@@ -308,6 +323,15 @@ export function Products() {
           </ul>
         )}
       </section>
+
+      {editing && base && (
+        <ProductEditor
+          base={base}
+          productId={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => setVersion((v) => v + 1)}
+        />
+      )}
     </>
   );
 }

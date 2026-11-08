@@ -30,6 +30,7 @@ model User {
   profile            UserProfile?
   connectInvitations ConnectInvitation[]
   preferences        UserPreference[]
+  productChanges     ShopProductChange[]
 
   @@map("user")
 }
@@ -662,6 +663,7 @@ model ShopProduct {
   updatedAt   DateTime      @updatedAt
 
   orderItems ShopOrderItem[]
+  changes    ShopProductChange[]
 
   @@unique([accountId, externalId])
   @@index([projectId])
@@ -740,4 +742,24 @@ model ShopLedgerEntry {
   @@unique([accountId, externalId])
   @@index([projectId, occurredAt])
   @@map("shop_ledger_entry")
+}
+
+/// Audit of changes made to a product from Adelie (ADR-0019): who changed what, from what to what.
+model ShopProductChange {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  workspaceId String      @db.Uuid
+  projectId   String      @db.Uuid
+  productId   String      @db.Uuid
+  product     ShopProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// { field: { from, to } } — only the fields that changed.
+  changes     Json
+  /// applied | failed
+  status      String
+  error       String?
+  createdAt   DateTime    @default(now())
+
+  @@index([productId, createdAt])
+  @@map("shop_product_change")
 }

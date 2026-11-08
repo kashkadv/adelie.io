@@ -83,7 +83,7 @@ const count = (v: number | null | undefined): number | null =>
   typeof v === 'number' && v >= 0 ? v : null;
 
 /** Digits after the decimal point of a currency (USD 2, JPY 0); 2 when unknown. */
-function minorDigits(currency: string): number {
+export function minorDigits(currency: string): number {
   try {
     return (
       new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions()
@@ -237,4 +237,52 @@ export function mapLedgerEntry(raw: EtsyLedgerEntry): LedgerEntryData {
     amount: raw.amount,
     currency: raw.currency ?? 'USD',
   };
+}
+
+/** Etsy's limits for listing fields (developer docs; tags: letters, digits, spaces, - ' ™ © ®). */
+export const ETSY_LIMITS = { title: 140, tags: 13, tag: 20, quantity: 999 } as const;
+const TAG = /^[\p{L}\p{N}\s\-'™©®]+$/u;
+
+export type ProductChangeError =
+  | 'titleEmpty'
+  | 'titleTooLong'
+  | 'tooManyTags'
+  | 'tagTooLong'
+  | 'tagInvalid'
+  | 'tagDuplicate'
+  | 'priceInvalid'
+  | 'quantityInvalid';
+
+/** Problems Etsy would reject a change for — checked before anything is sent. */
+export function productChangeErrors(changes: {
+  title?: string;
+  tags?: string[];
+  price?: number;
+  quantity?: number;
+}): ProductChangeError[] {
+  const errors: ProductChangeError[] = [];
+  if (changes.title !== undefined) {
+    if (!changes.title.trim()) errors.push('titleEmpty');
+    if (changes.title.length > ETSY_LIMITS.title) errors.push('titleTooLong');
+  }
+  if (changes.tags) {
+    if (changes.tags.length > ETSY_LIMITS.tags) errors.push('tooManyTags');
+    if (changes.tags.some((t) => t.length > ETSY_LIMITS.tag)) errors.push('tagTooLong');
+    if (changes.tags.some((t) => !TAG.test(t))) errors.push('tagInvalid');
+    const lower = changes.tags.map((t) => t.toLowerCase());
+    if (new Set(lower).size !== lower.length) errors.push('tagDuplicate');
+  }
+  // Etsy's minimum listing price is 0.20 of the currency (here in minor units: 20).
+  if (changes.price !== undefined && (!Number.isInteger(changes.price) || changes.price < 20)) {
+    errors.push('priceInvalid');
+  }
+  if (
+    changes.quantity !== undefined &&
+    (!Number.isInteger(changes.quantity) ||
+      changes.quantity < 0 ||
+      changes.quantity > ETSY_LIMITS.quantity)
+  ) {
+    errors.push('quantityInvalid');
+  }
+  return errors;
 }
