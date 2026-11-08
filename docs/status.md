@@ -135,4 +135,8 @@ SUCCESS — 10 дошок, 55 пінів із метриками, 90 днів а
   Verification у Meta (Instagram Advanced access) та комерційного доступу Etsy. Перед комерційним запуском —
   ФОП в умовах, платні тарифи й юридичний перегляд.
 - Etsy — майбутній напрям E-commerce Intelligence, поза MVP.
+- **Etsy Commercial Access** — подаватись із першим зовнішнім продавцем (разом із Business Verification у Meta, ФОП).
+  Дає: будь-яку кількість магазинів (Personal — до 5 разом із власним), можливо вищі ліміти (або лист на
+  developer@etsy.com), Enterprise Tier > 3 млн запитів/добу. Нових даних не дає. Вимоги: ручна перевірка, OAuth,
+  торговельна марка Etsy; платний продукт на Etsy API — лише з дозволу Etsy.
 - Деталі інфраструктури: [plans/infra-discussion.md](plans/infra-discussion.md).
