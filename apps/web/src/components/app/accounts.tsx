@@ -83,6 +83,7 @@ function RowMenu({
   const t = useTranslations('Accounts');
   const format = useFormatter();
   const [open, setOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const disconnected = account.status === 'REVOKED';
   const hidden = account.hidden;
@@ -134,7 +135,10 @@ function RowMenu({
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => !v);
+          setUpgradeOpen(false);
+        }}
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={t('actions')}
@@ -149,8 +153,53 @@ function RowMenu({
         >
           {account.status === 'ACTIVE' && item('sync', t('syncNow'), false, syncNote)}
           {account.status !== 'REVOKED' && account.access && item('access', t('changeAccess'))}
-          {account.missingFeatures.length > 0 && item('upgrade', t('updateAccess.action'))}
-          {account.missingFeatures.length > 0 && item('upgradeInvite', t('updateAccess.copyLink'))}
+          {account.missingFeatures.length > 0 && (
+            <>
+              {/* "Update access" opens its two ways in place: here, or by a link for the owner. */}
+              <button
+                type="button"
+                role="menuitem"
+                aria-expanded={upgradeOpen}
+                onClick={() => setUpgradeOpen((v) => !v)}
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-hover"
+              >
+                {t('updateAccess.action')}
+                <ChevronDown
+                  size={15}
+                  aria-hidden="true"
+                  className={`text-muted transition-transform duration-200 ${upgradeOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {upgradeOpen && (
+                <div className="ml-3 border-l border-line pl-2">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      onAction('upgrade');
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-hover"
+                  >
+                    <ArrowRight size={14} className="text-muted" aria-hidden="true" />
+                    {t('updateAccess.go', { platform: t(`platforms.${account.platform}`) })}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      onAction('upgradeInvite');
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-hover"
+                  >
+                    <Link2 size={14} className="text-muted" aria-hidden="true" />
+                    {t('updateAccess.copyLink')}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
           {disconnected ? item('reconnect', t('reconnect')) : item('disconnect', t('disconnect'))}
           {hidden ? item('unhide', t('unhide')) : item('hide', t('hide'))}
           <div className="my-1 h-px bg-line" />

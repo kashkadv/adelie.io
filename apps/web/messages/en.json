@@ -413,8 +413,9 @@
       "action": "Update access",
       "title": "More data available",
       "text": "Features “{features}” need an extra permission. “Update access” in the “⋯” menu — the platform asks for consent; the connection and all its history stay.",
-      "copyLink": "Copy link to update access",
-      "inviteBadge": "update access · {account}"
+      "copyLink": "Copy link",
+      "inviteBadge": "update access · {account}",
+      "go": "Go to {platform}"
     },
     "features": {
       "audience": "audience",
