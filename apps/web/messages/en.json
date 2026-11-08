@@ -757,6 +757,40 @@
       "noPins": "No pins lead to this product.",
       "untitledPin": "Untitled pin",
       "pinStats": "{impressions} impressions · {clicks} outbound clicks"
+    },
+    "orderCard": {
+      "close": "Close",
+      "previous": "Previous order",
+      "next": "Next order",
+      "failed": "Could not load the order.",
+      "title": "Order #{number}",
+      "paid": "Paid",
+      "shipped": "Shipped",
+      "items": "{count, plural, one {# item} other {# items}}",
+      "openListing": "Open the listing on Etsy",
+      "paidTitle": "What the buyer paid",
+      "subtotal": "Items",
+      "discount": "Discount",
+      "shipping": "Shipping",
+      "tax": "Sales tax",
+      "taxHint": "Etsy collects it from the buyer and remits it itself — it is not the shop’s money.",
+      "total": "Total",
+      "keptTitle": "What stayed with the shop",
+      "keptHint": "Etsy payment ledger entries tied to this order: the payment, tax, fees and VAT on them. Negative amounts are what Etsy took.",
+      "ledger": {
+        "sales": "Payment",
+        "tax": "Sales tax",
+        "refund": "Refund",
+        "transaction_fee": "Transaction fee",
+        "processing_fee": "Payment processing",
+        "listing_fee": "Listing",
+        "vat": "VAT on Etsy services",
+        "ads": "Etsy ads",
+        "other": "Other"
+      },
+      "net": "Stayed with the shop",
+      "noLedger": "The Etsy ledger has no entries for this order yet.",
+      "noPayment": "The payment for this order is not in the ledger — only fees are shown."
     }
   }
 }

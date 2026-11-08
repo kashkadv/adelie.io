@@ -396,6 +396,18 @@ export class EtsyAdapter implements PlatformAdapter {
     }
   }
 
+  /** Payments of a receipt (never recorded raw: they name the buyer). */
+  async getOrderPaymentIds(ctx: AdapterContext, receiptId: string): Promise<string[]> {
+    const shopId = await this.shopId(ctx);
+    const body = await this.get<{ results?: { payment_id?: number }[] }>(
+      ctx,
+      `/shops/${shopId}/receipts/${receiptId}/payments`,
+      {},
+      true,
+    );
+    return (body.results ?? []).flatMap((p) => (p.payment_id ? [String(p.payment_id)] : []));
+  }
+
   async *listOrders(ctx: AdapterContext, query: { since?: Date }): AsyncIterable<OrderData[]> {
     const shopId = await this.shopId(ctx);
     const minCreated = query.since ? Math.floor(query.since.getTime() / 1000) : undefined;

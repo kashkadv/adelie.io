@@ -264,6 +264,8 @@ export interface PlatformAdapter {
     productExternalId: string,
     changes: ProductChanges,
   ): Promise<ProductEditable>;
+  /** Points of sale: ids of the payments of an order — they key its ledger entries (Etsy). */
+  getOrderPaymentIds?(ctx: AdapterContext, orderExternalId: string): Promise<string[]>;
   /** Points of sale: the payment account's movements since `since`, in pages. */
   listLedger?(ctx: AdapterContext, query: { since: Date }): AsyncIterable<LedgerEntryData[]>;
 }

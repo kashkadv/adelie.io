@@ -369,3 +369,21 @@ describe('Etsy product editing', () => {
     );
   });
 });
+
+describe('Etsy order payments', () => {
+  it('finds the payments of a receipt, without recording them', async () => {
+    const recorded: unknown[] = [];
+    const client = new HttpClient({
+      baseUrl: 'https://api.etsy.com',
+      fetch: (async () =>
+        new Response(JSON.stringify({ results: [{ payment_id: 11 }, { payment_id: 12 }] }), {
+          status: 200,
+        })) as unknown as typeof fetch,
+      record: (r) => void recorded.push(r),
+      sleep: async () => undefined,
+    });
+    const ctx = { accessToken: 'T', accountExternalId: '345', http: client };
+    expect(await adapter.getOrderPaymentIds(ctx, '99')).toEqual(['11', '12']);
+    expect(recorded).toHaveLength(0);
+  });
+});

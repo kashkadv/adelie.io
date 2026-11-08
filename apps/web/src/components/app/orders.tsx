@@ -9,6 +9,7 @@ import { PeriodControl, resolveRange, type DateRange, type RangeLabels } from '.
 import { FilterChip } from '../ui/filter-chip';
 import { InfoTip } from '../ui/info-tip';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
+import { OrderDialog } from './order-dialog';
 import { EmptyState, PageHeader } from './page-header';
 import { minorDigits, useMoney, useSalesBase, useShops } from './sales-data';
 
@@ -127,6 +128,7 @@ export function Orders() {
   const [data, setData] = useState<{ key: string; value: Response } | null>(null);
   const [extra, setExtra] = useState<{ key: string; items: Order[] }>({ key: '', items: [] });
   const [loadingMore, setLoadingMore] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const range = resolveRange(period);
   const query = new URLSearchParams({
@@ -161,6 +163,7 @@ export function Orders() {
     }
   }
 
+  const openIndex = openId ? orders.findIndex((o) => o.id === openId) : -1;
   const main = shown?.totals[0];
   const currency = shown?.seriesCurrency ?? main?.currency ?? null;
   // Revenue per day (or month for long periods), in currency units for the chart.
@@ -326,50 +329,57 @@ export function Orders() {
                 const first = o.items[0];
                 const units = o.items.reduce((n, i) => n + i.quantity, 0);
                 return (
-                  <li key={o.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3">
-                    <span className="tabular w-32 shrink-0 text-sm whitespace-nowrap text-muted">
-                      {format.dateTime(new Date(o.orderedAt), {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </span>
-                    <div className="flex min-w-0 flex-1 basis-60 items-center gap-3">
-                      <span className="flex shrink-0 -space-x-3">
-                        {o.items.slice(0, 3).map((i) => (
-                          <span
-                            key={i.id}
-                            className="h-10 w-10 overflow-hidden rounded-lg border-2 border-[var(--surface,transparent)] bg-hover"
-                          >
-                            {i.product?.imageUrl && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={i.product.imageUrl}
-                                alt=""
-                                loading="lazy"
-                                className="h-full w-full object-cover"
-                              />
-                            )}
-                          </span>
-                        ))}
+                  <li key={o.id}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenId(o.id)}
+                      aria-haspopup="dialog"
+                      className="flex w-full flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3 text-left transition-colors hover:bg-hover"
+                    >
+                      <span className="tabular w-32 shrink-0 text-sm whitespace-nowrap text-muted">
+                        {format.dateTime(new Date(o.orderedAt), {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
                       </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm">
-                          {first?.title ?? first?.product?.title ?? t('orders.noTitle')}
-                        </p>
-                        <p className="text-xs text-muted">
-                          {t('orders.units', { count: units })}
-                          {o.items.length > 1 &&
-                            ` · ${t('orders.more', { count: o.items.length - 1 })}`}
-                        </p>
+                      <div className="flex min-w-0 flex-1 basis-60 items-center gap-3">
+                        <span className="flex shrink-0 -space-x-3">
+                          {o.items.slice(0, 3).map((i) => (
+                            <span
+                              key={i.id}
+                              className="h-10 w-10 overflow-hidden rounded-lg border-2 border-[var(--surface,transparent)] bg-hover"
+                            >
+                              {i.product?.imageUrl && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={i.product.imageUrl}
+                                  alt=""
+                                  loading="lazy"
+                                  className="h-full w-full object-cover"
+                                />
+                              )}
+                            </span>
+                          ))}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm">
+                            {first?.title ?? first?.product?.title ?? t('orders.noTitle')}
+                          </p>
+                          <p className="text-xs text-muted">
+                            {t('orders.units', { count: units })}
+                            {o.items.length > 1 &&
+                              ` · ${t('orders.more', { count: o.items.length - 1 })}`}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <span className="w-32 shrink-0 truncate text-sm text-muted">
-                      {o.country ? countryName(o.country) : '—'}
-                    </span>
-                    <span className="tabular w-28 shrink-0 text-right text-sm font-medium">
-                      {money(o.revenue, o.currency)}
-                    </span>
+                      <span className="w-32 shrink-0 truncate text-sm text-muted">
+                        {o.country ? countryName(o.country) : '—'}
+                      </span>
+                      <span className="tabular w-28 shrink-0 text-right text-sm font-medium">
+                        {money(o.revenue, o.currency)}
+                      </span>
+                    </button>
                   </li>
                 );
               })}
@@ -416,6 +426,20 @@ export function Orders() {
           )}
         </section>
       </div>
+
+      {openId && base && (
+        <OrderDialog
+          base={base}
+          orderId={openId}
+          onClose={() => setOpenId(null)}
+          onPrevious={openIndex > 0 ? () => setOpenId(orders[openIndex - 1]!.id) : undefined}
+          onNext={
+            openIndex >= 0 && openIndex < orders.length - 1
+              ? () => setOpenId(orders[openIndex + 1]!.id)
+              : undefined
+          }
+        />
+      )}
     </>
   );
 }

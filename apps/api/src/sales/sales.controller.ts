@@ -107,6 +107,95 @@ export class SalesController {
   }
 
   /**
+   * One order in full: its lines with their products, the amounts, and what stayed with the shop —
+   * the ledger entries tied to the receipt, its lines and its payments (the payment ids come live
+   * from the platform; without them the card shows fees only).
+   */
+  @Get('orders/:orderId')
+  async order(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    await this.visibleProject(request.workspace, projectId);
+    const db = this.prisma.client;
+    const order = await db.shopOrder.findFirst({
+      where: {
+        id: orderId,
+        projectId,
+        workspaceId: request.workspace.workspaceId,
+        account: SHOP_WHERE,
+      },
+      select: {
+        id: true,
+        externalId: true,
+        accountId: true,
+        orderedAt: true,
+        status: true,
+        isPaid: true,
+        isShipped: true,
+        currency: true,
+        total: true,
+        subtotal: true,
+        shipping: true,
+        tax: true,
+        discount: true,
+        country: true,
+        account: { select: { username: true, displayName: true, platform: true } },
+        items: {
+          select: {
+            id: true,
+            externalId: true,
+            title: true,
+            quantity: true,
+            price: true,
+            product: { select: { id: true, title: true, imageUrl: true, url: true, state: true } },
+          },
+        },
+      },
+    });
+    if (!order) throw new NotFoundException();
+
+    const paymentIds: string[] = await this.connector
+      .withAccount(order.accountId, (adapter, ctx) =>
+        adapter.getOrderPaymentIds
+          ? adapter.getOrderPaymentIds(ctx, order.externalId)
+          : Promise.resolve([]),
+      )
+      .catch(() => []);
+    const ledger = await db.shopLedgerEntry.findMany({
+      where: {
+        accountId: order.accountId,
+        referenceId: {
+          in: [order.externalId, ...order.items.map((i) => i.externalId), ...paymentIds],
+        },
+      },
+      orderBy: { occurredAt: 'asc' },
+      select: {
+        id: true,
+        type: true,
+        category: true,
+        amount: true,
+        currency: true,
+        occurredAt: true,
+      },
+    });
+    const paid = ledger.some((e) => e.category === 'sales');
+    const { externalId, accountId: _accountId, items, ...rest } = order;
+    return {
+      ...rest,
+      number: externalId,
+      revenue: netRevenue(order),
+      items: items.map(({ externalId: _id, ...i }) => i),
+      ledger: ledger.filter((e) => e.category !== 'payout'),
+      // What stayed with the shop: only when the payment itself is among the entries.
+      net: paid
+        ? ledger.filter((e) => e.category !== 'payout').reduce((n, e) => n + e.amount, 0)
+        : null,
+    };
+  }
+
+  /**
    * One product in full: our copy of it, its sales (all time, and per month for a year), its
    * latest orders, and the posts (pins) that lead to it.
    */
