@@ -187,6 +187,17 @@ export function ConnectInviteResult() {
     () => new URLSearchParams(window.location.search).get('connect'),
     () => null,
   );
+  /** Wrong account: who consented and who the link is for. */
+  const as = useSyncExternalStore(
+    subscribe,
+    () => new URLSearchParams(window.location.search).get('as') ?? '',
+    () => '',
+  );
+  const expected = useSyncExternalStore(
+    subscribe,
+    () => new URLSearchParams(window.location.search).get('expected') ?? '',
+    () => '',
+  );
   if (result === null) {
     return (
       <AuthFrame>
@@ -195,7 +206,14 @@ export function ConnectInviteResult() {
     );
   }
   const ok = result === 'connected';
-  const RESULTS = ['connected', 'denied', 'expired', 'alreadyConnected', 'error'] as const;
+  const RESULTS = [
+    'connected',
+    'denied',
+    'expired',
+    'alreadyConnected',
+    'wrongAccount',
+    'error',
+  ] as const;
   type Result = (typeof RESULTS)[number];
   const key: Result = (RESULTS as readonly string[]).includes(result)
     ? (result as Result)
@@ -209,7 +227,7 @@ export function ConnectInviteResult() {
           <XCircle size={40} strokeWidth={1.5} className="text-muted" aria-hidden="true" />
         )}
         <h1 className="text-xl font-semibold">{t(`result.${key}.title`)}</h1>
-        <p className="text-muted">{t(`result.${key}.text`)}</p>
+        <p className="text-muted">{t(`result.${key}.text`, { as, expected })}</p>
       </div>
     </AuthFrame>
   );

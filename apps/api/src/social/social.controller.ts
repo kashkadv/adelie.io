@@ -33,6 +33,7 @@ import {
   ConnectService,
   accessOf,
   parseAccess,
+  type ConnectOutcome,
   type ConnectResult,
 } from './connect.service.js';
 import { invitationStatus } from './invitation-token.js';
@@ -248,13 +249,31 @@ export class SocialController {
   async start(
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('platform') slug: string,
-    @Body() body: { access?: unknown } | undefined,
+    @Body() body: { access?: unknown; accountId?: unknown } | undefined,
     @Req() request: { workspace: WorkspaceRequestContext },
     @Session() session: UserSession,
   ) {
-    const { adapter } = this.connector.adapterFor(slug);
+    const { adapter, platform } = this.connector.adapterFor(slug);
     const access = parseAccess(adapter, body?.access);
     await this.visibleProject(request.workspace, projectId);
+    // Updating access of a connected account: remember which one, to check who consents.
+    let accountId: string | undefined;
+    if (body?.accountId !== undefined) {
+      const account =
+        typeof body.accountId === 'string'
+          ? await this.prisma.client.socialAccount.findFirst({
+              where: {
+                id: body.accountId,
+                projectId,
+                workspaceId: request.workspace.workspaceId,
+                platform,
+              },
+              select: { id: true },
+            })
+          : null;
+      if (!account) throw new NotFoundException();
+      accountId = account.id;
+    }
     const state = createState(
       {
         userId: session.user.id,
@@ -262,6 +281,7 @@ export class SocialController {
         projectId,
         platform: slug,
         access,
+        ...(accountId ? { accountId } : {}),
       },
       config.auth.secret,
     );
@@ -287,12 +307,19 @@ export class SocialController {
   ) {
     const state = query['state'] ? verifyState(query['state'], config.auth.secret) : null;
     const viaInvitation = !!state?.invitationId;
-    const back = (result: ConnectResult) =>
-      res.redirect(
-        viaInvitation
-          ? `${config.webUrl}/connect/result?connect=${result}&platform=${encodeURIComponent(slug)}`
-          : `${config.webUrl}/connections?connect=${result}&platform=${encodeURIComponent(slug)}`,
+    const back = (outcome: ConnectResult | ConnectOutcome) => {
+      const o = typeof outcome === 'string' ? { result: outcome } : outcome;
+      const params = new URLSearchParams({
+        connect: o.result,
+        platform: slug,
+        // Wrong account: who consented and who was meant to (handles, no secrets).
+        ...(o.connectedAs ? { as: o.connectedAs } : {}),
+        ...(o.expected ? { expected: o.expected } : {}),
+      });
+      return res.redirect(
+        `${config.webUrl}/${viaInvitation ? 'connect/result' : 'connections'}?${params}`,
       );
+    };
 
     // Diagnostics without secrets: which parameters the platform sent back (names only).
     console.log(
@@ -320,7 +347,7 @@ export class SocialController {
     code: string,
     state: OAuthState,
     rawState: string,
-  ): Promise<ConnectResult> {
+  ): Promise<ConnectResult | ConnectOutcome> {
     const { workspaceId, projectId, userId } = state;
     // Re-check access: membership or role may have changed since the flow started.
     const member = await this.prisma.client.workspaceMember.findUnique({
@@ -329,7 +356,7 @@ export class SocialController {
     });
     if (!member || !(CONNECT_ROLES as readonly string[]).includes(member.role)) return 'expired';
     await this.visibleProject({ workspaceId, memberId: member.id, role: member.role }, projectId);
-    const { result } = await this.connector.connect({
+    return this.connector.connect({
       slug,
       code,
       workspaceId,
@@ -337,8 +364,8 @@ export class SocialController {
       connectedByUserId: userId!,
       state: rawState,
       access: state.access,
+      expectedAccountId: state.accountId,
     });
-    return result;
   }
 
   private async completeInvitation(
@@ -346,7 +373,7 @@ export class SocialController {
     code: string,
     state: OAuthState,
     rawState: string,
-  ): Promise<ConnectResult> {
+  ): Promise<ConnectResult | ConnectOutcome> {
     const invitation = await this.prisma.client.connectInvitation.findUnique({
       where: { id: state.invitationId! },
     });
@@ -358,7 +385,7 @@ export class SocialController {
     ) {
       return 'expired';
     }
-    const { result, connectionId } = await this.connector.connect({
+    const outcome = await this.connector.connect({
       slug,
       code,
       workspaceId: invitation.workspaceId,
@@ -367,7 +394,10 @@ export class SocialController {
       connectedByUserId: invitation.createdByUserId,
       state: rawState,
       access: invitation.access === 'write' ? 'write' : 'read',
+      // An update-access link: consent must come from that account; otherwise the link stays.
+      expectedAccountId: invitation.accountId ?? undefined,
     });
+    const { result, connectionId } = outcome;
     if (result === 'connected') {
       // Single use. Conditional, so two parallel callbacks cannot both consume it.
       await this.prisma.client.connectInvitation.updateMany({
@@ -375,6 +405,6 @@ export class SocialController {
         data: { usedAt: new Date(), connectionId: connectionId ?? null },
       });
     }
-    return result;
+    return outcome;
   }
 }

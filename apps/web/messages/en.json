@@ -320,7 +320,8 @@
       "denied": "Connection cancelled — access was not granted in {platform}.",
       "expired": "The connection link has expired. Please try again.",
       "alreadyConnected": "This {platform} account is already connected to another project in this workspace.",
-      "error": "Could not connect the account. Please try again later."
+      "error": "Could not connect the account. Please try again later.",
+      "wrongAccount": "You are signed in to {platform} as {as}, but access is being updated for {expected}. Nothing was changed. Sign in to {platform} as {expected} and press “Update access” again."
     },
     "anotherAccountHint": "A platform connects the account you are signed in to in this browser. To add another one, switch to it on the platform's site first. An invitation link lets the account owner connect it themselves — no passwords shared.",
     "syncing": "Syncing…",
@@ -464,6 +465,10 @@
       "error": {
         "title": "Something went wrong",
         "text": "The account could not be connected. Please try again a bit later."
+      },
+      "wrongAccount": {
+        "title": "Wrong account",
+        "text": "You are signed in as {as}, but this link is for {expected}. Nothing was changed. Sign in on the platform as {expected} and open this link again — it still works."
       }
     },
     "fullAccess": "Full access",

@@ -13,6 +13,8 @@ export interface OAuthState {
   platform: string;
   /** Access the connection asks for (ADR-0019); absent = read. */
   access?: 'read' | 'write';
+  /** Updating access of this connected account (ADR-0020): consent must come from it. */
+  accountId?: string;
   /** Random nonce: two states are never equal. */
   nonce: string;
   /** Expiry, ms since epoch. */

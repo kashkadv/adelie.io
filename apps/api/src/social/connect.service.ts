@@ -63,7 +63,16 @@ export function parseAccess(adapter: PlatformAdapter, value: unknown): AccessLev
 export const CONNECT_ROLES = ['OWNER', 'ADMIN', 'MANAGER'] as const;
 
 /** Outcome of a connect attempt, shown to the user by the web app. */
-export type ConnectResult = 'connected' | 'denied' | 'expired' | 'alreadyConnected' | 'error';
+export type ConnectResult =
+  'connected' | 'denied' | 'expired' | 'alreadyConnected' | 'wrongAccount' | 'error';
+
+/** The outcome, and for `wrongAccount` who consented vs who was meant to (handles only). */
+export interface ConnectOutcome {
+  result: ConnectResult;
+  connectionId?: string;
+  connectedAs?: string;
+  expected?: string;
+}
 
 /**
  * Connecting a platform account to a project (ADR-0011, ADR-0012): shared by the signed-in flow
@@ -189,9 +198,18 @@ export class ConnectService {
     /** The signed OAuth state: the PKCE verifier is derived from it. */
     state: string;
     access?: AccessLevel;
-  }): Promise<{ result: ConnectResult; connectionId?: string }> {
+    /** Updating access of this connected account (ADR-0020): consent must come from it. */
+    expectedAccountId?: string;
+  }): Promise<ConnectOutcome> {
     const { slug, code } = input;
     const { platform, adapter, http } = this.adapterFor(slug);
+    const expected = input.expectedAccountId
+      ? await this.prisma.client.socialAccount.findFirst({
+          where: { id: input.expectedAccountId, projectId: input.projectId, platform },
+          select: { externalId: true, username: true, displayName: true },
+        })
+      : null;
+    if (input.expectedAccountId && !expected) return { result: 'expired' };
     const tokens = await adapter.exchangeCode(code, this.redirectUri(slug), http, {
       pkce: pkceFor(input.state, config.auth.secret),
       access: input.access ?? 'read',
@@ -203,7 +221,12 @@ export class ConnectService {
     );
     // Nothing selected on the consent screen (Meta lets people untick every account).
     if (tokens.accountIds && tokens.accountIds.length === 0) return { result: 'denied' };
-    const targets = tokens.accountIds ?? [undefined];
+    let targets: (string | undefined)[] = tokens.accountIds ?? [undefined];
+    // Updating one account: only it may be touched (Meta can grant several — keep just that one).
+    if (expected && tokens.accountIds) {
+      if (tokens.accountIds.includes(expected.externalId)) targets = [expected.externalId];
+      else return this.wrongAccount(adapter, tokens, http, tokens.accountIds[0], expected);
+    }
 
     let connectionId: string | undefined;
     let elsewhere = 0;
@@ -213,6 +236,14 @@ export class ConnectService {
         accountExternalId,
         http,
       });
+      // Consent from another account than the one being updated: nothing is stored or changed.
+      if (expected && account.externalId !== expected.externalId) {
+        return {
+          result: 'wrongAccount',
+          connectedAs: account.username ?? account.displayName ?? account.externalId,
+          expected: expected.username ?? expected.displayName ?? expected.externalId,
+        };
+      }
       const id = await this.store({ ...input, platform, tokens, account });
       if (id) connectionId ??= id;
       else elsewhere++;
@@ -220,6 +251,23 @@ export class ConnectService {
     if (!connectionId) return { result: elsewhere ? 'alreadyConnected' : 'error' };
     // The worker's scheduler picks new accounts up within a minute (INITIAL sync).
     return { result: 'connected', connectionId };
+  }
+
+  private async wrongAccount(
+    adapter: PlatformAdapter,
+    tokens: TokenSet,
+    http: HttpClient,
+    accountExternalId: string | undefined,
+    expected: { externalId: string; username: string | null; displayName: string | null },
+  ): Promise<ConnectOutcome> {
+    const other = await adapter
+      .getAccount({ accessToken: tokens.accessToken, accountExternalId, http })
+      .catch(() => null);
+    return {
+      result: 'wrongAccount',
+      connectedAs: other?.username ?? other?.displayName ?? accountExternalId,
+      expected: expected.username ?? expected.displayName ?? expected.externalId,
+    };
   }
 
   /** Stores one account; null when it already belongs to another project of the workspace. */

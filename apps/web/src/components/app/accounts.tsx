@@ -37,13 +37,28 @@ import { PlatformIcon } from '../ui/platform-icon';
 import { AccessDialog, type AccessLevel } from './access-dialog';
 import { EmptyState, PageHeader } from './page-header';
 
-type ConnectResult = 'connected' | 'denied' | 'expired' | 'alreadyConnected' | 'error';
-const RESULTS: ConnectResult[] = ['connected', 'denied', 'expired', 'alreadyConnected', 'error'];
+type ConnectResult =
+  'connected' | 'denied' | 'expired' | 'alreadyConnected' | 'wrongAccount' | 'error';
+const RESULTS: ConnectResult[] = [
+  'connected',
+  'denied',
+  'expired',
+  'alreadyConnected',
+  'wrongAccount',
+  'error',
+];
 
 /** Reads ?connect=… left by the OAuth callback once, then cleans the URL. */
-function useConnectResult(): [ConnectResult | null, string, () => void] {
+function useConnectResult(): [
+  ConnectResult | null,
+  string,
+  () => void,
+  { as: string; expected: string },
+] {
   const [result, setResult] = useState<ConnectResult | null>(null);
   const [platform, setPlatform] = useState('pinterest');
+  /** Wrong account: who consented and who was meant to. */
+  const [who, setWho] = useState({ as: '', expected: '' });
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const value = params.get('connect') as ConnectResult | null;
@@ -51,10 +66,11 @@ function useConnectResult(): [ConnectResult | null, string, () => void] {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-off read of the redirect result
       setResult(value);
       setPlatform(params.get('platform') ?? 'pinterest');
+      setWho({ as: params.get('as') ?? '', expected: params.get('expected') ?? '' });
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, []);
-  return [result, platform, () => setResult(null)];
+  return [result, platform, () => setResult(null), who];
 }
 
 type RowAction =
@@ -569,10 +585,13 @@ export function Accounts() {
         slug,
         initial: action === 'access' ? (current === 'read' ? 'write' : 'read') : current,
         current: action === 'access' ? current : undefined,
+        accountId: action === 'reconnect' ? undefined : account.id,
       });
     }
-    // Updating access re-runs consent for the same account: the connection is updated in place.
-    if (action === 'reconnect' || action === 'upgrade') return void onConnect(slug);
+    // Updating access re-runs consent for this very account: updated in place, and consent
+    // from another account changes nothing (ADR-0020).
+    if (action === 'upgrade') return void onConnect(slug, undefined, account.id);
+    if (action === 'reconnect') return void onConnect(slug);
     if (action === 'access') return;
     if (action === 'sync') {
       requestSync(account.id).catch(() => setNotice('actionFailed'));
@@ -612,6 +631,8 @@ export function Accounts() {
     slug: PlatformSlug;
     initial: AccessLevel;
     current?: AccessLevel;
+    /** Changing access of this connected account. */
+    accountId?: string;
   } | null>(null);
 
   async function onInvite(slug: PlatformSlug, access?: AccessLevel, accountId?: string) {
@@ -629,15 +650,15 @@ export function Accounts() {
     setCopiedId(id);
     setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 2000);
   }
-  const [result, resultPlatform, dismiss] = useConnectResult();
+  const [result, resultPlatform, dismiss, who] = useConnectResult();
   const [connecting, setConnecting] = useState(false);
   const [startError, setStartError] = useState(false);
 
-  async function onConnect(slug: PlatformSlug, access?: AccessLevel) {
+  async function onConnect(slug: PlatformSlug, access?: AccessLevel, accountId?: string) {
     setConnecting(true);
     setStartError(false);
     try {
-      await connect(slug, access);
+      await connect(slug, access, accountId);
     } catch {
       setStartError(true);
       setConnecting(false);
@@ -669,11 +690,11 @@ export function Accounts() {
           onClose={() => setAccessFor(null)}
           onConnect={(access) => {
             setAccessFor(null);
-            void onConnect(accessFor.slug, access);
+            void onConnect(accessFor.slug, access, accessFor.accountId);
           }}
           onInvite={(access) => {
             setAccessFor(null);
-            void onInvite(accessFor.slug, access);
+            void onInvite(accessFor.slug, access, accessFor.accountId);
           }}
         />
       )}
@@ -694,6 +715,8 @@ export function Accounts() {
           )}
           <p className="flex-1">
             {t(`result.${startError ? 'error' : result!}`, {
+              as: who.as,
+              expected: who.expected,
               platform:
                 resultPlatform === 'instagram'
                   ? 'Instagram'

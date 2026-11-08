@@ -99,11 +99,12 @@ export function useProjectAccounts() {
 
   /** Sends the browser to the platform's consent page; it comes back to /connections?connect=… */
   const connect = useCallback(
-    async (platform: PlatformSlug, access?: 'read' | 'write') => {
+    async (platform: PlatformSlug, access?: 'read' | 'write', accountId?: string) => {
       if (!base) return;
       const { url } = await api<{ url: string }>(`${base}/connections/${platform}`, {
         method: 'POST',
-        json: access ? { access } : {},
+        // accountId: updating that account's access — consent must come from it (ADR-0020).
+        json: { ...(access ? { access } : {}), ...(accountId ? { accountId } : {}) },
       });
       window.location.assign(url);
     },
