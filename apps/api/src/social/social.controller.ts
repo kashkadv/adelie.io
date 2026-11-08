@@ -31,7 +31,7 @@ import {
 import { CONNECT_ROLES, ConnectService, type ConnectResult } from './connect.service.js';
 import { invitationStatus } from './invitation-token.js';
 import { nextManualSync } from './manual-sync.js';
-import { createState, verifyState, type OAuthState } from './oauth-state.js';
+import { createState, pkceFor, verifyState, type OAuthState } from './oauth-state.js';
 
 /**
  * Connecting social accounts to a project (ADR-0011): the signed-in flow and the shared OAuth
@@ -251,7 +251,13 @@ export class SocialController {
       },
       config.auth.secret,
     );
-    return { url: adapter.authorizeUrl(state, this.connector.redirectUri(slug)) };
+    return {
+      url: adapter.authorizeUrl(
+        state,
+        this.connector.redirectUri(slug),
+        pkceFor(state, config.auth.secret),
+      ),
+    };
   }
 
   /**
@@ -286,8 +292,8 @@ export class SocialController {
     try {
       return back(
         viaInvitation
-          ? await this.completeInvitation(slug, query['code'], state)
-          : await this.completeSignedIn(slug, query['code'], state),
+          ? await this.completeInvitation(slug, query['code'], state, query['state']!)
+          : await this.completeSignedIn(slug, query['code'], state, query['state']!),
       );
     } catch (error) {
       // Never log tokens; adapter errors carry no secrets.
@@ -300,6 +306,7 @@ export class SocialController {
     slug: string,
     code: string,
     state: OAuthState,
+    rawState: string,
   ): Promise<ConnectResult> {
     const { workspaceId, projectId, userId } = state;
     // Re-check access: membership or role may have changed since the flow started.
@@ -315,6 +322,7 @@ export class SocialController {
       workspaceId,
       projectId,
       connectedByUserId: userId!,
+      state: rawState,
     });
     return result;
   }
@@ -323,6 +331,7 @@ export class SocialController {
     slug: string,
     code: string,
     state: OAuthState,
+    rawState: string,
   ): Promise<ConnectResult> {
     const invitation = await this.prisma.client.connectInvitation.findUnique({
       where: { id: state.invitationId! },
@@ -342,6 +351,7 @@ export class SocialController {
       projectId: invitation.projectId,
       // Audit: the member who sent the invitation.
       connectedByUserId: invitation.createdByUserId,
+      state: rawState,
     });
     if (result === 'connected') {
       // Single use. Conditional, so two parallel callbacks cannot both consume it.

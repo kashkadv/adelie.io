@@ -268,7 +268,8 @@
     "platforms": {
       "PINTEREST": "Pinterest",
       "INSTAGRAM": "Instagram",
-      "TIKTOK": "TikTok"
+      "TIKTOK": "TikTok",
+      "ETSY": "Etsy"
     },
     "status": {
       "ACTIVE": "Connected",
@@ -361,7 +362,8 @@
     "validUntil": "Link valid until",
     "explain": {
       "pinterest": "You will sign in on Pinterest and confirm access there. Adelie can only read profile, boards, pins and their statistics — it cannot post, edit or delete anything. Access can be revoked at any time in your Pinterest settings.",
-      "instagram": "You will sign in with Meta (Facebook / Instagram) and choose your professional Instagram account. Adelie can only read the profile, posts and their statistics — it cannot post, edit, delete or read messages. Access can be revoked at any time in your Instagram or Facebook settings."
+      "instagram": "You will sign in with Meta (Facebook / Instagram) and choose your professional Instagram account. Adelie can only read the profile, posts and their statistics — it cannot post, edit, delete or read messages. Access can be revoked at any time in your Instagram or Facebook settings.",
+      "etsy": "You will sign in to Etsy and confirm access there. Adelie can only read your shop, products and orders (amounts, items, country) — not buyers’ names, addresses or emails. It cannot change, publish or delete anything. You can revoke access any time in your Etsy settings."
     },
     "continue": "Continue to {platform}",
     "startFailed": "Could not start the connection. Please try again.",
@@ -475,7 +477,8 @@
     "platforms": {
       "PINTEREST": "Pinterest",
       "INSTAGRAM": "Instagram",
-      "TIKTOK": "TikTok"
+      "TIKTOK": "TikTok",
+      "ETSY": "Etsy"
     },
     "period": {
       "label": "Metrics period",

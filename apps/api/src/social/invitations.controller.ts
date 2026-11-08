@@ -28,7 +28,7 @@ import {
   invitationStatus,
   isInvitationToken,
 } from './invitation-token.js';
-import { createState } from './oauth-state.js';
+import { createState, pkceFor } from './oauth-state.js';
 
 /**
  * Connect invitations (ADR-0012): a link that lets someone connect their platform account to a
@@ -189,6 +189,12 @@ export class InvitationsController {
       },
       config.auth.secret,
     );
-    return { url: adapter.authorizeUrl(state, this.connector.redirectUri(slug)) };
+    return {
+      url: adapter.authorizeUrl(
+        state,
+        this.connector.redirectUri(slug),
+        pkceFor(state, config.auth.secret),
+      ),
+    };
   }
 }

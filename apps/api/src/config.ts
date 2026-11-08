@@ -32,6 +32,14 @@ export const config = {
           configId: process.env['INSTAGRAM_CONFIG_ID'],
         }
       : undefined,
+  /** Optional: connecting Etsy shops needs the app's keystring and shared secret. */
+  etsy:
+    process.env['ETSY_KEYSTRING'] && process.env['ETSY_SHARED_SECRET']
+      ? {
+          keystring: process.env['ETSY_KEYSTRING'],
+          sharedSecret: process.env['ETSY_SHARED_SECRET'],
+        }
+      : undefined,
   auth: {
     secret: required('BETTER_AUTH_SECRET'),
     url: process.env['BETTER_AUTH_URL'] ?? 'http://localhost:4000',

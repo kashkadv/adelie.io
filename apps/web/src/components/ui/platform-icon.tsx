@@ -1,6 +1,6 @@
-import { Pin, type LucideProps } from 'lucide-react';
+import { Pin, Store, type LucideProps } from 'lucide-react';
 
-export type PlatformKey = 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK';
+export type PlatformKey = 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY';
 
 /** Instagram-style glyph (lucide has no brand icons): rounded square, lens, flash dot. */
 function InstagramGlyph({ size = 24, strokeWidth = 2, className, ...rest }: LucideProps) {
@@ -26,5 +26,8 @@ function InstagramGlyph({ size = 24, strokeWidth = 2, className, ...rest }: Luci
 
 /** Icon of a social platform (no brand colours — ADR-0009 penguin tones). */
 export function PlatformIcon({ platform, ...props }: LucideProps & { platform: PlatformKey }) {
-  return platform === 'INSTAGRAM' ? <InstagramGlyph {...props} /> : <Pin {...props} />;
+  if (platform === 'INSTAGRAM') return <InstagramGlyph {...props} />;
+  // A shop (Etsy has no neutral glyph; a storefront reads as "point of sale", ADR-0018).
+  if (platform === 'ETSY') return <Store {...props} />;
+  return <Pin {...props} />;
 }

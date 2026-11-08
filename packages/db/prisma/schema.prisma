@@ -214,6 +214,8 @@ enum SocialPlatform {
   PINTEREST
   INSTAGRAM
   TIKTOK
+  /// Point of sale (ADR-0018): the "account" is the shop.
+  ETSY
 }
 
 enum ConnectionStatus {
@@ -318,6 +320,8 @@ model SocialAccount {
   postDaily    PostMetricDaily[]
   postLatest   PostMetricsLatest[]
   syncRuns     SyncRun[]
+  products     ShopProduct[]
+  orders       ShopOrder[]
 
   @@unique([workspaceId, platform, externalId])
   @@index([projectId])
@@ -621,4 +625,87 @@ model SyncPayload {
   @@index([syncRunId])
   @@index([fetchedAt])
   @@map("sync_payload")
+}
+
+// ---------- Sales (ADR-0018): shop = SocialAccount of a point-of-sale platform ----------
+
+/// A product the shop sells (Etsy listing). Money: integer minor units of `currency` (cents).
+model ShopProduct {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  workspaceId String        @db.Uuid
+  projectId   String        @db.Uuid
+  accountId   String        @db.Uuid
+  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  externalId  String
+  title       String
+  url         String?
+  imageUrl    String?
+  /// Platform state: active, inactive, sold_out, draft, expired.
+  state       String
+  price       Int?
+  currency    String?
+  quantity    Int?
+  /// Lifetime counters as the platform reports them (null = not reported).
+  views       Int?
+  favorers    Int?
+  tags        String[]      @default([])
+  listedAt    DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  orderItems ShopOrderItem[]
+
+  @@unique([accountId, externalId])
+  @@index([projectId])
+  @@map("shop_product")
+}
+
+/// An order (Etsy receipt). No buyer personal data is stored — only the country, for geography.
+model ShopOrder {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  workspaceId String        @db.Uuid
+  projectId   String        @db.Uuid
+  accountId   String        @db.Uuid
+  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  externalId  String
+  orderedAt   DateTime
+  status      String?
+  isPaid      Boolean?
+  isShipped   Boolean?
+  /// Money in minor units of `currency`: what the buyer paid (total) and its parts.
+  currency    String
+  total       Int?
+  subtotal    Int?
+  shipping    Int?
+  tax         Int?
+  discount    Int?
+  country     String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  items ShopOrderItem[]
+
+  @@unique([accountId, externalId])
+  @@index([accountId, orderedAt])
+  @@index([projectId, orderedAt])
+  @@map("shop_order")
+}
+
+/// One line of an order (Etsy transaction).
+model ShopOrderItem {
+  id                String       @id @default(uuid(7)) @db.Uuid
+  orderId           String       @db.Uuid
+  order             ShopOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId         String?      @db.Uuid
+  product           ShopProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  externalId        String
+  productExternalId String?
+  title             String?
+  quantity          Int
+  /// Unit price, minor units of the order currency.
+  price             Int?
+
+  @@unique([orderId, externalId])
+  @@index([productId])
+  @@map("shop_order_item")
 }

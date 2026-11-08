@@ -41,12 +41,15 @@ const REFRESH_ACCESS_BEFORE_MS = 7 * 24 * 3600 * 1000;
  */
 const REFRESH_REFRESH_BEFORE_MS = 30 * 24 * 3600 * 1000;
 /** Recorded with every value (ADR-0008 provenance). */
-const API_VERSION: Record<string, string> = { PINTEREST: 'v5', INSTAGRAM: 'v27.0' };
+const API_VERSION: Record<string, string> = { PINTEREST: 'v5', INSTAGRAM: 'v27.0', ETSY: 'v3' };
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
 const asDate = (yyyyMmDd: string) => new Date(`${yyyyMmDd}T00:00:00Z`);
 
 type StepOutcome = 'ok' | 'skipped';
+
+/** Orders re-read on every sync after the first: status and shipping change after the sale. */
+const ORDER_REFRESH_DAYS = 30;
 
 /** Runs one sync. Never throws for expected platform conditions; the SyncRun records the outcome. */
 export async function runSync(
@@ -539,6 +542,108 @@ export async function runSync(
     // 3b. Daily metrics per own post (ADR-0013): only posts with new activity or unsettled days.
     if (adapter.getPostMetrics) {
       await step('postDaily', () => syncPostDaily(changedPosts));
+    }
+
+    // 3c. Points of sale (ADR-0018): products, then orders with their lines.
+    if (adapter.listProducts) {
+      await step('products', async () => {
+        for await (const page of adapter.listProducts!(ctx())) {
+          for (const p of page) {
+            const data = {
+              title: p.title,
+              url: p.url ?? null,
+              imageUrl: p.imageUrl ?? null,
+              state: p.state,
+              price: p.price?.amount ?? null,
+              currency: p.price?.currency ?? null,
+              quantity: p.quantity,
+              views: p.views,
+              favorers: p.favorers,
+              tags: p.tags,
+              listedAt: p.listedAt ?? null,
+            };
+            await prisma.shopProduct.upsert({
+              where: { accountId_externalId: { accountId: account.id, externalId: p.externalId } },
+              create: {
+                workspaceId: account.workspaceId,
+                projectId: account.projectId,
+                accountId: account.id,
+                externalId: p.externalId,
+                ...data,
+              },
+              update: data,
+            });
+            count('products');
+          }
+        }
+      });
+    }
+    if (adapter.listOrders) {
+      await step('orders', async () => {
+        // First sync: the whole history; then the last 30 days, so status changes (shipped,
+        // refunded) are picked up too.
+        const since =
+          job.kind === 'INITIAL' || !account.lastSuccessfulSyncAt
+            ? undefined
+            : new Date(account.lastSuccessfulSyncAt.getTime() - ORDER_REFRESH_DAYS * 86_400_000);
+        const products = new Map(
+          (
+            await prisma.shopProduct.findMany({
+              where: { accountId: account.id },
+              select: { id: true, externalId: true },
+            })
+          ).map((p) => [p.externalId, p.id]),
+        );
+        for await (const page of adapter.listOrders!(ctx(), { since })) {
+          for (const o of page) {
+            const data = {
+              orderedAt: o.orderedAt,
+              status: o.status ?? null,
+              isPaid: o.isPaid ?? null,
+              isShipped: o.isShipped ?? null,
+              currency: o.currency,
+              total: o.total,
+              subtotal: o.subtotal,
+              shipping: o.shipping,
+              tax: o.tax,
+              discount: o.discount,
+              country: o.country ?? null,
+            };
+            await prisma.$transaction(async (tx) => {
+              const order = await tx.shopOrder.upsert({
+                where: {
+                  accountId_externalId: { accountId: account.id, externalId: o.externalId },
+                },
+                create: {
+                  workspaceId: account.workspaceId,
+                  projectId: account.projectId,
+                  accountId: account.id,
+                  externalId: o.externalId,
+                  ...data,
+                },
+                update: data,
+                select: { id: true },
+              });
+              // Lines are replaced as a whole: the platform's receipt is the truth.
+              await tx.shopOrderItem.deleteMany({ where: { orderId: order.id } });
+              await tx.shopOrderItem.createMany({
+                data: o.items.map((i) => ({
+                  orderId: order.id,
+                  productId: i.productExternalId
+                    ? (products.get(i.productExternalId) ?? null)
+                    : null,
+                  externalId: i.externalId,
+                  productExternalId: i.productExternalId ?? null,
+                  title: i.title ?? null,
+                  quantity: i.quantity,
+                  price: i.price?.amount ?? null,
+                })),
+              });
+            });
+            count('orders');
+          }
+        }
+      });
     }
 
     // 4. Account analytics: totals, then each supported breakdown.

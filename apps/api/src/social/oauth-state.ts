@@ -1,7 +1,7 @@
 // OAuth `state` for connecting social accounts: a signed, short-lived token that binds the callback
 // to whoever started it (CSRF protection; ADR-0011, ADR-0012). Stateless: HMAC-SHA256.
 // Exactly one binding: `userId` (a signed-in member connects) or `invitationId` (connect by invitation).
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export interface OAuthState {
   /** Signed-in flow: the callback must come with this user's session. */
@@ -50,4 +50,15 @@ export function verifyState(token: string, secret: string, now = Date.now()): OA
   } catch {
     return null;
   }
+}
+
+/**
+ * PKCE pair for a state (RFC 7636; Etsy requires it). The verifier is derived from the signed state
+ * with the server secret, so the callback recomputes it without storing anything; it never leaves
+ * the API except in the token request.
+ */
+export function pkceFor(state: string, secret: string): { verifier: string; challenge: string } {
+  const verifier = createHmac('sha256', secret).update(`pkce:${state}`).digest('base64url');
+  const challenge = createHash('sha256').update(verifier).digest('base64url');
+  return { verifier, challenge };
 }

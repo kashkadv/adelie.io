@@ -286,17 +286,22 @@ const ROLES: Record<SocialAccount['platform'], ('content' | 'ads' | 'sales')[]> 
   PINTEREST: ['content'],
   INSTAGRAM: ['content'],
   TIKTOK: ['content'],
+  ETSY: ['sales'],
 };
 
-/** Platforms that can be connected now (ADR-0004), grouped by the section they feed (ADR-0018). */
-const CONNECTABLE: { key: 'PINTEREST' | 'INSTAGRAM'; slug: PlatformSlug }[] = [
-  { key: 'PINTEREST', slug: 'pinterest' },
-  { key: 'INSTAGRAM', slug: 'instagram' },
+/** Platforms that can be connected now, grouped by the section they feed (ADR-0018). */
+const CONNECTABLE: {
+  key: 'PINTEREST' | 'INSTAGRAM' | 'ETSY';
+  slug: PlatformSlug;
+  group: 'promotion' | 'sales';
+}[] = [
+  { key: 'PINTEREST', slug: 'pinterest', group: 'promotion' },
+  { key: 'INSTAGRAM', slug: 'instagram', group: 'promotion' },
+  { key: 'ETSY', slug: 'etsy', group: 'sales' },
 ];
 /** Listed as "soon", so the menu shows where Adelie is going. */
 const SOON: { group: 'promotion' | 'sales'; name: string }[] = [
   { group: 'promotion', name: 'TikTok' },
-  { group: 'sales', name: 'Etsy' },
   { group: 'sales', name: 'Shopify' },
 ];
 
@@ -364,35 +369,6 @@ function ConnectMenu({
             {t('groups.promotion')}
             <InfoTip text={t('anotherAccountHint')} />
           </p>
-          {CONNECTABLE.map(({ key, slug }) => (
-            <div key={key}>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  onConnect(slug);
-                }}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-hover"
-              >
-                <PlatformIcon platform={key} size={18} strokeWidth={1.75} aria-hidden="true" />
-                <span className="flex-1">{t(`platforms.${key}`)}</span>
-                <ArrowRight size={14} className="text-muted" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  onInvite(slug);
-                }}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs text-muted hover:bg-hover hover:text-foreground"
-              >
-                <Link2 size={16} strokeWidth={1.75} className="ml-px" aria-hidden="true" />
-                <span className="flex-1">{t('copyInvite')}</span>
-              </button>
-            </div>
-          ))}
           {(['promotion', 'sales'] as const).map((group) => (
             <div key={group}>
               {group === 'sales' && (
@@ -400,6 +376,35 @@ function ConnectMenu({
                   {t('groups.sales')}
                 </p>
               )}
+              {CONNECTABLE.filter((c) => c.group === group).map(({ key, slug }) => (
+                <div key={key}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      onConnect(slug);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-hover"
+                  >
+                    <PlatformIcon platform={key} size={18} strokeWidth={1.75} aria-hidden="true" />
+                    <span className="flex-1">{t(`platforms.${key}`)}</span>
+                    <ArrowRight size={14} className="text-muted" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      onInvite(slug);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs text-muted hover:bg-hover hover:text-foreground"
+                  >
+                    <Link2 size={16} strokeWidth={1.75} className="ml-px" aria-hidden="true" />
+                    <span className="flex-1">{t('copyInvite')}</span>
+                  </button>
+                </div>
+              ))}
               {SOON.filter((s) => s.group === group).map(({ name }) => (
                 <div
                   key={name}
@@ -449,7 +454,7 @@ export function Accounts() {
 
   function onRowAction(account: SocialAccount, action: RowAction) {
     if (action === 'reconnect') {
-      return void onConnect(account.platform === 'INSTAGRAM' ? 'instagram' : 'pinterest');
+      return void onConnect(account.platform.toLowerCase() as PlatformSlug);
     }
     if (action === 'sync') {
       requestSync(account.id).catch(() => setNotice('actionFailed'));
@@ -546,7 +551,12 @@ export function Accounts() {
           )}
           <p className="flex-1">
             {t(`result.${startError ? 'error' : result!}`, {
-              platform: resultPlatform === 'instagram' ? 'Instagram' : 'Pinterest',
+              platform:
+                resultPlatform === 'instagram'
+                  ? 'Instagram'
+                  : resultPlatform === 'etsy'
+                    ? 'Etsy'
+                    : 'Pinterest',
             })}
           </p>
           <button

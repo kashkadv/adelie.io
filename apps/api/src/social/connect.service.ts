@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import type { SocialPlatform } from '@adelie/db';
 import {
+  ETSY_API,
+  EtsyAdapter,
   HttpClient,
   InstagramAdapter,
   META_GRAPH_API,
@@ -13,16 +15,19 @@ import {
 import { socialTokenAad, tokenCipherFromEnv, type TokenCipher } from '@adelie/shared/crypto';
 import { config } from '../config.js';
 import { PrismaService } from '../prisma.service.js';
+import { pkceFor } from './oauth-state.js';
 
 /** URL path segment → platform (ADR-0004: Pinterest, then Instagram). */
 export const PLATFORMS: Record<string, SocialPlatform> = {
   pinterest: 'PINTEREST',
   instagram: 'INSTAGRAM',
+  etsy: 'ETSY',
 };
 export const PLATFORM_SLUGS: Record<SocialPlatform, string> = {
   PINTEREST: 'pinterest',
   INSTAGRAM: 'instagram',
   TIKTOK: 'tiktok',
+  ETSY: 'etsy',
 };
 
 /** Roles that may connect accounts and create connect invitations (ADR-0007). */
@@ -53,6 +58,14 @@ export class ConnectService {
   } {
     const platform = PLATFORMS[slug];
     if (!platform) throw new NotFoundException();
+    if (platform === 'ETSY') {
+      if (!config.etsy) throw new ServiceUnavailableException('Etsy is not configured');
+      return {
+        platform,
+        adapter: new EtsyAdapter(config.etsy),
+        http: new HttpClient({ baseUrl: ETSY_API }),
+      };
+    }
     if (platform === 'INSTAGRAM') {
       if (!config.instagram) throw new ServiceUnavailableException('Instagram is not configured');
       return {
@@ -84,10 +97,17 @@ export class ConnectService {
     workspaceId: string;
     projectId: string;
     connectedByUserId: string | null;
+    /** The signed OAuth state: the PKCE verifier is derived from it. */
+    state: string;
   }): Promise<{ result: ConnectResult; connectionId?: string }> {
     const { slug, code } = input;
     const { platform, adapter, http } = this.adapterFor(slug);
-    const tokens = await adapter.exchangeCode(code, this.redirectUri(slug), http);
+    const tokens = await adapter.exchangeCode(
+      code,
+      this.redirectUri(slug),
+      http,
+      pkceFor(input.state, config.auth.secret),
+    );
 
     // Diagnostics without secrets: how many accounts the grant covers.
     console.log(

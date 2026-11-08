@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STATE_TTL_MS, createState, verifyState } from './oauth-state.js';
+import { STATE_TTL_MS, createState, verifyState, pkceFor } from './oauth-state.js';
 
 const secret = 'test-secret-test-secret-test-secret';
 const data = { userId: 'u1', workspaceId: 'w1', projectId: 'p1', platform: 'pinterest' };
@@ -29,5 +29,15 @@ describe('OAuth state', () => {
     expect(verifyState(`${payload}.${sig}x`, secret)).toBeNull();
     expect(verifyState(token, 'another-secret-another-secret-xx')).toBeNull();
     expect(verifyState('garbage', secret)).toBeNull();
+  });
+});
+
+describe('pkceFor', () => {
+  it('derives a stable RFC 7636 pair per state', () => {
+    const a = pkceFor('state-1', 'secret');
+    expect(a).toEqual(pkceFor('state-1', 'secret'));
+    expect(a.verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(a.challenge).not.toBe(a.verifier);
+    expect(pkceFor('state-2', 'secret').verifier).not.toBe(a.verifier);
   });
 });

@@ -2,7 +2,7 @@
 // and know nothing about the database; the sync orchestrator (worker) persists them.
 import type { HttpClient } from './http.js';
 
-export type Platform = 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK';
+export type Platform = 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY';
 
 /** Mirrors the DataStatus enum in the database. */
 export type DataStatus = 'READY' | 'PROCESSING' | 'ESTIMATE' | 'UNAVAILABLE';
@@ -90,6 +90,60 @@ export interface AdapterContext {
   today?: string;
 }
 
+/** Money in integer minor units of `currency` (e.g. cents), as stored (ADR-0018). */
+export interface Money {
+  amount: number;
+  currency: string;
+}
+
+/** A product of a point of sale (Etsy listing). Lifetime counters: null = not reported. */
+export interface ProductData {
+  externalId: string;
+  title: string;
+  url?: string;
+  imageUrl?: string;
+  state: string;
+  price: Money | null;
+  quantity: number | null;
+  views: number | null;
+  favorers: number | null;
+  tags: string[];
+  listedAt?: Date;
+}
+
+export interface OrderItemData {
+  externalId: string;
+  productExternalId?: string;
+  title?: string;
+  quantity: number;
+  /** Unit price. */
+  price: Money | null;
+}
+
+/** An order. Never carries buyer personal data — only the country. */
+export interface OrderData {
+  externalId: string;
+  orderedAt: Date;
+  status?: string;
+  isPaid?: boolean;
+  isShipped?: boolean;
+  currency: string;
+  /** Minor units of `currency`; null = not reported. */
+  total: number | null;
+  subtotal: number | null;
+  shipping: number | null;
+  tax: number | null;
+  discount: number | null;
+  country?: string;
+  items: OrderItemData[];
+}
+
+/** PKCE (RFC 7636) for platforms that require it (Etsy). */
+export interface Pkce {
+  verifier: string;
+  challenge: string;
+}
+
 export interface AccountMetricsQuery {
   from: string;
   to: string;
@@ -122,8 +176,8 @@ export interface PlatformAdapter {
   readonly capabilities: PlatformCapabilities;
 
   /** URL to send the user to for consent. `state` must be verified on callback (CSRF). */
-  authorizeUrl(state: string, redirectUri: string): string;
-  exchangeCode(code: string, redirectUri: string, http: HttpClient): Promise<TokenSet>;
+  authorizeUrl(state: string, redirectUri: string, pkce?: Pkce): string;
+  exchangeCode(code: string, redirectUri: string, http: HttpClient, pkce?: Pkce): Promise<TokenSet>;
   refreshToken(refreshToken: string, http: HttpClient): Promise<TokenSet>;
 
   getAccount(ctx: AdapterContext): Promise<AccountData>;
@@ -132,4 +186,8 @@ export interface PlatformAdapter {
   getAccountMetrics(ctx: AdapterContext, query: AccountMetricsQuery): Promise<MetricPoint[]>;
   /** Daily metrics of one post (ADR-0013): POST-scope points, one per metric per day. */
   getPostMetrics?(ctx: AdapterContext, query: PostMetricsQuery): Promise<MetricPoint[]>;
+  /** Points of sale (ADR-0018): every product of the shop, in pages. */
+  listProducts?(ctx: AdapterContext): AsyncIterable<ProductData[]>;
+  /** Points of sale: orders created since `since` (all of them when absent), in pages. */
+  listOrders?(ctx: AdapterContext, query: { since?: Date }): AsyncIterable<OrderData[]>;
 }

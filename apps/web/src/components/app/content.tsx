@@ -32,7 +32,7 @@ import { PostDialog } from './post-dialog';
 import { usePreferences } from './preferences';
 import { useWorkspace } from './workspace-context';
 
-type Platform = SocialAccount['platform'];
+type Platform = Exclude<SocialAccount['platform'], 'ETSY'>;
 type MetricKey =
   | 'impressions'
   | 'saves'
@@ -282,8 +282,12 @@ export function Content() {
     () => allAccounts?.filter((a) => a.status !== 'REVOKED' && !a.hidden) ?? null,
     [allAccounts],
   );
+  // Points of sale have no posts (ADR-0018): their data lives in Sales.
   const platforms = useMemo(
-    () => [...new Set((accounts ?? []).map((a) => a.platform))],
+    () =>
+      [...new Set((accounts ?? []).map((a) => a.platform))].filter(
+        (p): p is Platform => p in ALL_COLUMNS,
+      ),
     [accounts],
   );
   const [chosenPlatform, setPlatform] = useState<Platform | null>(null);

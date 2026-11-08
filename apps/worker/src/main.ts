@@ -4,6 +4,8 @@ import {
   InstagramAdapter,
   META_GRAPH_API,
   PINTEREST_API,
+  ETSY_API,
+  EtsyAdapter,
   PinterestAdapter,
 } from '@adelie/platforms';
 import {
@@ -51,6 +53,14 @@ const instagram =
       })
     : null;
 
+const etsy =
+  process.env['ETSY_KEYSTRING'] && process.env['ETSY_SHARED_SECRET']
+    ? new EtsyAdapter({
+        keystring: process.env['ETSY_KEYSTRING'],
+        sharedSecret: process.env['ETSY_SHARED_SECRET'],
+      })
+    : null;
+
 const deps: SyncDeps = {
   prisma,
   cipher,
@@ -60,6 +70,7 @@ const deps: SyncDeps = {
     if (platform === 'INSTAGRAM' && instagram) {
       return { adapter: instagram, baseUrl: META_GRAPH_API };
     }
+    if (platform === 'ETSY' && etsy) return { adapter: etsy, baseUrl: ETSY_API };
     return null;
   },
   log: (message) => console.log(`[sync] ${message}`),
