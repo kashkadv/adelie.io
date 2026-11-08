@@ -3,9 +3,9 @@
 import { ArrowUpRight, ChevronLeft, ChevronRight, ExternalLink, Play, X } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useId, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { api } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
+import { PanelSheet } from '../ui/panel-sheet';
 import { Segmented } from '../ui/segmented';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
 import { useMoney } from './sales-data';
@@ -127,12 +127,8 @@ export function PostDialog({
     };
     document.addEventListener('keydown', onKey);
     panel.current?.focus();
-    // The page behind must not scroll while the dialog is open.
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = overflow;
     };
   }, [onClose, onPrevious, onNext]);
 
@@ -174,65 +170,52 @@ export function PostDialog({
       ...(withYear ? { year: 'numeric' } : {}),
     });
 
-  return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6">
-      <button
-        type="button"
-        aria-label={t('close')}
-        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div
-        ref={panel}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        className="glass glass-strong animate-rise relative flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-[28px] outline-none"
-      >
-        {/* Top bar: navigation and close — stays visible while the body scrolls. */}
-        <div className="flex items-center gap-1 border-b border-line px-4 py-2.5">
-          <span className="flex-1 truncate px-2 text-sm text-muted">
-            {detail &&
-              [
-                PLATFORM_NAMES[platform],
-                detail.account.displayName || detail.account.username,
-                detail.board?.name,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-          </span>
-          <button
-            type="button"
-            onClick={onPrevious}
-            disabled={!onPrevious}
-            aria-label={t('previous')}
-            title={t('previous')}
-            className="icon-btn h-9 w-9 disabled:opacity-30"
-          >
-            <ChevronLeft size={18} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={onNext}
-            disabled={!onNext}
-            aria-label={t('next')}
-            title={t('next')}
-            className="icon-btn h-9 w-9 disabled:opacity-30"
-          >
-            <ChevronRight size={18} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t('close')}
-            className="icon-btn h-9 w-9"
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
-        </div>
+  return (
+    <PanelSheet labelledBy={titleId} panelRef={panel}>
+      {/* Top bar: navigation and close — stays visible while the body scrolls. */}
+      <div className="flex items-center gap-1 border-b border-line px-4 py-2.5">
+        <span className="flex-1 truncate px-2 text-sm text-muted">
+          {detail &&
+            [
+              PLATFORM_NAMES[platform],
+              detail.account.displayName || detail.account.username,
+              detail.board?.name,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+        </span>
+        <button
+          type="button"
+          onClick={onPrevious}
+          disabled={!onPrevious}
+          aria-label={t('previous')}
+          title={t('previous')}
+          className="icon-btn h-9 w-9 disabled:opacity-30"
+        >
+          <ChevronLeft size={18} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={!onNext}
+          aria-label={t('next')}
+          title={t('next')}
+          className="icon-btn h-9 w-9 disabled:opacity-30"
+        >
+          <ChevronRight size={18} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('close')}
+          className="icon-btn h-9 w-9"
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
+      </div>
 
-        <div className="overflow-y-auto p-5 sm:p-6">
+      <div className="flex-1 overflow-y-auto p-5 sm:p-8">
+        <div className="mx-auto w-full max-w-5xl">
           {failed && <p className="py-10 text-center text-sm text-muted">{t('failed')}</p>}
           {!detail && !failed && <p className="py-16 text-center text-sm text-muted">…</p>}
           {detail && (
@@ -411,7 +394,6 @@ export function PostDialog({
           )}
         </div>
       </div>
-    </div>,
-    document.body,
+    </PanelSheet>
   );
 }

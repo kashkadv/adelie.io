@@ -14,6 +14,7 @@ import { Sidebar } from './sidebar';
 import { MeProvider } from './me-context';
 import { UserMenu } from './user-menu';
 import { WorkspaceProvider } from './workspace-context';
+import { PANEL_LAYER_ID } from '../ui/panel-sheet';
 
 /**
  * Full-screen app frame in two layers (ADR-0009):
@@ -42,7 +43,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
       <WorkspaceProvider>
         <div className="flex h-dvh flex-col px-3 pb-3 md:px-8 md:pb-8">
           {/* Top bar (base layer) */}
-          <header className="flex h-16 shrink-0 items-center md:h-[88px]">
+          <header className="relative z-50 flex h-16 shrink-0 items-center md:h-[88px]">
             <button
               type="button"
               className="icon-btn md:hidden"
@@ -111,9 +112,13 @@ export function AppFrame({ children }: { children: ReactNode }) {
             )}
 
             {/* Content viewport (raised layer) */}
-            <main className="content-panel min-w-0 flex-1 overflow-y-auto rounded-[32px] md:ml-6">
-              <div className="w-full p-5 md:p-8">{children}</div>
-            </main>
+            <div className="relative min-w-0 flex-1 md:ml-6">
+              <main className="content-panel h-full overflow-y-auto rounded-[32px]">
+                <div className="w-full p-5 md:p-8">{children}</div>
+              </main>
+              {/* Detail sheets (post, product) open here, exactly over the panel. */}
+              <div id={PANEL_LAYER_ID} className="pointer-events-none absolute inset-0 z-40" />
+            </div>
           </div>
         </div>
       </WorkspaceProvider>
