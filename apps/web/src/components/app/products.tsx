@@ -9,6 +9,7 @@ import { PeriodControl, resolveRange, type DateRange, type RangeLabels } from '.
 import { FilterChip } from '../ui/filter-chip';
 import { InfoTip } from '../ui/info-tip';
 import { EmptyState, PageHeader } from './page-header';
+import { ProductDialog } from './product-dialog';
 import { ProductEditor } from './product-editor';
 import { useMoney, useSalesBase, useShops } from './sales-data';
 
@@ -52,6 +53,7 @@ export function Products() {
   const [search, setSearch] = useState('');
   const [data, setData] = useState<{ key: string; value: Response } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   /** Bumped after a save: the list reloads with the new values. */
   const [version, setVersion] = useState(0);
 
@@ -99,6 +101,8 @@ export function Products() {
       return (b.listedAt ?? '').localeCompare(a.listedAt ?? '');
     });
   }, [shown, state, pins, search, sort]);
+
+  const openIndex = openId ? items.findIndex((p) => p.id === openId) : -1;
 
   const labels: RangeLabels = {
     all: tc('period.all'),
@@ -255,8 +259,14 @@ export function Products() {
                 key={p.id}
                 className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 xl:flex-nowrap"
               >
-                <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
-                  <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-hover">
+                {/* The product itself opens its card (sales, orders, pins). */}
+                <button
+                  type="button"
+                  onClick={() => setOpenId(p.id)}
+                  aria-haspopup="dialog"
+                  className="group flex min-w-0 flex-1 basis-72 items-center gap-3 rounded-xl text-left"
+                >
+                  <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-hover transition-transform duration-200 group-hover:scale-[1.04]">
                     {p.imageUrl && (
                       // External platform image: plain <img>, lazy.
                       // eslint-disable-next-line @next/next/no-img-element
@@ -269,7 +279,10 @@ export function Products() {
                     )}
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium" title={p.title}>
+                    <p
+                      className="truncate text-sm font-medium group-hover:underline group-hover:underline-offset-2"
+                      title={p.title}
+                    >
                       {p.title}
                     </p>
                     <p className="flex items-center gap-2 text-xs text-muted">
@@ -297,7 +310,7 @@ export function Products() {
                         })}
                     </p>
                   </div>
-                </div>
+                </button>
                 <dl className="tabular grid shrink-0 grid-cols-3 gap-x-6 gap-y-2 text-right sm:grid-cols-6 xl:w-[46rem]">
                   {COLUMNS.map((c) => (
                     <div key={c}>
@@ -342,6 +355,28 @@ export function Products() {
           </ul>
         )}
       </section>
+
+      {openId && base && (
+        <ProductDialog
+          base={base}
+          productId={openId}
+          onClose={() => setOpenId(null)}
+          onPrevious={openIndex > 0 ? () => setOpenId(items[openIndex - 1]!.id) : undefined}
+          onNext={
+            openIndex >= 0 && openIndex < items.length - 1
+              ? () => setOpenId(items[openIndex + 1]!.id)
+              : undefined
+          }
+          onEdit={
+            items[openIndex]?.state !== 'removed'
+              ? () => {
+                  setEditing(openId);
+                  setOpenId(null);
+                }
+              : undefined
+          }
+        />
+      )}
 
       {editing && base && (
         <ProductEditor

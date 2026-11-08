@@ -30,7 +30,7 @@ import {
   WorkspaceRoles,
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
-import { moneyFlow, netRevenue, ordersByDay } from './sales.js';
+import { monthlySales, moneyFlow, netRevenue, ordersByDay } from './sales.js';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
@@ -104,6 +104,99 @@ export class SalesController {
         user: { select: { name: true } },
       },
     });
+  }
+
+  /**
+   * One product in full: our copy of it, its sales (all time, and per month for a year), its
+   * latest orders, and the posts (pins) that lead to it.
+   */
+  @Get('products/:productId')
+  async product(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    await this.visibleProject(request.workspace, projectId);
+    const db = this.prisma.client;
+    const product = await db.shopProduct.findFirst({
+      where: {
+        id: productId,
+        projectId,
+        workspaceId: request.workspace.workspaceId,
+        account: SHOP_WHERE,
+      },
+      select: {
+        id: true,
+        externalId: true,
+        title: true,
+        url: true,
+        imageUrl: true,
+        state: true,
+        price: true,
+        currency: true,
+        quantity: true,
+        views: true,
+        favorers: true,
+        tags: true,
+        listedAt: true,
+        updatedAt: true,
+        account: { select: { id: true, username: true, displayName: true, platform: true } },
+      },
+    });
+    if (!product) throw new NotFoundException();
+
+    const [lines, posts] = await Promise.all([
+      db.shopOrderItem.findMany({
+        where: { productId },
+        orderBy: { order: { orderedAt: 'desc' } },
+        select: {
+          id: true,
+          quantity: true,
+          price: true,
+          order: { select: { orderedAt: true, country: true, currency: true, status: true } },
+        },
+      }),
+      db.socialPost.findMany({
+        where: {
+          projectId,
+          workspaceId: request.workspace.workspaceId,
+          linkKey: `${product.account.platform.toLowerCase()}:${product.externalId}`,
+          account: { hiddenAt: null, connection: { status: { not: 'REVOKED' } } },
+        },
+        orderBy: { publishedAt: { sort: 'desc', nulls: 'last' } },
+        select: {
+          id: true,
+          title: true,
+          thumbnailUrl: true,
+          url: true,
+          publishedAt: true,
+          account: { select: { platform: true } },
+          latest: { select: { impressions: true, saves: true, outboundClicks: true } },
+        },
+      }),
+    ]);
+    const flat = lines.map((l) => ({ ...l, orderedAt: l.order.orderedAt }));
+    const { externalId: _externalId, ...rest } = product;
+    return {
+      ...rest,
+      sales: {
+        units: lines.reduce((n, l) => n + l.quantity, 0),
+        revenue: lines.reduce((n, l) => n + (l.price ?? 0) * l.quantity, 0),
+        orders: lines.length,
+        firstSale: lines.at(-1)?.order.orderedAt ?? null,
+        lastSale: lines[0]?.order.orderedAt ?? null,
+      },
+      monthly: monthlySales(flat, 12, new Date().toISOString().slice(0, 10)),
+      orders: lines.slice(0, 10).map((l) => ({
+        id: l.id,
+        orderedAt: l.order.orderedAt,
+        quantity: l.quantity,
+        price: l.price,
+        currency: l.order.currency,
+        country: l.order.country,
+      })),
+      posts,
+    };
   }
 
   /**

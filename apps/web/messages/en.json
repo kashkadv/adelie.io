@@ -734,6 +734,29 @@
       "failed": "Could not save. Try again.",
       "history": "Changes made in Adelie",
       "failedBadge": "failed"
+    },
+    "card": {
+      "close": "Close",
+      "previous": "Previous product",
+      "next": "Next product",
+      "failed": "Could not load the product.",
+      "openOnEtsy": "Open on Etsy",
+      "lastSale": "last sold {date}",
+      "tags": "{count, plural, =0 {Tags} other {Tags · #}}",
+      "tagsHint": "Etsy search finds the product by its tags: up to 13, each a phrase buyers search for.",
+      "noTags": "No tags — Etsy search finds this product less often.",
+      "soldHint": "Units sold, all time.",
+      "revenueHint": "Earned for all units sold — price × quantity, without tax and shipping.",
+      "monthly": "Sales by month",
+      "ordersTotal": "{count, plural, one {# order} other {# orders}} all time",
+      "since": "since {date}",
+      "latestOrders": "Latest orders",
+      "noOrders": "This product has not sold yet.",
+      "pins": "Pins leading here",
+      "pinsHint": "Pinterest pins whose link leads to this listing.",
+      "noPins": "No pins lead to this product.",
+      "untitledPin": "Untitled pin",
+      "pinStats": "{impressions} impressions · {clicks} outbound clicks"
     }
   }
 }

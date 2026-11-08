@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { moneyFlow, netRevenue, ordersByDay, salesOverview } from './sales.js';
+import { monthlySales, moneyFlow, netRevenue, ordersByDay, salesOverview } from './sales.js';
 
 describe('sales', () => {
   it('revenue leaves out the sales tax the platform remits', () => {
@@ -81,5 +81,30 @@ describe('moneyFlow', () => {
       ads: -13912,
       net: 340000 - 36500 - 59074 - 13912,
     });
+  });
+});
+
+describe('monthlySales', () => {
+  it('units and revenue per month, empty months as zero', () => {
+    const line = (iso: string, quantity: number, price: number) => ({
+      orderedAt: new Date(iso),
+      quantity,
+      price,
+    });
+    expect(
+      monthlySales(
+        [
+          line('2026-10-03T10:00:00Z', 2, 1000),
+          line('2026-08-31T23:00:00Z', 1, 500),
+          line('2025-01-01T00:00:00Z', 9, 9),
+        ],
+        3,
+        '2026-10-24',
+      ),
+    ).toEqual([
+      { month: '2026-08-01', units: 1, revenue: 500 },
+      { month: '2026-09-01', units: 0, revenue: 0 },
+      { month: '2026-10-01', units: 2, revenue: 2000 },
+    ]);
   });
 });

@@ -149,3 +149,27 @@ export function salesOverview(orders: SalesOrder[], current: Window, previous: W
     ],
   };
 }
+
+/**
+ * Units and revenue per calendar month (UTC) for the last `months` months up to `today`,
+ * from order lines (unit price × quantity). Months without sales are zero.
+ */
+export function monthlySales(
+  lines: { orderedAt: Date; quantity: number; price: number | null }[],
+  months: number,
+  today: string,
+): { month: string; units: number; revenue: number }[] {
+  const [y, m] = today.split('-').map(Number) as [number, number];
+  const out = Array.from({ length: months }, (_, i) => {
+    const d = new Date(Date.UTC(y, m - 1 - (months - 1 - i), 1));
+    return { month: d.toISOString().slice(0, 10), units: 0, revenue: 0 };
+  });
+  const index = new Map(out.map((o, i) => [o.month.slice(0, 7), i]));
+  for (const l of lines) {
+    const i = index.get(l.orderedAt.toISOString().slice(0, 7));
+    if (i === undefined) continue;
+    out[i]!.units += l.quantity;
+    out[i]!.revenue += (l.price ?? 0) * l.quantity;
+  }
+  return out;
+}
