@@ -8,6 +8,7 @@ import {
   Play,
   RefreshCw,
   Search,
+  Store,
   X,
 } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
@@ -61,6 +62,8 @@ type Post = {
   metrics: Metrics | null;
   dataStatus: string | null;
   asOf: string | null;
+  /** The shop product the post leads to (ADR-0018). */
+  linkedProduct: { id: string; title: string; imageUrl: string | null } | null;
 };
 type Page = {
   total: number;
@@ -107,7 +110,11 @@ type Filters = {
   ownership: Ownership;
   sort: Sort;
   search: string;
+  /** Where posts lead: '' = anywhere. */
+  leads: '' | Leads;
 };
+const LEADS = ['product', 'site', 'none'] as const;
+type Leads = (typeof LEADS)[number];
 const DEFAULT_FILTERS: Filters = {
   period: { preset: '7d' },
   published: { preset: 'all' },
@@ -117,6 +124,7 @@ const DEFAULT_FILTERS: Filters = {
   // Newest first by default: the freshest posts are what people check most.
   sort: 'publishedAt',
   search: '',
+  leads: '',
 };
 const columnsKey = (platform: Platform) => `content.columns.${platform}`;
 
@@ -214,6 +222,24 @@ function PostRow({
                   {t('savedBadge')}
                 </span>
               )}
+              {post.linkedProduct && (
+                <span
+                  className="flex min-w-0 shrink items-center gap-1 rounded-full bg-hover py-px pr-2 pl-px text-foreground"
+                  title={t('leads.toProduct', { title: post.linkedProduct.title })}
+                >
+                  {post.linkedProduct.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={post.linkedProduct.imageUrl}
+                      alt=""
+                      className="h-4 w-4 shrink-0 rounded-full object-cover"
+                    />
+                  ) : (
+                    <Store size={11} className="ml-1 shrink-0" aria-hidden="true" />
+                  )}
+                  <span className="max-w-40 truncate">{post.linkedProduct.title}</span>
+                </span>
+              )}
               <span className="truncate">
                 {[post.board?.name, t(`types.${post.contentType}`)].filter(Boolean).join(' · ')}
               </span>
@@ -298,7 +324,7 @@ export function Content() {
   // board over to Instagram nor loses them on the way back. Not remembered across reloads.
   const [filtersBy, setFiltersBy] = useState<Partial<Record<Platform, Filters>>>({});
   const filters = (platform && filtersBy[platform]) || DEFAULT_FILTERS;
-  const { period, published, accountId, boardId, ownership, search } = filters;
+  const { period, published, accountId, boardId, ownership, search, leads } = filters;
   const chosenSort = filters.sort;
   const setFilter = <F extends keyof Filters>(key: F, value: Filters[F]) => {
     if (!platform) return;
@@ -314,6 +340,7 @@ export function Content() {
   const setOwnership = (v: Ownership) => setFilter('ownership', v);
   const setSort = (v: Sort) => setFilter('sort', v);
   const setSearch = (v: string) => setFilter('search', v);
+  const setLeads = (v: '' | Leads) => setFilter('leads', v);
   const [openId, setOpenId] = useState<string | null>(null);
   // The search sent to the API, a moment after typing stops; another platform's is never used.
   const [typed, setTyped] = useState<{ platform?: Platform; q: string }>({ q: '' });
@@ -375,6 +402,7 @@ export function Content() {
     ...(accountId ? { accountId } : {}),
     ...(boardId ? { boardId } : {}),
     ...(debounced ? { q: debounced } : {}),
+    ...(leads ? { leads } : {}),
   }).toString();
 
   useEffect(() => {
@@ -595,6 +623,15 @@ export function Content() {
           onChange={setPublished}
           labels={publishedLabels}
         />
+        {platform === 'PINTEREST' && (
+          <FilterChip
+            label={t('leads.label')}
+            value={leads}
+            onChange={(v) => setLeads(v as '' | Leads)}
+            options={LEADS.map((l) => ({ value: l, label: t(`leads.${l}`) }))}
+            clearLabel={t('clearFilter')}
+          />
+        )}
         {platform === 'PINTEREST' && (
           <FilterChip
             label={t('ownershipLabel')}

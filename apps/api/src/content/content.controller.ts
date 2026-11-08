@@ -53,6 +53,8 @@ const POST_SELECT = {
   isOwn: true,
   publishedAt: true,
   dailyTo: true,
+  link: true,
+  linkKey: true,
   board: { select: { id: true, name: true } },
   account: { select: { id: true, username: true, platform: true } },
   latest: {
@@ -127,6 +129,25 @@ export class ContentController {
         : undefined;
     const search = query['q']?.trim();
 
+    // Where posts lead (ADR-0018): to a product of the project's shops, elsewhere, or nowhere.
+    const leads = query['leads'];
+    if (leads && !['product', 'site', 'none'].includes(leads)) {
+      throw new BadRequestException('Unknown leads filter');
+    }
+    const products = await this.projectProducts(projectId, request.workspace.workspaceId);
+    const productKeys = [...products.keys()];
+    const leadsWhere: Prisma.SocialPostWhereInput =
+      leads === 'product'
+        ? { linkKey: { in: productKeys } }
+        : leads === 'site'
+          ? {
+              link: { not: null },
+              OR: [{ linkKey: null }, { linkKey: { notIn: productKeys } }],
+            }
+          : leads === 'none'
+            ? { link: null }
+            : {};
+
     const where: Prisma.SocialPostWhereInput = {
       projectId,
       workspaceId: request.workspace.workspaceId,
@@ -140,20 +161,32 @@ export class ContentController {
         connection: { status: { not: 'REVOKED' } },
       },
       ...(query['boardId'] ? { boardId: query['boardId'] } : {}),
-      ...(search
-        ? {
-            OR: [
-              { title: { contains: search, mode: 'insensitive' } },
-              { description: { contains: search, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
+      AND: [
+        leadsWhere,
+        search
+          ? {
+              OR: [
+                { title: { contains: search, mode: 'insensitive' } },
+                { description: { contains: search, mode: 'insensitive' } },
+              ],
+            }
+          : {},
+      ],
     };
+    const withProducts = <T extends { items: { linkKey: string | null }[] }>(page: T) => ({
+      ...page,
+      items: page.items.map(({ linkKey, ...item }) => ({
+        ...item,
+        linkedProduct: (linkKey && products.get(linkKey)) || null,
+      })),
+    });
 
     // Period sums from daily post values (ADR-0013, ADR-0017).
     const periodKeys = PERIOD_METRICS[platform];
     if (from && to && periodKeys) {
-      return this.listForPeriod(where, { from, to, sort, page, platform, keys: periodKeys });
+      return withProducts(
+        await this.listForPeriod(where, { from, to, sort, page, platform, keys: periodKeys }),
+      );
     }
 
     const orderBy: Prisma.SocialPostOrderByWithRelationInput[] =
@@ -176,7 +209,7 @@ export class ContentController {
       }),
     ]);
 
-    return {
+    return withProducts({
       total,
       page,
       pageSize: PAGE_SIZE,
@@ -201,7 +234,31 @@ export class ContentController {
         dataStatus: latest?.dataStatus ?? null,
         asOf: latest?.asOfDate ?? null,
       })),
-    };
+    });
+  }
+
+  /** The project's shop products by link key (`etsy:<listing>`), for "leads to a product". */
+  private async projectProducts(projectId: string, workspaceId: string) {
+    const rows = await this.prisma.client.shopProduct.findMany({
+      where: {
+        projectId,
+        workspaceId,
+        account: { hiddenAt: null, connection: { status: { not: 'REVOKED' } } },
+      },
+      select: {
+        id: true,
+        externalId: true,
+        title: true,
+        imageUrl: true,
+        account: { select: { platform: true } },
+      },
+    });
+    return new Map(
+      rows.map(({ externalId, account, ...p }) => [
+        `${account.platform.toLowerCase()}:${externalId}`,
+        p,
+      ]),
+    );
   }
 
   /**

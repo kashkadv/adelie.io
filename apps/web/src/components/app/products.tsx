@@ -46,6 +46,8 @@ export function Products() {
   const [shopId, setShopId] = useState('');
   const [period, setPeriod] = useState<DateRange>({ preset: 'all' });
   const [state, setState] = useState('active');
+  /** Products with posts leading to them (ADR-0018): '' = all. */
+  const [pins, setPins] = useState<'' | 'with' | 'without'>('');
   const [sort, setSort] = useState<Column>('revenue');
   const [search, setSearch] = useState('');
   const [data, setData] = useState<{ key: string; value: Response } | null>(null);
@@ -80,7 +82,10 @@ export function Products() {
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
     const list = (shown?.items ?? []).filter(
-      (p) => (!state || p.state === state) && (!q || p.title.toLowerCase().includes(q)),
+      (p) =>
+        (!state || p.state === state) &&
+        (!pins || (pins === 'with' ? p.posts > 0 : p.posts === 0)) &&
+        (!q || p.title.toLowerCase().includes(q)),
     );
     // Highest first; no data last; then newest listing.
     return list.sort((a, b) => {
@@ -93,7 +98,7 @@ export function Products() {
       }
       return (b.listedAt ?? '').localeCompare(a.listedAt ?? '');
     });
-  }, [shown, state, search, sort]);
+  }, [shown, state, pins, search, sort]);
 
   const labels: RangeLabels = {
     all: tc('period.all'),
@@ -171,6 +176,20 @@ export function Products() {
           value={state}
           onChange={setState}
           options={states.map((s) => ({ value: s, label: t(`states.${s}`) }))}
+          clearLabel={tc('clearFilter')}
+        />
+        <FilterChip
+          label={t('products.pins')}
+          value={pins}
+          onChange={(v) => {
+            setPins(v as '' | 'with' | 'without');
+            // Pins often lead to products that are gone from the shop: show every state then.
+            if (v === 'with') setState('');
+          }}
+          options={(['with', 'without'] as const).map((v) => ({
+            value: v,
+            label: t(`products.pinsFilter.${v}`),
+          }))}
           clearLabel={tc('clearFilter')}
         />
         <span className="xl:hidden">

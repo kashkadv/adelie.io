@@ -537,7 +537,14 @@
       "move": "Move “{column}”",
       "reset": "Reset to default"
     },
-    "periodHintInstagram": "Instagram does not report post statistics per day, so Adelie records the totals daily and takes the change from the previous day. Days accumulate from when Adelie started doing so (no history before that); a day ends at the daily sync. Reach for a period is how many new accounts saw the post. “—” means no data, not zero."
+    "periodHintInstagram": "Instagram does not report post statistics per day, so Adelie records the totals daily and takes the change from the previous day. Days accumulate from when Adelie started doing so (no history before that); a day ends at the daily sync. Reach for a period is how many new accounts saw the post. “—” means no data, not zero.",
+    "leads": {
+      "label": "Leads to",
+      "product": "a shop product",
+      "site": "another site",
+      "none": "no link",
+      "toProduct": "Leads to product: {title}"
+    }
   },
   "Post": {
     "close": "Close",
@@ -631,7 +638,12 @@
       },
       "posts": "{count, plural, one {# pin leads here} other {# pins lead here}}",
       "postsHint": "Pins whose link leads to this product.",
-      "edit": "Edit"
+      "edit": "Edit",
+      "pins": "Pins",
+      "pinsFilter": {
+        "with": "lead to the product",
+        "without": "none lead here"
+      }
     },
     "orders": {
       "title": "Orders",
