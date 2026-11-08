@@ -30,7 +30,7 @@ import {
   WorkspaceRoles,
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
-import { monthlySales, moneyFlow, netRevenue, ordersByDay } from './sales.js';
+import { countsAsSale, monthlySales, moneyFlow, netRevenue, ordersByDay } from './sales.js';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
@@ -185,6 +185,8 @@ export class SalesController {
     return {
       ...rest,
       number: externalId,
+      // The order in the seller's Etsy dashboard.
+      sellerUrl: `https://www.etsy.com/your/orders/sold?order_id=${externalId}`,
       revenue: netRevenue(order),
       items: items.map(({ externalId: _id, ...i }) => i),
       ledger: ledger.filter((e) => e.category !== 'payout'),
@@ -264,19 +266,21 @@ export class SalesController {
         },
       }),
     ]);
-    const flat = lines.map((l) => ({ ...l, orderedAt: l.order.orderedAt }));
+    // Canceled and fully refunded orders are not sales.
+    const sold = lines.filter((l) => countsAsSale(l.order.status));
+    const flat = sold.map((l) => ({ ...l, orderedAt: l.order.orderedAt }));
     const { externalId: _externalId, ...rest } = product;
     return {
       ...rest,
       sales: {
-        units: lines.reduce((n, l) => n + l.quantity, 0),
-        revenue: lines.reduce((n, l) => n + (l.price ?? 0) * l.quantity, 0),
-        orders: lines.length,
-        firstSale: lines.at(-1)?.order.orderedAt ?? null,
-        lastSale: lines[0]?.order.orderedAt ?? null,
+        units: sold.reduce((n, l) => n + l.quantity, 0),
+        revenue: sold.reduce((n, l) => n + (l.price ?? 0) * l.quantity, 0),
+        orders: sold.length,
+        firstSale: sold.at(-1)?.order.orderedAt ?? null,
+        lastSale: sold[0]?.order.orderedAt ?? null,
       },
       monthly: monthlySales(flat, 12, new Date().toISOString().slice(0, 10)),
-      orders: lines.slice(0, 10).map((l) => ({
+      orders: sold.slice(0, 10).map((l) => ({
         id: l.id,
         orderedAt: l.order.orderedAt,
         quantity: l.quantity,
@@ -483,7 +487,12 @@ export class SalesController {
           productId: { not: null },
           order: { ...where, ...(period ? { orderedAt: { gte: period.gte, lt: period.lt } } : {}) },
         },
-        select: { productId: true, quantity: true, price: true },
+        select: {
+          productId: true,
+          quantity: true,
+          price: true,
+          order: { select: { status: true } },
+        },
       }),
     ]);
     // Posts that lead to each product (pin links, ADR-0018).
@@ -504,6 +513,7 @@ export class SalesController {
     const posts = new Map(leading.map((g) => [g.linkKey, g._count._all]));
     const sold = new Map<string, { units: number; revenue: number }>();
     for (const l of lines) {
+      if (!countsAsSale(l.order.status)) continue;
       const s = sold.get(l.productId!) ?? { units: 0, revenue: 0 };
       s.units += l.quantity;
       s.revenue += (l.price ?? 0) * l.quantity;
@@ -533,12 +543,37 @@ export class SalesController {
     await this.visibleProject(request.workspace, projectId);
     const period = this.period(query);
     const page = Math.max(0, Number(query['page'] ?? 0) || 0);
-    const where: Prisma.ShopOrderWhereInput = {
+    const sort = query['sort'] ?? 'date';
+    if (!['date', 'amount', 'units'].includes(sort)) throw new BadRequestException('Unknown sort');
+    const dir = query['dir'] === 'asc' ? 1 : -1;
+    for (const k of ['paid', 'shipped'] as const) {
+      if (query[k] && !['yes', 'no'].includes(query[k]!)) throw new BadRequestException(`Bad ${k}`);
+    }
+    // The period and the shop: the base for the filter options and the ledger.
+    const base: Prisma.ShopOrderWhereInput = {
       ...this.where(projectId, request.workspace, query['accountId']),
       ...(period ? { orderedAt: { gte: period.gte, lt: period.lt } } : {}),
     };
+    const q = query['q']?.trim();
+    const where: Prisma.ShopOrderWhereInput = {
+      ...base,
+      ...(query['status'] ? { status: query['status'] } : {}),
+      ...(query['paid'] ? { isPaid: query['paid'] === 'yes' } : {}),
+      ...(query['shipped'] ? { isShipped: query['shipped'] === 'yes' } : {}),
+      ...(query['country'] !== undefined && query['country'] !== ''
+        ? { country: query['country'] === '-' ? null : query['country'] }
+        : {}),
+      ...(q
+        ? {
+            OR: [
+              { externalId: q.replace(/^#/, '') },
+              { items: { some: { title: { contains: q, mode: 'insensitive' } } } },
+            ],
+          }
+        : {}),
+    };
     const db = this.prisma.client;
-    const [ledger, all, rows] = await Promise.all([
+    const [ledger, all, facets] = await Promise.all([
       // What stays with the shop: the payment account's movements in the period.
       db.shopLedgerEntry.groupBy({
         by: ['currency', 'category'],
@@ -548,28 +583,16 @@ export class SalesController {
         },
         _sum: { amount: true },
       }),
+      // Every matching order: a shop has hundreds or thousands — sorted and paged in memory.
       db.shopOrder.findMany({
         where,
-        select: {
-          orderedAt: true,
-          currency: true,
-          total: true,
-          tax: true,
-          shipping: true,
-          country: true,
-          items: { select: { quantity: true } },
-        },
-      }),
-      db.shopOrder.findMany({
-        where,
-        orderBy: [{ orderedAt: 'desc' }, { id: 'asc' }],
-        skip: page * PAGE_SIZE,
-        take: PAGE_SIZE,
         select: {
           id: true,
           externalId: true,
           orderedAt: true,
           status: true,
+          isPaid: true,
+          isShipped: true,
           currency: true,
           total: true,
           tax: true,
@@ -588,7 +611,17 @@ export class SalesController {
           },
         },
       }),
+      // Filter options for the period (not narrowed by the filters themselves).
+      db.shopOrder.findMany({
+        where: base,
+        select: { status: true, country: true },
+      }),
     ]);
+
+    const units = (o: { items: { quantity: number }[] }) =>
+      o.items.reduce((n, i) => n + i.quantity, 0);
+    // Canceled and fully refunded orders are listed, but they are not sales.
+    const sales = all.filter((o) => countsAsSale(o.status));
 
     // Totals per currency (shops may sell in different ones; never summed across currencies).
     const totals = new Map<
@@ -596,7 +629,7 @@ export class SalesController {
       { currency: string; orders: number; units: number; revenue: number; tax: number }
     >();
     const countries = new Map<string, { country: string; orders: number }>();
-    for (const o of all) {
+    for (const o of sales) {
       const t = totals.get(o.currency) ?? {
         currency: o.currency,
         orders: 0,
@@ -605,7 +638,7 @@ export class SalesController {
         tax: 0,
       };
       t.orders += 1;
-      t.units += o.items.reduce((n, i) => n + i.quantity, 0);
+      t.units += units(o);
       t.revenue += netRevenue(o) ?? 0;
       t.tax += o.tax ?? 0;
       totals.set(o.currency, t);
@@ -613,10 +646,22 @@ export class SalesController {
       countries.set(c, { country: c, orders: (countries.get(c)?.orders ?? 0) + 1 });
     }
     const main = [...totals.values()].sort((a, b) => b.orders - a.orders)[0]?.currency ?? null;
-    const first = all.reduce<Date | null>(
+    const first = sales.reduce<Date | null>(
       (min, o) => (!min || o.orderedAt < min ? o.orderedAt : min),
       null,
     );
+
+    const key = (o: (typeof all)[number]) =>
+      sort === 'amount'
+        ? (netRevenue(o) ?? -1)
+        : sort === 'units'
+          ? units(o)
+          : o.orderedAt.getTime();
+    const ordered = [...all].sort(
+      (a, b) => dir * (key(a) - key(b)) || b.orderedAt.getTime() - a.orderedAt.getTime(),
+    );
+    const rows = ordered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    const distinct = (values: (string | null)[]) => [...new Set(values.map((v) => v ?? ''))].sort();
 
     return {
       period: period ? { from: period.from, to: period.to } : null,
@@ -628,13 +673,17 @@ export class SalesController {
       series:
         main && (period || first)
           ? ordersByDay(
-              all.filter((o) => o.currency === main),
+              sales.filter((o) => o.currency === main),
               period?.from ?? first!.toISOString().slice(0, 10),
               period?.to ?? new Date().toISOString().slice(0, 10),
             )
           : [],
       seriesCurrency: main,
       countries: [...countries.values()].sort((a, b) => b.orders - a.orders),
+      facets: {
+        statuses: distinct(facets.map((f) => f.status)).filter(Boolean),
+        countries: distinct(facets.map((f) => f.country)),
+      },
       money: moneyFlow(
         ledger.map((g) => ({
           currency: g.currency,
@@ -642,7 +691,12 @@ export class SalesController {
           amount: g._sum.amount ?? 0,
         })),
       ),
-      items: rows.map((o) => ({ ...o, revenue: netRevenue(o) })),
+      items: rows.map(({ externalId, ...o }) => ({
+        ...o,
+        number: externalId,
+        revenue: netRevenue(o),
+        units: units(o),
+      })),
     };
   }
 }

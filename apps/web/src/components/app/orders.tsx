@@ -1,6 +1,6 @@
 'use client';
 
-import { RefreshCw, ReceiptText } from 'lucide-react';
+import { ArrowDown, ArrowUp, RefreshCw, ReceiptText, Search, X } from 'lucide-react';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -15,9 +15,12 @@ import { minorDigits, useMoney, useSalesBase, useShops } from './sales-data';
 
 type Order = {
   id: string;
-  externalId: string;
+  number: string;
   orderedAt: string;
   status: string | null;
+  isPaid: boolean | null;
+  isShipped: boolean | null;
+  units: number;
   currency: string;
   revenue: number | null;
   tax: number | null;
@@ -49,6 +52,8 @@ type Response = {
   series: { date: string; revenue: number; orders: number }[];
   seriesCurrency: string | null;
   countries: { country: string; orders: number }[];
+  /** Filter options for the period: statuses and countries ('' = unknown). */
+  facets: { statuses: string[]; countries: string[] };
   /** What stays with the shop, per currency (payment-account ledger). */
   money: Money[];
   items: Order[];
@@ -114,6 +119,10 @@ function MoneyCard({ money }: { money: Money[] | null }) {
 const MONTHLY_AFTER_DAYS = 120;
 
 /** Orders of the project's shops (ADR-0018): totals, revenue per day, countries, the orders. */
+type SortKey = 'date' | 'amount' | 'units';
+type YesNo = '' | 'yes' | 'no';
+
+/** Orders of the project's shops (ADR-0018): totals, revenue, countries, the filterable list. */
 export function Orders() {
   const t = useTranslations('Sales');
   const tc = useTranslations('Content');
@@ -125,15 +134,37 @@ export function Orders() {
   const [shopId, setShopId] = useState('');
   // A year by default: a small shop has a handful of orders a month.
   const [period, setPeriod] = useState<DateRange>({ preset: '12m' });
+  const [status, setStatus] = useState('');
+  const [paid, setPaid] = useState<YesNo>('');
+  const [shipped, setShipped] = useState<YesNo>('');
+  const [country, setCountry] = useState('');
+  const [search, setSearch] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'desc' | 'asc' }>({
+    key: 'date',
+    dir: 'desc',
+  });
   const [data, setData] = useState<{ key: string; value: Response } | null>(null);
   const [extra, setExtra] = useState<{ key: string; items: Order[] }>({ key: '', items: [] });
   const [loadingMore, setLoadingMore] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
 
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(id);
+  }, [search]);
+
   const range = resolveRange(period);
   const query = new URLSearchParams({
     ...(range ?? {}),
     ...(shopId ? { accountId: shopId } : {}),
+    ...(status ? { status } : {}),
+    ...(paid ? { paid } : {}),
+    ...(shipped ? { shipped } : {}),
+    ...(country ? { country } : {}),
+    ...(debounced ? { q: debounced } : {}),
+    sort: sort.key,
+    dir: sort.dir,
   }).toString();
   const key = `${base}?${query}`;
 
@@ -148,7 +179,9 @@ export function Orders() {
       cancelled = true;
     };
   }, [base, query]);
-  const shown = data?.key === key ? data.value : null;
+  // The previous result stays while the next loads (no flicker on every filter change).
+  const shown = data?.value ?? null;
+  const fresh = data?.key === key;
   const orders = [...(shown?.items ?? []), ...(extra.key === key ? extra.items : [])];
 
   async function loadMore() {
@@ -231,6 +264,39 @@ export function Orders() {
     { id: 'units', value: main ? format.number(main.units) : '—' },
   ];
   const countryTotal = shown?.countries.reduce((n, c) => n + c.orders, 0) ?? 0;
+  const yesNo = (v: boolean | null, yes: string, no: string) => (v === null ? '—' : v ? yes : no);
+  const filtered = !!(status || paid || shipped || country || debounced);
+  const clearFilters = () => {
+    setStatus('');
+    setPaid('');
+    setShipped('');
+    setCountry('');
+    setSearch('');
+  };
+  const sortBy = (k: SortKey) =>
+    setSort((s) =>
+      s.key === k ? { key: k, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key: k, dir: 'desc' },
+    );
+  const sortHeader = (k: SortKey, label: string) => (
+    <button
+      type="button"
+      onClick={() => sortBy(k)}
+      aria-pressed={sort.key === k}
+      className={`flex items-center gap-1 whitespace-nowrap hover:text-foreground ${
+        sort.key === k ? 'font-semibold text-foreground' : ''
+      }`}
+    >
+      {sort.key === k &&
+        (sort.dir === 'desc' ? (
+          <ArrowDown size={12} aria-hidden="true" />
+        ) : (
+          <ArrowUp size={12} aria-hidden="true" />
+        ))}
+      {label}
+    </button>
+  );
+  /** Columns of the list on wide screens: date · items · country · status · paid · shipped · sum. */
+  const GRID = 'xl:grid xl:grid-cols-[8rem_minmax(0,1fr)_9rem_9rem_7rem_8rem_8rem] xl:gap-4';
 
   return (
     <>
@@ -246,6 +312,7 @@ export function Orders() {
                   {t('orders.currencies', { currency: main?.currency ?? '' })}
                 </>
               )}
+              <InfoTip text={t('orders.voidHint')} />
             </span>
           ) : (
             ' '
@@ -260,6 +327,7 @@ export function Orders() {
           labels={labels}
           ariaLabel={tc('period.label')}
         />
+        <span className="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
         {shops && shops.length > 1 && (
           <FilterChip
             label={t('shop')}
@@ -269,6 +337,79 @@ export function Orders() {
             clearLabel={tc('clearFilter')}
           />
         )}
+        <FilterChip
+          label={t('orders.columns.status')}
+          value={status}
+          onChange={setStatus}
+          options={(shown?.facets.statuses ?? []).map((v) => ({
+            value: v,
+            label: statusLabel(t, v),
+          }))}
+          clearLabel={tc('clearFilter')}
+        />
+        <FilterChip
+          label={t('orders.columns.paid')}
+          value={paid}
+          onChange={(v) => setPaid(v as YesNo)}
+          options={[
+            { value: 'yes', label: t('orders.paidYes') },
+            { value: 'no', label: t('orders.paidNo') },
+          ]}
+          clearLabel={tc('clearFilter')}
+        />
+        <FilterChip
+          label={t('orders.columns.shipped')}
+          value={shipped}
+          onChange={(v) => setShipped(v as YesNo)}
+          options={[
+            { value: 'yes', label: t('orders.shippedYes') },
+            { value: 'no', label: t('orders.shippedNo') },
+          ]}
+          clearLabel={tc('clearFilter')}
+        />
+        <FilterChip
+          label={t('orders.columns.country')}
+          value={country}
+          onChange={setCountry}
+          options={(shown?.facets.countries ?? [])
+            .map((c) => ({ value: c || '-', label: countryName(c) }))
+            .sort((a, b) => a.label.localeCompare(b.label))}
+          searchable={(shown?.facets.countries.length ?? 0) > 8}
+          searchPlaceholder={t('orders.searchCountries')}
+          clearLabel={tc('clearFilter')}
+        />
+        <span className="xl:hidden">
+          <FilterChip
+            label={tc('sortBy')}
+            value={sort.key}
+            onChange={(v) => setSort({ key: v as SortKey, dir: 'desc' })}
+            options={(['date', 'amount', 'units'] as const).map((k) => ({
+              value: k,
+              label: t(`orders.sort.${k}`),
+            }))}
+            clearable={false}
+          />
+        </span>
+        <label className="ml-auto flex h-9 w-full items-center gap-2 rounded-full border border-line px-3.5 text-sm focus-within:border-[var(--field-focus)] sm:w-64">
+          <Search size={15} className="shrink-0 text-muted" aria-hidden="true" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('orders.search')}
+            aria-label={t('orders.search')}
+            className="w-full min-w-0 bg-transparent outline-none placeholder:text-muted"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              aria-label={tc('clearFilter')}
+              className="text-muted hover:text-foreground"
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          )}
+        </label>
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -287,7 +428,7 @@ export function Orders() {
         ))}
       </div>
 
-      <div className="mb-4 grid gap-4 xl:grid-cols-3">
+      <div className="mb-4 grid items-start gap-4 xl:grid-cols-3">
         <section
           className="card animate-rise rounded-[24px] p-5 xl:col-span-2"
           style={{ animationDelay: '200ms' }}
@@ -308,124 +449,170 @@ export function Orders() {
             <p className="px-1 py-10 text-center text-sm text-muted">{t('orders.none')}</p>
           )}
         </section>
-        <MoneyCard money={shown?.money ?? null} />
+        <div className="grid gap-4">
+          <MoneyCard money={shown?.money ?? null} />
+          <section
+            className="card animate-rise rounded-[24px] p-5"
+            style={{ animationDelay: '260ms' }}
+          >
+            <h2 className="mb-4 px-1 text-lg font-semibold">{t('orders.countries')}</h2>
+            {countryTotal ? (
+              <ul className="space-y-3">
+                {shown!.countries.slice(0, 6).map((c) => (
+                  <li key={c.country} className="flex items-center gap-3 px-1 text-sm">
+                    <span className="flex-1 truncate">{countryName(c.country)}</span>
+                    <span className="tabular text-muted">
+                      {format.number(c.orders / countryTotal, {
+                        style: 'percent',
+                        maximumFractionDigits: 0,
+                      })}
+                    </span>
+                    <span className="tabular w-10 text-right font-medium">
+                      {format.number(c.orders)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-1 text-sm text-muted">{t('orders.none')}</p>
+            )}
+          </section>
+        </div>
       </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-3">
-        <section
-          className="card animate-rise rounded-[24px] xl:col-span-2"
-          style={{ animationDelay: '280ms' }}
-        >
-          <h2 className="border-b border-line px-5 py-4 text-lg font-semibold">
-            {t('orders.list')}
-          </h2>
-          {!shown ? (
-            <p className="px-5 py-10 text-center text-sm text-muted">…</p>
-          ) : orders.length === 0 ? (
-            <p className="px-5 py-14 text-center text-sm text-muted">{t('orders.none')}</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {orders.map((o) => {
-                const first = o.items[0];
-                const units = o.items.reduce((n, i) => n + i.quantity, 0);
-                return (
-                  <li key={o.id}>
-                    <button
-                      type="button"
-                      onClick={() => setOpenId(o.id)}
-                      aria-haspopup="dialog"
-                      className="flex w-full flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3 text-left transition-colors hover:bg-hover"
-                    >
-                      <span className="tabular w-32 shrink-0 text-sm whitespace-nowrap text-muted">
-                        {format.dateTime(new Date(o.orderedAt), {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+      {/* The list: full width, sortable columns, every row opens the order card. */}
+      <section
+        className={`card animate-rise rounded-[24px] transition-opacity ${fresh ? '' : 'opacity-60'}`}
+        style={{ animationDelay: '300ms' }}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
+          <h2 className="text-lg font-semibold">{t('orders.list')}</h2>
+          {filtered && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-sm text-muted hover:text-foreground"
+            >
+              {t('orders.clearFilters')}
+            </button>
+          )}
+        </div>
+        <div className={`hidden border-b border-line px-5 py-3 text-xs text-muted ${GRID}`}>
+          {sortHeader('date', t('orders.columns.date'))}
+          <span>{sortHeader('units', t('orders.columns.items'))}</span>
+          <span>{t('orders.columns.country')}</span>
+          <span>{t('orders.columns.status')}</span>
+          <span>{t('orders.columns.paid')}</span>
+          <span>{t('orders.columns.shipped')}</span>
+          <span className="flex justify-end">
+            {sortHeader('amount', t('orders.columns.amount'))}
+          </span>
+        </div>
+        {!shown ? (
+          <p className="px-5 py-10 text-center text-sm text-muted">…</p>
+        ) : orders.length === 0 ? (
+          <p className="px-5 py-14 text-center text-sm text-muted">
+            {filtered ? t('orders.noMatches') : t('orders.none')}
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {orders.map((o) => {
+              const first = o.items[0];
+              const voided =
+                !!o.status &&
+                ['canceled', 'cancelled', 'fully refunded'].includes(o.status.toLowerCase());
+              return (
+                <li key={o.id}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(o.id)}
+                    aria-haspopup="dialog"
+                    className={`flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 text-left text-sm transition-colors hover:bg-hover xl:items-center ${GRID}`}
+                  >
+                    <span className="tabular w-32 shrink-0 whitespace-nowrap text-muted xl:w-auto">
+                      {format.dateTime(new Date(o.orderedAt), {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
+                    <span className="flex min-w-0 flex-1 basis-60 items-center gap-3 xl:basis-auto">
+                      <span className="flex shrink-0 -space-x-3">
+                        {o.items.slice(0, 3).map((i) => (
+                          <span
+                            key={i.id}
+                            className="h-10 w-10 overflow-hidden rounded-lg border-2 border-[var(--card)] bg-hover"
+                          >
+                            {i.product?.imageUrl && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={i.product.imageUrl}
+                                alt=""
+                                loading="lazy"
+                                className="h-full w-full object-cover"
+                              />
+                            )}
+                          </span>
+                        ))}
                       </span>
-                      <div className="flex min-w-0 flex-1 basis-60 items-center gap-3">
-                        <span className="flex shrink-0 -space-x-3">
-                          {o.items.slice(0, 3).map((i) => (
-                            <span
-                              key={i.id}
-                              className="h-10 w-10 overflow-hidden rounded-lg border-2 border-[var(--surface,transparent)] bg-hover"
-                            >
-                              {i.product?.imageUrl && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={i.product.imageUrl}
-                                  alt=""
-                                  loading="lazy"
-                                  className="h-full w-full object-cover"
-                                />
-                              )}
-                            </span>
-                          ))}
+                      <span className="min-w-0">
+                        <span
+                          className={`block truncate ${voided ? 'text-muted line-through' : ''}`}
+                        >
+                          {first?.title ?? first?.product?.title ?? t('orders.noTitle')}
                         </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm">
-                            {first?.title ?? first?.product?.title ?? t('orders.noTitle')}
-                          </p>
-                          <p className="text-xs text-muted">
-                            {t('orders.units', { count: units })}
-                            {o.items.length > 1 &&
-                              ` · ${t('orders.more', { count: o.items.length - 1 })}`}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="w-32 shrink-0 truncate text-sm text-muted">
-                        {o.country ? countryName(o.country) : '—'}
+                        <span className="block text-xs text-muted">
+                          №{o.number} · {t('orders.units', { count: o.units })}
+                          {o.items.length > 1 &&
+                            ` · ${t('orders.more', { count: o.items.length - 1 })}`}
+                        </span>
                       </span>
-                      <span className="tabular w-28 shrink-0 text-right text-sm font-medium">
-                        {money(o.revenue, o.currency)}
+                    </span>
+                    <span className="w-full truncate text-muted sm:w-36 xl:w-auto">
+                      {o.country ? countryName(o.country) : '—'}
+                    </span>
+                    <span className="xl:w-auto">
+                      <span
+                        className={`inline-block rounded-full px-2 text-xs leading-5 whitespace-nowrap ${
+                          voided ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300' : 'bg-hover'
+                        }`}
+                      >
+                        {o.status ? statusLabel(t, o.status) : '—'}
                       </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          {shown && orders.length < shown.total && (
-            <div className="border-t border-line p-3 text-center">
-              <button
-                type="button"
-                onClick={loadMore}
-                disabled={loadingMore}
-                className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm text-muted hover:bg-hover hover:text-foreground"
-              >
-                {loadingMore && <RefreshCw size={14} className="animate-spin" aria-hidden="true" />}
-                {tc('loadMore', { count: shown.total - orders.length })}
-              </button>
-            </div>
-          )}
-        </section>
-        <section
-          className="card animate-rise rounded-[24px] p-5"
-          style={{ animationDelay: '240ms' }}
-        >
-          <h2 className="mb-4 px-1 text-lg font-semibold">{t('orders.countries')}</h2>
-          {countryTotal ? (
-            <ul className="space-y-3">
-              {shown!.countries.slice(0, 8).map((c) => (
-                <li key={c.country} className="flex items-center gap-3 px-1 text-sm">
-                  <span className="flex-1 truncate">{countryName(c.country)}</span>
-                  <span className="tabular text-muted">
-                    {format.number(c.orders / countryTotal, {
-                      style: 'percent',
-                      maximumFractionDigits: 0,
-                    })}
-                  </span>
-                  <span className="tabular w-10 text-right font-medium">
-                    {format.number(c.orders)}
-                  </span>
+                    </span>
+                    <span className="whitespace-nowrap text-muted">
+                      {yesNo(o.isPaid, t('orders.paidYes'), t('orders.paidNo'))}
+                    </span>
+                    <span className="whitespace-nowrap text-muted">
+                      {yesNo(o.isShipped, t('orders.shippedYes'), t('orders.shippedNo'))}
+                    </span>
+                    <span
+                      className={`tabular ml-auto text-right font-medium whitespace-nowrap xl:ml-0 ${
+                        voided ? 'text-muted line-through' : ''
+                      }`}
+                    >
+                      {money(o.revenue, o.currency)}
+                    </span>
+                  </button>
                 </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="px-1 text-sm text-muted">{t('orders.none')}</p>
-          )}
-        </section>
-      </div>
+              );
+            })}
+          </ul>
+        )}
+        {shown && orders.length < shown.total && (
+          <div className="border-t border-line p-3 text-center">
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm text-muted hover:bg-hover hover:text-foreground"
+            >
+              {loadingMore && <RefreshCw size={14} className="animate-spin" aria-hidden="true" />}
+              {tc('loadMore', { count: shown.total - orders.length })}
+            </button>
+          </div>
+        )}
+      </section>
 
       {openId && base && (
         <OrderDialog
@@ -442,4 +629,21 @@ export function Orders() {
       )}
     </>
   );
+}
+
+/** Etsy statuses come in English ("Completed"); known ones are translated, others shown as is. */
+const KNOWN_STATUSES = [
+  'paid',
+  'completed',
+  'open',
+  'payment processing',
+  'canceled',
+  'fully refunded',
+  'partially refunded',
+];
+function statusLabel(t: ReturnType<typeof useTranslations<'Sales'>>, status: string): string {
+  const k = status.toLowerCase();
+  return KNOWN_STATUSES.includes(k)
+    ? t(`orders.statuses.${k.replace(/ /g, '_')}` as 'orders.statuses.paid')
+    : status;
 }

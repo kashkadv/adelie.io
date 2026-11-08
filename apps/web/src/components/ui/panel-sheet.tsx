@@ -64,7 +64,7 @@ export function PanelSheet({
         aria-labelledby={labelledBy}
         tabIndex={-1}
         style={box ?? undefined}
-        className={`glass glass-strong animate-rise absolute flex flex-col overflow-hidden rounded-[32px] outline-none ${
+        className={`sheet-surface animate-rise absolute flex flex-col overflow-hidden rounded-[32px] outline-none ${
           box ? '' : 'inset-3'
         }`}
       >

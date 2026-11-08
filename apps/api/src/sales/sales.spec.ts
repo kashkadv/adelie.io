@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { monthlySales, moneyFlow, netRevenue, ordersByDay, salesOverview } from './sales.js';
+import {
+  countsAsSale,
+  monthlySales,
+  moneyFlow,
+  netRevenue,
+  ordersByDay,
+  salesOverview,
+} from './sales.js';
 
 describe('sales', () => {
   it('revenue leaves out the sales tax the platform remits', () => {
@@ -106,5 +113,15 @@ describe('monthlySales', () => {
       { month: '2026-09-01', units: 0, revenue: 0 },
       { month: '2026-10-01', units: 2, revenue: 2000 },
     ]);
+  });
+});
+
+describe('countsAsSale', () => {
+  it('canceled and fully refunded orders are not sales', () => {
+    expect(countsAsSale('Completed')).toBe(true);
+    expect(countsAsSale('Partially Refunded')).toBe(true);
+    expect(countsAsSale('Canceled')).toBe(false);
+    expect(countsAsSale('Fully Refunded')).toBe(false);
+    expect(countsAsSale(null)).toBe(true);
   });
 });

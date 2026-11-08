@@ -23,6 +23,8 @@ type Detail = {
   discount: number | null;
   revenue: number | null;
   country: string | null;
+  /** The order in the seller's Etsy dashboard. */
+  sellerUrl: string | null;
   account: { username: string | null; displayName: string | null };
   items: {
     id: string;
@@ -211,6 +213,17 @@ export function OrderDialog({
                   </span>
                 )}
               </p>
+              {detail.sellerUrl && (
+                <a
+                  href={detail.sellerUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl border border-line px-3 py-1.5 text-sm hover:bg-hover"
+                >
+                  <ExternalLink size={15} aria-hidden="true" />
+                  {t('openInEtsy')}
+                </a>
+              )}
 
               <section className="mt-6">
                 <h3 className="mb-2 px-1 text-sm font-semibold">

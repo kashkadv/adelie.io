@@ -688,7 +688,39 @@
         "adsHint": "Etsy Ads (promotion in Etsy search) and Offsite Ads.",
         "other": "Other",
         "net": "Net revenue"
-      }
+      },
+      "columns": {
+        "date": "Date",
+        "items": "Items",
+        "country": "Country",
+        "status": "Status",
+        "paid": "Payment",
+        "shipped": "Shipping",
+        "amount": "Amount"
+      },
+      "paidYes": "Paid",
+      "paidNo": "Unpaid",
+      "shippedYes": "Shipped",
+      "shippedNo": "Not shipped",
+      "statuses": {
+        "paid": "Paid",
+        "completed": "Completed",
+        "open": "Open",
+        "payment_processing": "Payment processing",
+        "canceled": "Canceled",
+        "fully_refunded": "Fully refunded",
+        "partially_refunded": "Partially refunded"
+      },
+      "sort": {
+        "date": "Date",
+        "amount": "Amount",
+        "units": "Units"
+      },
+      "search": "Product or order #",
+      "searchCountries": "Search countries",
+      "clearFilters": "Clear filters",
+      "noMatches": "No orders match these filters.",
+      "voidHint": "Canceled and fully refunded orders are listed but not counted in revenue, KPIs or the chart. Filters apply to the whole page except “What stays with the shop” — that is the Etsy payment ledger for the period."
     },
     "editor": {
       "title": "Edit product",
@@ -790,7 +822,8 @@
       },
       "net": "Stayed with the shop",
       "noLedger": "The Etsy ledger has no entries for this order yet.",
-      "noPayment": "The payment for this order is not in the ledger — only fees are shown."
+      "noPayment": "The payment for this order is not in the ledger — only fees are shown.",
+      "openInEtsy": "Open in Etsy Shop Manager"
     }
   }
 }

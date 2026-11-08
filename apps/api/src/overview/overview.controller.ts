@@ -23,7 +23,7 @@ import {
   snapshotMetric,
   type StoredValue,
 } from './aggregate.js';
-import { salesOverview } from '../sales/sales.js';
+import { countsAsSale, salesOverview } from '../sales/sales.js';
 
 const PERIOD_DAYS = [7, 30, 90] as const;
 type Platform = 'PINTEREST' | 'INSTAGRAM';
@@ -148,6 +148,7 @@ export class OverviewController {
         },
         select: {
           orderedAt: true,
+          status: true,
           currency: true,
           total: true,
           tax: true,
@@ -156,10 +157,13 @@ export class OverviewController {
         },
       });
       const sales = salesOverview(
-        orders.map(({ items, ...o }) => ({
-          ...o,
-          units: items.reduce((n, i) => n + i.quantity, 0),
-        })),
+        // Canceled and fully refunded orders are not sales.
+        orders
+          .filter((o) => countsAsSale(o.status))
+          .map(({ items, status: _status, ...o }) => ({
+            ...o,
+            units: items.reduce((n, i) => n + i.quantity, 0),
+          })),
         current,
         previous,
       );

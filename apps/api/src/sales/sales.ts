@@ -47,6 +47,12 @@ export function moneyFlow(rows: { currency: string; category: string; amount: nu
 }
 
 const DAY_MS = 86_400_000;
+
+/** Order statuses that are not sales: listed, but left out of revenue, units and charts. */
+const VOID_STATUSES = ['canceled', 'cancelled', 'fully refunded'];
+export function countsAsSale(status: string | null | undefined): boolean {
+  return !status || !VOID_STATUSES.includes(status.toLowerCase());
+}
 const day = (d: Date) => d.toISOString().slice(0, 10);
 
 /**

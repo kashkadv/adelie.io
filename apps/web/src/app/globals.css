@@ -249,6 +249,14 @@ h3 {
     backdrop-filter: blur(32px) saturate(160%);
   }
 
+  /* A detail sheet over a darkened backdrop: the panel's own colour, made opaque (the panel over the
+     page background), so it looks exactly like the content panel and never like a grey card. */
+  .sheet-surface {
+    background: linear-gradient(var(--panel), var(--panel)), var(--background);
+    border: 1px solid var(--panel-border);
+    box-shadow: var(--panel-shadow);
+  }
+
   /* Cards inside the viewport. */
   .card {
     background: var(--card);
