@@ -673,11 +673,11 @@
       "more": "{count, plural, one {# more product} other {# more products}}",
       "money": {
         "title": "What stays with the shop",
-        "hint": "From the Etsy payment ledger for the period: sales without tax, minus refunds, Etsy fees and Etsy ads. Payouts to the bank are money moving, not costs, so they are not shown.",
+        "hint": "Sales come from paid orders (without sales tax). Refunds, fees, ads and the rest come from the Etsy payment ledger for the period. Payouts to the bank are money moving, not costs, so they are not shown. The page filters do not apply to this card.",
         "none": "No money movements in this period.",
         "sales": "Sales",
-        "salesHint": "What buyers paid, without the sales tax Etsy remits itself.",
-        "refunds": "Refunds to buyers",
+        "salesHint": "What buyers paid in paid orders, without the sales tax Etsy remits itself.",
+        "refunds": "Refunds",
         "fees": "Etsy fees",
         "feesHint": "What Etsy charges for its services: transaction fees, payment processing, listing and renewal fees, and VAT on them.",
         "transaction": "transaction",
@@ -687,7 +687,8 @@
         "ads": "Etsy ads",
         "adsHint": "Etsy Ads (promotion in Etsy search) and Offsite Ads.",
         "other": "Other",
-        "net": "Net revenue"
+        "net": "Net revenue",
+        "otherHint": "Other Etsy ledger entries: credits from Etsy, adjustments, older service types."
       },
       "columns": {
         "date": "Date",
@@ -822,7 +823,7 @@
       },
       "net": "Stayed with the shop",
       "noLedger": "The Etsy ledger has no entries for this order yet.",
-      "noPayment": "The payment for this order is not in the ledger — only fees are shown.",
+      "noPayment": "The payment for this order went around the Etsy ledger (e.g. PayPal) — only fees are shown.",
       "openInEtsy": "Open in Etsy Shop Manager"
     }
   }

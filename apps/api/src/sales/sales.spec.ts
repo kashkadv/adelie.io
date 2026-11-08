@@ -68,19 +68,22 @@ describe('salesOverview', () => {
 });
 
 describe('moneyFlow', () => {
-  it('sales without tax, minus refunds, fees, VAT and ads; payouts left out', () => {
+  it('sales from paid orders; refunds, fees, VAT and ads from the ledger; payouts left out', () => {
     const row = (category: string, amount: number) => ({ currency: 'USD', category, amount });
-    const [usd] = moneyFlow([
-      row('sales', 364116),
-      row('tax', -24116),
-      row('refund', -36500),
-      row('transaction_fee', -19752),
-      row('processing_fee', -19965),
-      row('listing_fee', -7200),
-      row('vat', -12157),
-      row('ads', -13912),
-      row('payout', -258606),
-    ]);
+    const [usd] = moneyFlow(
+      [
+        row('sales', 364116), // replaced by the orders' sales
+        row('tax', -24116),
+        row('refund', -36500),
+        row('transaction_fee', -19752),
+        row('processing_fee', -19965),
+        row('listing_fee', -7200),
+        row('vat', -12157),
+        row('ads', -13912),
+        row('payout', -258606),
+      ],
+      new Map([['USD', 340000]]),
+    );
     expect(usd).toMatchObject({
       sales: 340000,
       refunds: -36500,
@@ -88,6 +91,14 @@ describe('moneyFlow', () => {
       ads: -13912,
       net: 340000 - 36500 - 59074 - 13912,
     });
+  });
+
+  it('years before the ledger had payments: sales still come from the orders', () => {
+    const [usd] = moneyFlow(
+      [{ currency: 'USD', category: 'transaction_fee', amount: -500 }],
+      new Map([['USD', 10000]]),
+    );
+    expect(usd).toMatchObject({ sales: 10000, net: 9500 });
   });
 });
 

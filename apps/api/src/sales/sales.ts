@@ -14,12 +14,19 @@ export const MONEY_CATEGORIES = [
 ] as const;
 
 /**
- * What stays with the shop, per currency: sums per category and the net (all of them together).
- * Sales are shown without the sales tax the platform remits.
+ * What stays with the shop, per currency. Sales come from paid orders without the sales tax — the
+ * ledger misses them where payments went around it (Gushka before 2024: PayPal) — and everything
+ * else (refunds, fees, VAT, ads) from the payment ledger, which always has them.
  */
-export function moneyFlow(rows: { currency: string; category: string; amount: number }[]) {
+export function moneyFlow(
+  rows: { currency: string; category: string; amount: number }[],
+  sales: Map<string, number>,
+) {
   const byCurrency = new Map<string, Record<string, number>>();
+  for (const [currency, amount] of sales) byCurrency.set(currency, { sales: amount });
   for (const r of rows) {
+    // The ledger's own sales and their tax are replaced by the orders' sales.
+    if (r.category === 'sales' || r.category === 'tax') continue;
     if (!(MONEY_CATEGORIES as readonly string[]).includes(r.category)) continue;
     const sums = byCurrency.get(r.currency) ?? {};
     sums[r.category] = (sums[r.category] ?? 0) + r.amount;
@@ -30,7 +37,7 @@ export function moneyFlow(rows: { currency: string; category: string; amount: nu
     const fees = get('transaction_fee') + get('processing_fee') + get('listing_fee');
     return {
       currency,
-      sales: get('sales') + get('tax'),
+      sales: get('sales'),
       refunds: get('refund'),
       fees: {
         transaction: get('transaction_fee'),
@@ -41,7 +48,7 @@ export function moneyFlow(rows: { currency: string; category: string; amount: nu
       feesTotal: fees + get('vat'),
       ads: get('ads'),
       other: get('other'),
-      net: MONEY_CATEGORIES.reduce((n, k) => n + get(k), 0),
+      net: MONEY_CATEGORIES.filter((k) => k !== 'tax').reduce((n, k) => n + get(k), 0),
     };
   });
 }

@@ -614,7 +614,14 @@ export class SalesController {
       // Filter options for the period (not narrowed by the filters themselves).
       db.shopOrder.findMany({
         where: base,
-        select: { status: true, country: true },
+        select: {
+          status: true,
+          country: true,
+          isPaid: true,
+          currency: true,
+          total: true,
+          tax: true,
+        },
       }),
     ]);
 
@@ -690,6 +697,11 @@ export class SalesController {
           category: g.category,
           amount: g._sum.amount ?? 0,
         })),
+        // Paid orders of the period (refunds of canceled ones come from the ledger).
+        facets.reduce((m, o) => {
+          if (o.isPaid) m.set(o.currency, (m.get(o.currency) ?? 0) + (netRevenue(o) ?? 0));
+          return m;
+        }, new Map<string, number>()),
       ),
       items: rows.map(({ externalId, ...o }) => ({
         ...o,

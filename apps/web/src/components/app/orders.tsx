@@ -60,28 +60,47 @@ type Response = {
 };
 
 /**
- * What stays with the shop: sales without tax, minus refunds, platform fees (with their parts) and
- * the platform's own ads — from the payment account's ledger.
+ * What stays with the shop, as one row from sales to net: sales from paid orders (without tax),
+ * then refunds, Etsy fees (with their parts), Etsy ads and the rest from the payment ledger.
  */
 function MoneyCard({ money }: { money: Money[] | null }) {
   const t = useTranslations('Sales.orders.money');
   const format = useMoney();
   const m = money?.[0];
-  const row = (label: string, value: number, opts: { sub?: boolean; hint?: string } = {}) => (
-    <li
-      className={`flex items-center gap-2 px-1 ${opts.sub ? 'pl-4 text-xs text-muted' : 'text-sm'}`}
+  const cell = (
+    label: string,
+    value: number,
+    opts: { hint?: string; parts?: { label: string; value: number }[]; strong?: boolean } = {},
+  ) => (
+    <div
+      className={`min-w-0 rounded-2xl px-4 py-3 ${opts.strong ? 'bg-accent text-accent-foreground' : 'bg-hover'}`}
     >
-      <span className="flex flex-1 items-center gap-1.5">
+      <p className={`flex items-center gap-1 text-xs ${opts.strong ? 'opacity-80' : 'text-muted'}`}>
         {label}
         {opts.hint && <InfoTip text={opts.hint} />}
-      </span>
-      <span className={`tabular ${value < 0 && !opts.sub ? 'text-muted' : ''}`}>
+      </p>
+      <p className="tabular mt-1 font-display text-lg font-semibold whitespace-nowrap">
         {format(value, m!.currency)}
-      </span>
-    </li>
+      </p>
+      {opts.parts && (
+        <ul className="mt-1.5 space-y-0.5 text-[11px] text-muted">
+          {opts.parts
+            .filter((p) => p.value !== 0)
+            .map((p) => (
+              <li key={p.label} className="flex justify-between gap-2">
+                <span className="truncate">{p.label}</span>
+                <span className="tabular whitespace-nowrap">{format(p.value, m!.currency)}</span>
+              </li>
+            ))}
+        </ul>
+      )}
+    </div>
   );
   return (
-    <section className="card animate-rise rounded-[24px] p-5" style={{ animationDelay: '240ms' }}>
+    <section
+      className="card animate-rise mb-4 rounded-[24px] p-5"
+      style={{ animationDelay: '260ms' }}
+    >
       <h2 className="mb-4 flex items-center gap-1.5 px-1 text-lg font-semibold">
         {t('title')}
         <InfoTip text={t('hint')} />
@@ -91,25 +110,22 @@ function MoneyCard({ money }: { money: Money[] | null }) {
       ) : !m ? (
         <p className="px-1 text-sm text-muted">{t('none')}</p>
       ) : (
-        <>
-          <ul className="space-y-2.5">
-            {row(t('sales'), m.sales, { hint: t('salesHint') })}
-            {m.refunds !== 0 && row(t('refunds'), m.refunds)}
-            {row(t('fees'), m.feesTotal, { hint: t('feesHint') })}
-            {m.fees.transaction !== 0 && row(t('transaction'), m.fees.transaction, { sub: true })}
-            {m.fees.processing !== 0 && row(t('processing'), m.fees.processing, { sub: true })}
-            {m.fees.listing !== 0 && row(t('listing'), m.fees.listing, { sub: true })}
-            {m.fees.vat !== 0 && row(t('vat'), m.fees.vat, { sub: true })}
-            {m.ads !== 0 && row(t('ads'), m.ads, { hint: t('adsHint') })}
-            {m.other !== 0 && row(t('other'), m.other)}
-          </ul>
-          <div className="mt-4 flex items-center justify-between border-t border-line px-1 pt-3">
-            <span className="text-sm font-semibold">{t('net')}</span>
-            <span className="tabular font-display text-xl font-semibold">
-              {format(m.net, m.currency)}
-            </span>
-          </div>
-        </>
+        <div className="grid items-start gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {cell(t('sales'), m.sales, { hint: t('salesHint') })}
+          {cell(t('refunds'), m.refunds)}
+          {cell(t('fees'), m.feesTotal, {
+            hint: t('feesHint'),
+            parts: [
+              { label: t('transaction'), value: m.fees.transaction },
+              { label: t('processing'), value: m.fees.processing },
+              { label: t('listing'), value: m.fees.listing },
+              { label: t('vat'), value: m.fees.vat },
+            ],
+          })}
+          {cell(t('ads'), m.ads, { hint: t('adsHint') })}
+          {cell(t('other'), m.other, { hint: t('otherHint') })}
+          {cell(t('net'), m.net, { strong: true })}
+        </div>
       )}
     </section>
   );
@@ -428,7 +444,7 @@ export function Orders() {
         ))}
       </div>
 
-      <div className="mb-4 grid items-start gap-4 xl:grid-cols-3">
+      <div className="mb-4 grid gap-4 xl:grid-cols-3">
         <section
           className="card animate-rise rounded-[24px] p-5 xl:col-span-2"
           style={{ animationDelay: '200ms' }}
@@ -449,36 +465,35 @@ export function Orders() {
             <p className="px-1 py-10 text-center text-sm text-muted">{t('orders.none')}</p>
           )}
         </section>
-        <div className="grid gap-4">
-          <MoneyCard money={shown?.money ?? null} />
-          <section
-            className="card animate-rise rounded-[24px] p-5"
-            style={{ animationDelay: '260ms' }}
-          >
-            <h2 className="mb-4 px-1 text-lg font-semibold">{t('orders.countries')}</h2>
-            {countryTotal ? (
-              <ul className="space-y-3">
-                {shown!.countries.slice(0, 6).map((c) => (
-                  <li key={c.country} className="flex items-center gap-3 px-1 text-sm">
-                    <span className="flex-1 truncate">{countryName(c.country)}</span>
-                    <span className="tabular text-muted">
-                      {format.number(c.orders / countryTotal, {
-                        style: 'percent',
-                        maximumFractionDigits: 0,
-                      })}
-                    </span>
-                    <span className="tabular w-10 text-right font-medium">
-                      {format.number(c.orders)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="px-1 text-sm text-muted">{t('orders.none')}</p>
-            )}
-          </section>
-        </div>
+        <section
+          className="card animate-rise rounded-[24px] p-5"
+          style={{ animationDelay: '260ms' }}
+        >
+          <h2 className="mb-4 px-1 text-lg font-semibold">{t('orders.countries')}</h2>
+          {countryTotal ? (
+            <ul className="space-y-3">
+              {shown!.countries.slice(0, 6).map((c) => (
+                <li key={c.country} className="flex items-center gap-3 px-1 text-sm">
+                  <span className="flex-1 truncate">{countryName(c.country)}</span>
+                  <span className="tabular text-muted">
+                    {format.number(c.orders / countryTotal, {
+                      style: 'percent',
+                      maximumFractionDigits: 0,
+                    })}
+                  </span>
+                  <span className="tabular w-10 text-right font-medium">
+                    {format.number(c.orders)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-1 text-sm text-muted">{t('orders.none')}</p>
+          )}
+        </section>
       </div>
+
+      <MoneyCard money={shown?.money ?? null} />
 
       {/* The list: full width, sortable columns, every row opens the order card. */}
       <section
