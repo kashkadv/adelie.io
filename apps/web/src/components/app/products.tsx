@@ -306,7 +306,7 @@ export function Products() {
             clearable={false}
           />
         </span>
-        <label className="ml-auto flex h-9 w-full items-center gap-2 rounded-full border border-line px-3.5 text-sm focus-within:border-[var(--field-focus)] sm:w-56">
+        <label className="ml-auto flex h-9 w-full items-center gap-2 rounded-full border border-line px-3.5 text-sm focus-within:border-[var(--field-focus)] sm:w-72">
           <Search size={15} className="shrink-0 text-muted" aria-hidden="true" />
           <input
             value={search}
