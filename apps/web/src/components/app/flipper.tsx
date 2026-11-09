@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { apiUrl } from '@/lib/auth-client';
 import { InfoTip } from '../ui/info-tip';
+import { FlipperCheckout } from './flipper-checkout';
 import { FlipperSources } from './flipper-sources';
 import { Segmented } from '../ui/segmented';
 import { CONNECT_ROLES } from './accounts-data';
@@ -61,7 +62,7 @@ type LiveEvent = {
   visitor: string | null;
 };
 
-type Tab = 'analytics' | 'sources' | 'live' | 'settings';
+type Tab = 'analytics' | 'sources' | 'checkout' | 'live' | 'settings';
 
 const PAGE_SIZE = 25;
 
@@ -283,6 +284,7 @@ export function Flipper() {
               options={[
                 { value: 'analytics', label: t('tabAnalytics') },
                 { value: 'sources', label: t('tabSources') },
+                { value: 'checkout', label: t('tabCheckout') },
                 { value: 'live', label: t('live') },
                 { value: 'settings', label: t('tabSettings') },
               ]}
@@ -367,6 +369,8 @@ export function Flipper() {
               <FlipperGuide scriptUrl={`${apiUrl}/flipper.js`} siteId={site.publicId} />
             </>
           )}
+
+          {tab === 'checkout' && base && <FlipperCheckout base={base} accountId={current.id} />}
 
           {tab === 'sources' && base && <FlipperSources base={base} accountId={current.id} />}
 

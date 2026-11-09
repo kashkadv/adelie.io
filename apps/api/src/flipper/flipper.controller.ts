@@ -48,6 +48,17 @@ const GROUPS = {
   term: Prisma.raw('"term"'),
 } as const;
 
+/** The steps of the checkout page, in the order a buyer meets them. */
+export const CHECKOUT_STEPS = [
+  'BeginCheckout',
+  'CheckoutFieldBlur',
+  'DeliveryMethodSelected',
+  'DeliveryCitySelected',
+  'DeliveryWarehouseSelected',
+  'PaymentClicked',
+  'Purchase',
+] as const;
+
 export const FUNNEL = [
   'ViewCategory',
   'ProductView',
@@ -320,6 +331,62 @@ export class FlipperController {
       WHERE "siteId" = ${site.id}::uuid AND name = 'Purchase' AND properties->>'currency' IS NOT NULL
       ORDER BY "occurredAt" DESC LIMIT 1`;
     return { days: n, currency: currency[0]?.currency ?? null, rows };
+  }
+
+  /**
+   * Where buyers stop on the checkout page: how many reached each step, which fields were filled
+   * or left empty, which fields failed validation, and what they chose. Visitors who agreed only
+   * (a person is followed across steps only then). Never what was typed: only field names.
+   */
+  @Get(':accountId/checkout')
+  async checkout(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Query('days') days: string | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const site = await this.siteOf(request.workspace, projectId, accountId);
+    const n = [7, 30, 90].includes(Number(days)) ? Number(days) : 7;
+    const since = new Date(Date.now() - n * 86_400_000);
+    const db = this.prisma.client;
+    const sid = site.id;
+    const base = Prisma.sql`"siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot" AND "visitorId" IS NOT NULL`;
+    const [steps, fields, failures, delivery, payment] = await Promise.all([
+      db.$queryRaw<{ name: string; visitors: number }[]>`
+        SELECT name, count(DISTINCT "visitorId")::int AS visitors FROM website_event
+        WHERE ${base} AND name IN (${Prisma.join([...CHECKOUT_STEPS])}) GROUP BY name`,
+      db.$queryRaw<{ field: string; visitors: number; filled: number }[]>`
+        SELECT properties->>'field' AS field,
+               count(DISTINCT "visitorId")::int AS visitors,
+               count(DISTINCT "visitorId") FILTER (WHERE properties->>'filled' = 'true')::int AS filled
+        FROM website_event
+        WHERE ${base} AND name = 'CheckoutFieldBlur' AND properties->>'field' IS NOT NULL
+        GROUP BY 1 ORDER BY visitors DESC LIMIT 30`,
+      db.$queryRaw<{ field: string; visitors: number }[]>`
+        SELECT f AS field, count(DISTINCT "visitorId")::int AS visitors
+        FROM website_event, unnest(string_to_array(properties->>'fields', ',')) AS f
+        WHERE ${base} AND name = 'CheckoutValidationFailed' AND f <> ''
+        GROUP BY 1 ORDER BY visitors DESC LIMIT 30`,
+      db.$queryRaw<{ value: string; visitors: number }[]>`
+        SELECT properties->>'method' AS value, count(DISTINCT "visitorId")::int AS visitors
+        FROM website_event
+        WHERE ${base} AND name = 'DeliveryMethodSelected' AND properties->>'method' IS NOT NULL
+        GROUP BY 1 ORDER BY visitors DESC LIMIT 20`,
+      db.$queryRaw<{ value: string; visitors: number }[]>`
+        SELECT properties->>'payment_method' AS value, count(DISTINCT "visitorId")::int AS visitors
+        FROM website_event
+        WHERE ${base} AND name = 'PaymentClicked' AND properties->>'payment_method' IS NOT NULL
+        GROUP BY 1 ORDER BY visitors DESC LIMIT 20`,
+    ]);
+    const by = new Map(steps.map((x) => [x.name, x.visitors]));
+    return {
+      days: n,
+      steps: CHECKOUT_STEPS.map((name) => ({ name, visitors: by.get(name) ?? 0 })),
+      fields,
+      failures,
+      delivery,
+      payment,
+    };
   }
 
   /**

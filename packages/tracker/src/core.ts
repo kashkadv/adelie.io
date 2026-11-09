@@ -145,8 +145,28 @@ function productOf(item: unknown, currency?: string): Rec | null {
 }
 
 export type DataLayerCall = {
-  method: 'viewCategory' | 'productView' | 'addToCart' | 'beginCheckout' | 'purchase';
+  method: 'viewCategory' | 'productView' | 'addToCart' | 'beginCheckout' | 'purchase' | 'track';
   args: unknown[];
+};
+
+/**
+ * Checkout-page events a shop pushes as plain `{event, …}` objects (GTM style): where buyers stop.
+ * Only the named fields are taken, never anything else — and `checkout_field_blurred` carries the
+ * field's name and whether it is filled, never what was typed.
+ */
+const CHECKOUT_EVENTS: Record<string, { name: string; fields: Record<string, string> }> = {
+  checkout_field_blurred: {
+    name: 'CheckoutFieldBlur',
+    fields: { field: 'field', filled: 'filled' },
+  },
+  delivery_method_selected: { name: 'DeliveryMethodSelected', fields: { method: 'method' } },
+  delivery_city_selected: { name: 'DeliveryCitySelected', fields: { city: 'city' } },
+  delivery_warehouse_selected: {
+    name: 'DeliveryWarehouseSelected',
+    fields: { warehouse: 'warehouse' },
+  },
+  checkout_validation_failed: { name: 'CheckoutValidationFailed', fields: { fields: 'fields' } },
+  payment_clicked: { name: 'PaymentClicked', fields: { paymentMethod: 'payment_method' } },
 };
 
 /**
@@ -171,6 +191,22 @@ export function fromDataLayer(entry: unknown): DataLayerCall[] {
     params = (entry[2] as Rec | undefined) ?? {};
   } else return [];
   if (typeof name !== 'string') return [];
+
+  const checkout = CHECKOUT_EVENTS[name];
+  if (checkout && isRec(entry) && !('length' in entry)) {
+    const props: Rec = {};
+    for (const [from, to] of Object.entries(checkout.fields)) {
+      const v = (entry as Rec)[from];
+      if (Array.isArray(v))
+        props[to] = v
+          .filter((x) => typeof x === 'string')
+          .join(',')
+          .slice(0, 200);
+      else if (typeof v === 'boolean') props[to] = v;
+      else if (typeof v === 'string' || typeof v === 'number') props[to] = String(v).slice(0, 120);
+    }
+    return [{ method: 'track', args: [checkout.name, props] }];
+  }
 
   const currency = str(params.currency);
   const items = (Array.isArray(params.items) ? params.items : [])

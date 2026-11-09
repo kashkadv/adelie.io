@@ -1368,6 +1368,28 @@
       "term": "Term"
     },
     "tileVisitors": "{count, plural, one {# visitor} other {# visitors}}",
-    "serverUrl": "Address and method. The key goes in the header Authorization: Bearer YOUR_KEY; the body is JSON (see the guide below)."
+    "serverUrl": "Address and method. The key goes in the header Authorization: Bearer YOUR_KEY; the body is JSON (see the guide below).",
+    "tabCheckout": "Checkout",
+    "chkNote": "Only visitors who agreed",
+    "chkHint": "A person is followed from step to step only when they agreed, so these numbers are lower than the real traffic. Field names are counted, never what was typed.",
+    "chkSteps": "Steps of the checkout page",
+    "chkFields": "Fields",
+    "chkFieldsHint": "Reached: the visitor went into the field and left it. Filled: it was not empty when they left. A big gap shows a field people give up on.",
+    "chkField": "Field",
+    "chkReached": "Reached",
+    "chkFilled": "Filled",
+    "chkFailures": "Fields that failed validation",
+    "chkDelivery": "Chosen delivery",
+    "chkPayment": "Chosen payment",
+    "chkNone": "Nothing yet.",
+    "chkStep": {
+      "BeginCheckout": "Checkout opened",
+      "CheckoutFieldBlur": "Started filling the form",
+      "DeliveryMethodSelected": "Chose delivery",
+      "DeliveryCitySelected": "Chose a city",
+      "DeliveryWarehouseSelected": "Chose a branch",
+      "PaymentClicked": "Pressed Pay",
+      "Purchase": "Paid"
+    }
   }
 }

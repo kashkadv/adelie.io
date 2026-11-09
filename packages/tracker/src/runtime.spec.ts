@@ -234,6 +234,36 @@ describe('events', () => {
     }
   });
 
+  it('takes checkout-page events from dataLayer without anything typed by the buyer', () => {
+    const w = window as unknown as { dataLayer?: unknown[] };
+    w.dataLayer = [];
+    try {
+      load({ 'auto-pageview': 'false' });
+      w.dataLayer.push({
+        event: 'checkout_field_blurred',
+        field: 'email',
+        filled: true,
+        value: 'a@b.c',
+      });
+      w.dataLayer.push({ event: 'checkout_validation_failed', fields: ['phone', 'email'] });
+      w.dataLayer.push({ event: 'payment_clicked', paymentMethod: 'monobank' });
+      w.dataLayer.push({ event: 'delivery_city_selected', city: null });
+      vi.advanceTimersByTime(2000);
+      const events = bodies().flatMap((b) => b.e);
+      expect(events.map((e) => e.n)).toEqual([
+        'CheckoutFieldBlur',
+        'CheckoutValidationFailed',
+        'PaymentClicked',
+        'DeliveryCitySelected',
+      ]);
+      expect(events[0]!.p).toEqual({ field: 'email', filled: true });
+      expect(events[1]!.p).toEqual({ fields: 'phone,email' });
+      expect(events[2]!.p).toEqual({ payment_method: 'monobank' });
+    } finally {
+      delete w.dataLayer;
+    }
+  });
+
   it('data-datalayer="false" leaves dataLayer alone', () => {
     const w = window as unknown as { dataLayer?: unknown[] };
     w.dataLayer = [];
