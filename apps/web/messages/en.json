@@ -733,7 +733,8 @@
         "has": "On {name}",
         "lacks": "Not on {name}",
         "lacksSites": "Not on any site"
-      }
+      },
+      "linked": "Linked products +{count}"
     },
     "orders": {
       "title": "Orders",

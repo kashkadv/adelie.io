@@ -441,7 +441,7 @@ export function Products() {
               </span>
             ))}
           </span>
-          <span className="w-24" />
+          <span className="w-16" />
         </div>
         {!shown ? (
           <p className="px-5 py-10 text-center text-sm text-muted">…</p>
@@ -460,13 +460,15 @@ export function Products() {
                     <span className="flex w-5 shrink-0 justify-center">
                       <Issues product={p} />
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setOpenId(p.id)}
-                      aria-haspopup="dialog"
-                      className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left"
-                    >
-                      <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-hover transition-transform duration-200 group-hover:scale-[1.04]">
+                    <div className="group flex min-w-0 flex-1 items-center gap-3">
+                      {/* The photo and the title open the card; the photo is not a second tab stop. */}
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        aria-hidden="true"
+                        onClick={() => setOpenId(p.id)}
+                        className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-hover transition-transform duration-200 group-hover:scale-[1.04]"
+                      >
                         {p.imageUrl && (
                           // External platform image: plain <img>, lazy.
                           // eslint-disable-next-line @next/next/no-img-element
@@ -477,14 +479,17 @@ export function Products() {
                             className="h-full w-full object-cover"
                           />
                         )}
-                      </span>
-                      <div className="min-w-0">
-                        <p
-                          className="truncate text-sm font-medium group-hover:underline group-hover:underline-offset-2"
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setOpenId(p.id)}
+                          aria-haspopup="dialog"
+                          className="block max-w-full truncate text-left text-sm font-medium group-hover:underline group-hover:underline-offset-2"
                           title={p.title}
                         >
                           {p.title}
-                        </p>
+                        </button>
                         <p className="flex items-center gap-2 text-xs text-muted">
                           {p.state !== 'active' && (
                             <span className="rounded-full border border-line px-1.5 leading-4">
@@ -515,9 +520,26 @@ export function Products() {
                                 year: 'numeric',
                               }),
                             })}
+                          {/* The same product on the other channels: opens the rows below. */}
+                          {p.elsewhere.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => toggleExpanded(p.id)}
+                              aria-expanded={expanded.has(p.id)}
+                              title={t('products.elsewhere')}
+                              className="ml-3 inline-flex shrink-0 items-center gap-1 rounded-full bg-hover px-2 leading-5 font-medium text-foreground hover:bg-[var(--field-focus)]"
+                            >
+                              {t('products.linked', { count: p.elsewhere.length })}
+                              <ChevronDown
+                                size={13}
+                                aria-hidden="true"
+                                className={`transition-transform duration-200 ${expanded.has(p.id) ? 'rotate-180' : ''}`}
+                              />
+                            </button>
+                          )}
                         </p>
                       </div>
-                    </button>
+                    </div>
                   </div>
                   <dl
                     className={`tabular grid shrink-0 gap-x-6 gap-y-2 text-right ${
@@ -537,24 +559,7 @@ export function Products() {
                       </div>
                     ))}
                   </dl>
-                  <span className="flex w-24 shrink-0 items-center justify-end">
-                    {p.elsewhere.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => toggleExpanded(p.id)}
-                        aria-expanded={expanded.has(p.id)}
-                        title={t('products.elsewhere')}
-                        aria-label={t('products.elsewhere')}
-                        className="mr-1 inline-flex h-8 items-center gap-1 rounded-xl px-2 text-xs text-muted hover:bg-hover hover:text-foreground"
-                      >
-                        <span className="tabular">{p.elsewhere.length}</span>
-                        <ChevronDown
-                          size={14}
-                          aria-hidden="true"
-                          className={`transition-transform duration-200 ${expanded.has(p.id) ? 'rotate-180' : ''}`}
-                        />
-                      </button>
-                    )}
+                  <span className="flex w-16 shrink-0 items-center justify-end">
                     {p.state !== 'removed' && p.account.platform === 'ETSY' && (
                       <button
                         type="button"
