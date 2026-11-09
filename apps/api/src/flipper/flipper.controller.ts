@@ -221,11 +221,16 @@ export class FlipperController {
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
           AND "visitorId" IS NOT NULL AND name IN (${Prisma.join([...FUNNEL])})
         GROUP BY name`,
-      db.$queryRaw<{ channel: string; views: number }[]>`
-        SELECT channel, count(*)::int AS views FROM website_event
+      // A visit is a session of someone who agreed, or an arrival of someone who did not (their
+      // page view of the landing is the only one that says where they came from): comparable.
+      db.$queryRaw<{ channel: string; visits: number }[]>`
+        SELECT channel,
+               (count(DISTINCT "sessionId") FILTER (WHERE consent)
+                + count(*) FILTER (WHERE NOT consent))::int AS visits
+        FROM website_event
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
           AND name = 'PageView' AND channel IS NOT NULL
-        GROUP BY channel ORDER BY views DESC LIMIT 10`,
+        GROUP BY channel ORDER BY visits DESC LIMIT 10`,
       db.$queryRaw<{ item: string; views: number; visitors: number }[]>`
         SELECT properties->>'item_id' AS item, count(*)::int AS views,
                count(DISTINCT coalesce("visitorId", "dailyId"))::int AS visitors

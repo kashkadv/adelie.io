@@ -1168,7 +1168,7 @@
     "visitorsHint": "Each person is counted once a day: with consent by a persistent id, without it by an anonymous daily hash that does not link days. This is an estimate.",
     "funnel": "Funnel (with consent only)",
     "funnelHint": "How many unique visitors who agreed reached each step. The percentage is of the previous step.",
-    "channels": "Channels (page views)",
+    "channels": "Channels (visits)",
     "noChannels": "Sources appear when visits with utm labels or from other sites arrive.",
     "topProducts": "Most viewed products",
     "live": "Live events",
@@ -1183,7 +1183,7 @@
       "install": {
         "title": "1. Installation",
         "lead": "Add two lines to the head of every page (or once in a shared template). The first is a tiny stub so calls made before the script loads are not lost. The second is the script itself: it loads asynchronously, does not slow the site down and its errors never break the page.",
-        "next": "In Next.js this goes in the root layout. If one codebase serves several domains, the id is chosen by host (the example is for gushka.ua and gushka.world).",
+        "next": "In Next.js this goes in the root layout. Each domain has its own id and its own mode: in the example gushka.ua runs in full mode at once (data-consent granted) and gushka.world stays anonymous.",
         "options": "Options are attributes of the script tag: data-consent=\"granted\" (do not wait for consent — see below), data-spa=\"false\" (do not count route changes as page views), data-auto-pageview=\"false\" (do not count the page view automatically), data-allow-params=\"page,sort\" (which more address parameters may be sent; by default only utm and click ids), data-link-domains=\"gushka.world\" (carry the visitor to your other domain)."
       },
       "consent": {

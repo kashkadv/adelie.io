@@ -81,16 +81,20 @@ const ATTRIBUTES = `<!-- No JavaScript needed: data-flipper-* on the element fir
   data-flipper-quantity="1"
 >Add to cart</button>`;
 
-const NEXT = `// app/layout.tsx (Next.js): one place, every page
+const NEXT = `// app/layout.tsx (Next.js): one place, every page; each domain has its own id and mode
 import Script from 'next/script';
+import { headers } from 'next/headers';
 
-const FLIPPER = {
-  'gushka.ua': 'fl_UA_SITE_ID',
-  'gushka.world': 'fl_WORLD_SITE_ID',
+const SITES = {
+  // Ukraine: full mode at once (visitor, sessions, funnel) — no cookie banner needed
+  'gushka.ua': { id: 'fl_UA_SITE_ID', consent: 'granted' },
+  // The world: anonymous for now (views and unique visitors per day, nothing stored in the browser)
+  'gushka.world': { id: 'fl_WORLD_SITE_ID', consent: undefined },
 } as const;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const host = (await headers()).get('host')?.replace(/^www\\./, '') ?? 'gushka.ua';
+  const host = ((await headers()).get('host') ?? 'gushka.ua').replace(/^www\\./, '') as keyof typeof SITES;
+  const site = SITES[host] ?? SITES['gushka.ua'];
   return (
     <html>
       <body>
@@ -100,8 +104,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         }</Script>
         <Script
           src="https://dev-api.adelie.space/flipper.js"
-          data-site-id={FLIPPER[host as keyof typeof FLIPPER]}
-          data-link-domains="gushka.world,gushka.ua"
+          data-site-id={site.id}
+          data-consent={site.consent}
           strategy="afterInteractive"
         />
       </body>

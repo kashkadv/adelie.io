@@ -28,6 +28,9 @@
    постійний `visitor_id` (cookie `_fl_v`, 400 днів), сеанс (`_fl_s`, 30 хв), атрибуція сеансу (`_fl_a`), воронка.
    Do Not Track і Global Privacy Control — нічого не надсилається. З адрес лишаються лише utm-параметри й click id
    (gclid, fbclid, ttclid, epik, msclkid) та дозволені сайтом (`data-allow-params`).
+   **Рішення для Gushka (2026-11-10):** `gushka.ua` — повний режим одразу (`data-consent="granted"`, аудиторія
+   переважно українська, банера немає); `gushka.world` — завжди анонімний (покупці з ЄС), доки не буде банера згоди.
+   Відповідальність за підставу обробки — на власнику сайту.
 5. **Події.** Автоматично: `PageView` (з SPA-переходами через History API), `OutboundClick`. Магазин:
    `ViewCategory`, `ProductView`, `AddToCart`, `BeginCheckout` (стандартні властивості: `item_id` — артикул = `g:id`,
    `item_name`, `price`, `currency`, `quantity`, `value`, `items`). `Purchase` — **лише з сервера** (окремий етап).

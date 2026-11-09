@@ -33,7 +33,7 @@ type Summary = {
   counts: { name: string; events: number }[];
   daily: { day: string; visitors: number; views: number }[];
   funnel: { name: string; visitors: number }[];
-  channels: { channel: string; views: number }[];
+  channels: { channel: string; visits: number }[];
   products: { item: string; views: number; visitors: number }[];
   consent: { consenting: number; anonymous: number };
 };
@@ -325,7 +325,7 @@ export function Flipper() {
                   {(summary?.channels ?? []).map((c) => (
                     <li key={c.channel} className="flex justify-between gap-3">
                       <span>{c.channel}</span>
-                      <span className="tabular text-muted">{format.number(c.views)}</span>
+                      <span className="tabular text-muted">{format.number(c.visits)}</span>
                     </li>
                   ))}
                 </ul>
