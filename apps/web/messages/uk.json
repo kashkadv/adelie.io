@@ -1343,6 +1343,8 @@
     "serverShownOnce": "Скопіюйте ключ зараз: він показується лише один раз.",
     "liveRange": "{from}–{to} з {total}",
     "livePrev": "Новіші події",
-    "liveNext": "Старіші події"
+    "liveNext": "Старіші події",
+    "tabAnalytics": "Аналітика",
+    "tabSettings": "Налаштування й встановлення"
   }
 }

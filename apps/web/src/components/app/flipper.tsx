@@ -60,6 +60,8 @@ type LiveEvent = {
   visitor: string | null;
 };
 
+type Tab = 'analytics' | 'settings';
+
 const PAGE_SIZE = 25;
 
 const STANDARD = [
@@ -98,6 +100,7 @@ export function Flipper() {
   const [events, setEvents] = useState<LiveEvent[] | null>(null);
   const [eventsTotal, setEventsTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [tabChoice, setTabChoice] = useState<Tab | null>(null);
   const [busy, setBusy] = useState(false);
 
   /** Bumped to read the sites again (after switching one on). */
@@ -211,6 +214,7 @@ export function Flipper() {
     );
   }
 
+  const tab: Tab = tabChoice ?? (site?.lastEventAt ? 'analytics' : 'settings');
   const live = site?.lastEventAt && now - new Date(site.lastEventAt).getTime() < 24 * 3600 * 1000;
   const total = summary ? summary.consent.consenting + summary.consent.anonymous : 0;
   const funnelTop = Math.max(1, ...(summary?.funnel.map((f) => f.visitors) ?? [0]));
@@ -269,273 +273,301 @@ export function Flipper() {
 
       {current && site && (
         <>
-          <section className="card animate-rise mb-6 rounded-[24px] p-5">
-            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <h2 className="text-sm font-semibold">{t('install')}</h2>
-              <span className="flex items-center gap-2 text-xs text-muted">
-                <span
-                  aria-hidden="true"
-                  className={`h-2 w-2 rounded-full ${live ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                />
-                {site.lastEventAt ? t('lastEvent', { date: date(site.lastEventAt) }) : t('waiting')}
-              </span>
-              <span className="text-xs text-muted">
-                {t('siteId')}: <span className="tabular text-foreground">{site.publicId}</span>
-              </span>
-            </div>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="flex items-center gap-1.5 text-xs text-muted">
-                {t('mode')}
-                <InfoTip text={t('modeHint')} />
-              </span>
-              <Segmented
-                ariaLabel={t('mode')}
-                value={site.consentMode}
-                onChange={(m) => !busy && setMode(m)}
-                options={[
-                  { value: 'anonymous', label: t('modeAnonymous') },
-                  { value: 'granted', label: t('modeGranted') },
-                ]}
-              />
-            </div>
-            <CodeBlock
-              code={installSnippet(`${apiUrl}/flipper.js?site=${site.publicId}`, site.publicId)}
-              label={t('install')}
-            />
-          </section>
-
-          <section className="card animate-rise mb-6 rounded-[24px] p-5">
-            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-                {t('serverTitle')}
-                <InfoTip text={t('serverHint')} />
-              </h2>
-              <span className="text-xs text-muted">
-                {site.serverKeyHint
-                  ? t('serverKeySet', { hint: site.serverKeyHint })
-                  : t('serverKeyNone')}
-              </span>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  if (!site.serverKeyHint || window.confirm(t('serverRegenerate'))) void makeKey();
-                }}
-                className="rounded-full border border-line px-3 py-1 text-xs hover:text-foreground"
-              >
-                {site.serverKeyHint ? t('serverNewKey') : t('serverMakeKey')}
-              </button>
-            </div>
-            {newKey && (
-              <>
-                <p className="mb-2 text-xs text-amber-700 dark:text-amber-300">
-                  {t('serverShownOnce')}
-                </p>
-                <CodeBlock code={newKey} label={t('serverTitle')} />
-              </>
-            )}
-          </section>
-
-          <div className="animate-rise mb-4 flex flex-wrap items-center gap-3">
+          <div className="animate-rise mb-5">
             <Segmented
-              ariaLabel={t('period')}
-              value={days}
-              onChange={setDays}
-              options={PERIODS.map((p) => ({ value: p, label: t('days', { count: Number(p) }) }))}
+              ariaLabel={t('title')}
+              value={tab}
+              onChange={setTabChoice}
+              options={[
+                { value: 'analytics', label: t('tabAnalytics') },
+                { value: 'settings', label: t('tabSettings') },
+              ]}
             />
-            {summary && total > 0 && (
-              <span className="flex items-center gap-1.5 text-xs text-muted">
-                {t('consentShare', {
-                  percent: Math.round((summary.consent.consenting / total) * 100),
-                })}
-                <InfoTip text={t('consentHint')} />
-              </span>
-            )}
           </div>
 
-          <dl className="animate-rise mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            {STANDARD.map((n) => (
-              <div key={n} className="rounded-2xl bg-hover px-4 py-3">
-                <dt className="text-xs text-muted">{t(`events.${n}`)}</dt>
-                <dd className="tabular mt-1 font-display text-xl font-semibold">
-                  {summary ? format.number(count(n)) : '—'}
-                </dd>
+          {tab === 'settings' && (
+            <>
+              <section className="card animate-rise mb-6 rounded-[24px] p-5">
+                <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <h2 className="text-sm font-semibold">{t('install')}</h2>
+                  <span className="flex items-center gap-2 text-xs text-muted">
+                    <span
+                      aria-hidden="true"
+                      className={`h-2 w-2 rounded-full ${live ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                    />
+                    {site.lastEventAt
+                      ? t('lastEvent', { date: date(site.lastEventAt) })
+                      : t('waiting')}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {t('siteId')}: <span className="tabular text-foreground">{site.publicId}</span>
+                  </span>
+                </div>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="flex items-center gap-1.5 text-xs text-muted">
+                    {t('mode')}
+                    <InfoTip text={t('modeHint')} />
+                  </span>
+                  <Segmented
+                    ariaLabel={t('mode')}
+                    value={site.consentMode}
+                    onChange={(m) => !busy && setMode(m)}
+                    options={[
+                      { value: 'anonymous', label: t('modeAnonymous') },
+                      { value: 'granted', label: t('modeGranted') },
+                    ]}
+                  />
+                </div>
+                <CodeBlock
+                  code={installSnippet(`${apiUrl}/flipper.js?site=${site.publicId}`, site.publicId)}
+                  label={t('install')}
+                />
+              </section>
+
+              <section className="card animate-rise mb-6 rounded-[24px] p-5">
+                <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                    {t('serverTitle')}
+                    <InfoTip text={t('serverHint')} />
+                  </h2>
+                  <span className="text-xs text-muted">
+                    {site.serverKeyHint
+                      ? t('serverKeySet', { hint: site.serverKeyHint })
+                      : t('serverKeyNone')}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!site.serverKeyHint || window.confirm(t('serverRegenerate')))
+                        void makeKey();
+                    }}
+                    className="rounded-full border border-line px-3 py-1 text-xs hover:text-foreground"
+                  >
+                    {site.serverKeyHint ? t('serverNewKey') : t('serverMakeKey')}
+                  </button>
+                </div>
+                {newKey && (
+                  <>
+                    <p className="mb-2 text-xs text-amber-700 dark:text-amber-300">
+                      {t('serverShownOnce')}
+                    </p>
+                    <CodeBlock code={newKey} label={t('serverTitle')} />
+                  </>
+                )}
+              </section>
+
+              <h2 className="mb-3 px-3.5 text-lg font-semibold">{t('guideTitle')}</h2>
+              <FlipperGuide scriptUrl={`${apiUrl}/flipper.js`} siteId={site.publicId} />
+            </>
+          )}
+
+          {tab === 'analytics' && (
+            <>
+              <div className="animate-rise mb-4 flex flex-wrap items-center gap-3">
+                <Segmented
+                  ariaLabel={t('period')}
+                  value={days}
+                  onChange={setDays}
+                  options={PERIODS.map((p) => ({
+                    value: p,
+                    label: t('days', { count: Number(p) }),
+                  }))}
+                />
+                {summary && total > 0 && (
+                  <span className="flex items-center gap-1.5 text-xs text-muted">
+                    {t('consentShare', {
+                      percent: Math.round((summary.consent.consenting / total) * 100),
+                    })}
+                    <InfoTip text={t('consentHint')} />
+                  </span>
+                )}
               </div>
-            ))}
-          </dl>
 
-          <section className="card animate-rise mb-6 rounded-[24px] p-5">
-            <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold">
-              {t('visitorsPerDay')}
-              <InfoTip text={t('visitorsHint')} />
-            </h2>
-            <ImpressionsChart
-              points={(summary?.daily ?? []).map((d) => ({
-                date: d.day,
-                value: d.visitors,
-                status: 'READY' as const,
-              }))}
-              ariaLabel={t('visitorsPerDay')}
-            />
-          </section>
+              <dl className="animate-rise mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                {STANDARD.map((n) => (
+                  <div key={n} className="rounded-2xl bg-hover px-4 py-3">
+                    <dt className="text-xs text-muted">{t(`events.${n}`)}</dt>
+                    <dd className="tabular mt-1 font-display text-xl font-semibold">
+                      {summary ? format.number(count(n)) : '—'}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
 
-          <div className="mb-6 grid gap-6 lg:grid-cols-2">
-            <section className="card animate-rise rounded-[24px] p-5">
-              <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
-                {t('funnel')}
-                <InfoTip text={t('funnelHint')} />
-              </h2>
-              <ul className="grid gap-3">
-                {(summary?.funnel ?? []).map((step, i, all) => {
-                  const previous = i > 0 ? all[i - 1]!.visitors : 0;
-                  return (
-                    <li key={step.name}>
-                      <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
-                        <span>{t(`events.${step.name as 'ViewCategory'}`)}</span>
-                        <span className="tabular">
-                          {i > 0 && previous > 0 && (
-                            <span className="mr-2 text-xs text-muted">
-                              {Math.round((step.visitors / previous) * 100)}%
+              <section className="card animate-rise mb-6 rounded-[24px] p-5">
+                <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold">
+                  {t('visitorsPerDay')}
+                  <InfoTip text={t('visitorsHint')} />
+                </h2>
+                <ImpressionsChart
+                  points={(summary?.daily ?? []).map((d) => ({
+                    date: d.day,
+                    value: d.visitors,
+                    status: 'READY' as const,
+                  }))}
+                  ariaLabel={t('visitorsPerDay')}
+                />
+              </section>
+
+              <div className="mb-6 grid gap-6 lg:grid-cols-2">
+                <section className="card animate-rise rounded-[24px] p-5">
+                  <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
+                    {t('funnel')}
+                    <InfoTip text={t('funnelHint')} />
+                  </h2>
+                  <ul className="grid gap-3">
+                    {(summary?.funnel ?? []).map((step, i, all) => {
+                      const previous = i > 0 ? all[i - 1]!.visitors : 0;
+                      return (
+                        <li key={step.name}>
+                          <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
+                            <span>{t(`events.${step.name as 'ViewCategory'}`)}</span>
+                            <span className="tabular">
+                              {i > 0 && previous > 0 && (
+                                <span className="mr-2 text-xs text-muted">
+                                  {Math.round((step.visitors / previous) * 100)}%
+                                </span>
+                              )}
+                              {format.number(step.visitors)}
                             </span>
-                          )}
-                          {format.number(step.visitors)}
-                        </span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-hover">
-                        <div
-                          className="h-full rounded-full bg-accent"
-                          style={{ width: `${(step.visitors / funnelTop) * 100}%` }}
-                        />
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-hover">
+                            <div
+                              className="h-full rounded-full bg-accent"
+                              style={{ width: `${(step.visitors / funnelTop) * 100}%` }}
+                            />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
 
-            <section className="card animate-rise rounded-[24px] p-5">
-              <h2 className="mb-3 text-sm font-semibold">{t('channels')}</h2>
-              {summary && summary.channels.length === 0 ? (
-                <p className="text-sm text-muted">{t('noChannels')}</p>
-              ) : (
-                <ul className="grid gap-2 text-sm">
-                  {(summary?.channels ?? []).map((c) => (
-                    <li key={c.channel} className="flex justify-between gap-3">
-                      <span>{c.channel}</span>
-                      <span className="tabular text-muted">{format.number(c.visits)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {summary && summary.products.length > 0 && (
-                <>
-                  <h2 className="mt-5 mb-3 text-sm font-semibold">{t('topProducts')}</h2>
-                  <ul className="grid gap-2 text-sm">
-                    {summary.products.map((p) => (
-                      <li key={p.item} className="flex items-start justify-between gap-3">
-                        <span className="min-w-0">
-                          {p.url ? (
-                            <a
-                              href={p.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block truncate hover:underline"
-                              title={p.title ?? p.item}
-                            >
-                              {p.title ?? p.item}
-                            </a>
-                          ) : (
-                            <span className="block truncate">{p.title ?? p.item}</span>
-                          )}
-                          {p.title && <span className="tabular text-xs text-muted">{p.item}</span>}
+                <section className="card animate-rise rounded-[24px] p-5">
+                  <h2 className="mb-3 text-sm font-semibold">{t('channels')}</h2>
+                  {summary && summary.channels.length === 0 ? (
+                    <p className="text-sm text-muted">{t('noChannels')}</p>
+                  ) : (
+                    <ul className="grid gap-2 text-sm">
+                      {(summary?.channels ?? []).map((c) => (
+                        <li key={c.channel} className="flex justify-between gap-3">
+                          <span>{c.channel}</span>
+                          <span className="tabular text-muted">{format.number(c.visits)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {summary && summary.products.length > 0 && (
+                    <>
+                      <h2 className="mt-5 mb-3 text-sm font-semibold">{t('topProducts')}</h2>
+                      <ul className="grid gap-2 text-sm">
+                        {summary.products.map((p) => (
+                          <li key={p.item} className="flex items-start justify-between gap-3">
+                            <span className="min-w-0">
+                              {p.url ? (
+                                <a
+                                  href={p.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block truncate hover:underline"
+                                  title={p.title ?? p.item}
+                                >
+                                  {p.title ?? p.item}
+                                </a>
+                              ) : (
+                                <span className="block truncate">{p.title ?? p.item}</span>
+                              )}
+                              {p.title && (
+                                <span className="tabular text-xs text-muted">{p.item}</span>
+                              )}
+                            </span>
+                            <span className="tabular text-muted">
+                              {t('productViews', { views: p.views, visitors: p.visitors })}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </section>
+              </div>
+
+              <section className="card animate-rise mb-6 overflow-hidden rounded-[24px]">
+                <h2 className="flex items-center gap-1.5 border-b border-line px-5 py-4 text-sm font-semibold">
+                  {t('live')}
+                  <InfoTip text={t('liveHint')} />
+                </h2>
+                {!events ? (
+                  <p className="px-5 py-8 text-center text-sm text-muted">…</p>
+                ) : events.length === 0 ? (
+                  <p className="px-5 py-8 text-center text-sm text-muted">{t('noEvents')}</p>
+                ) : (
+                  <ul className="divide-y divide-line">
+                    {events.map((e) => (
+                      <li
+                        key={e.id}
+                        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2.5 text-sm"
+                      >
+                        <span className="tabular w-20 shrink-0 text-xs text-muted">
+                          {time(e.occurredAt)}
                         </span>
-                        <span className="tabular text-muted">
-                          {t('productViews', { views: p.views, visitors: p.visitors })}
+                        <span className="w-32 shrink-0 font-medium">{e.name}</span>
+                        <span className="min-w-0 flex-1 truncate text-muted" title={e.url}>
+                          {shortUrl(e.url)}
                         </span>
+                        {e.channel && (
+                          <span className="rounded-full border border-line px-2 text-xs leading-5">
+                            {e.channel}
+                          </span>
+                        )}
+                        {e.visitor && (
+                          <span
+                            className="tabular text-xs text-muted"
+                            title={e.consent ? t('known') : t('anonymous')}
+                          >
+                            {e.consent ? '●' : '○'} {e.visitor}
+                          </span>
+                        )}
                       </li>
                     ))}
                   </ul>
-                </>
-              )}
-            </section>
-          </div>
-
-          <section className="card animate-rise mb-6 overflow-hidden rounded-[24px]">
-            <h2 className="flex items-center gap-1.5 border-b border-line px-5 py-4 text-sm font-semibold">
-              {t('live')}
-              <InfoTip text={t('liveHint')} />
-            </h2>
-            {!events ? (
-              <p className="px-5 py-8 text-center text-sm text-muted">…</p>
-            ) : events.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-muted">{t('noEvents')}</p>
-            ) : (
-              <ul className="divide-y divide-line">
-                {events.map((e) => (
-                  <li
-                    key={e.id}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2.5 text-sm"
+                )}
+                {eventsTotal > PAGE_SIZE && (
+                  <nav
+                    aria-label={t('live')}
+                    className="flex items-center justify-end gap-3 border-t border-line px-5 py-3 text-xs text-muted"
                   >
-                    <span className="tabular w-20 shrink-0 text-xs text-muted">
-                      {time(e.occurredAt)}
+                    <span className="tabular">
+                      {t('liveRange', {
+                        from: (page - 1) * PAGE_SIZE + 1,
+                        to: Math.min(page * PAGE_SIZE, eventsTotal),
+                        total: eventsTotal,
+                      })}
                     </span>
-                    <span className="w-32 shrink-0 font-medium">{e.name}</span>
-                    <span className="min-w-0 flex-1 truncate text-muted" title={e.url}>
-                      {shortUrl(e.url)}
-                    </span>
-                    {e.channel && (
-                      <span className="rounded-full border border-line px-2 text-xs leading-5">
-                        {e.channel}
-                      </span>
-                    )}
-                    {e.visitor && (
-                      <span
-                        className="tabular text-xs text-muted"
-                        title={e.consent ? t('known') : t('anonymous')}
-                      >
-                        {e.consent ? '●' : '○'} {e.visitor}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {eventsTotal > PAGE_SIZE && (
-              <nav
-                aria-label={t('live')}
-                className="flex items-center justify-end gap-3 border-t border-line px-5 py-3 text-xs text-muted"
-              >
-                <span className="tabular">
-                  {t('liveRange', {
-                    from: (page - 1) * PAGE_SIZE + 1,
-                    to: Math.min(page * PAGE_SIZE, eventsTotal),
-                    total: eventsTotal,
-                  })}
-                </span>
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage((n) => n - 1)}
-                  aria-label={t('livePrev')}
-                  className="rounded-lg border border-line p-1.5 hover:text-foreground"
-                >
-                  <ChevronLeft size={14} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  disabled={page * PAGE_SIZE >= eventsTotal}
-                  onClick={() => setPage((n) => n + 1)}
-                  aria-label={t('liveNext')}
-                  className="rounded-lg border border-line p-1.5 hover:text-foreground"
-                >
-                  <ChevronRight size={14} aria-hidden="true" />
-                </button>
-              </nav>
-            )}
-          </section>
-
-          <h2 className="mb-3 px-3.5 text-lg font-semibold">{t('guideTitle')}</h2>
-          <FlipperGuide scriptUrl={`${apiUrl}/flipper.js`} siteId={site.publicId} />
+                    <button
+                      type="button"
+                      disabled={page <= 1}
+                      onClick={() => setPage((n) => n - 1)}
+                      aria-label={t('livePrev')}
+                      className="rounded-lg border border-line p-1.5 hover:text-foreground"
+                    >
+                      <ChevronLeft size={14} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={page * PAGE_SIZE >= eventsTotal}
+                      onClick={() => setPage((n) => n + 1)}
+                      aria-label={t('liveNext')}
+                      className="rounded-lg border border-line p-1.5 hover:text-foreground"
+                    >
+                      <ChevronRight size={14} aria-hidden="true" />
+                    </button>
+                  </nav>
+                )}
+              </section>
+            </>
+          )}
         </>
       )}
     </>

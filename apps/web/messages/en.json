@@ -1343,6 +1343,8 @@
     "serverShownOnce": "Copy the key now: it is shown only once.",
     "liveRange": "{from}–{to} of {total}",
     "livePrev": "Newer events",
-    "liveNext": "Older events"
+    "liveNext": "Older events",
+    "tabAnalytics": "Analytics",
+    "tabSettings": "Settings and installation"
   }
 }
