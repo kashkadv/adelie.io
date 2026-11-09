@@ -1,8 +1,8 @@
 'use client';
 
+import { FlipperIcon } from '../ui/flipper-icon';
 import {
   FileChartColumn,
-  Footprints,
   Images,
   ChartColumn,
   House,
@@ -29,7 +29,11 @@ type NavKey =
   | 'reports'
   | 'connections'
   | 'settings';
-type NavItem = { key: NavKey; href: string; icon: LucideIcon };
+type NavItem = {
+  key: NavKey;
+  href: string;
+  icon: LucideIcon | typeof FlipperIcon;
+};
 
 /**
  * Sections by the question they answer (ADR-0018): Promotion — "where am I seen and what comes of
@@ -51,7 +55,7 @@ const NAV: { group?: 'promotion' | 'sales' | 'site'; items: NavItem[] }[] = [
     ],
   },
   // Flipper: what visitors do on the site (ADR-0022).
-  { group: 'site', items: [{ key: 'flipper', href: '/flipper', icon: Footprints }] },
+  { group: 'site', items: [{ key: 'flipper', href: '/flipper', icon: FlipperIcon }] },
   {
     items: [
       { key: 'reports', href: '/reports', icon: FileChartColumn },
