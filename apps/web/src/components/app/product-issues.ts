@@ -13,7 +13,6 @@ export type IssueCode =
   | 'skuGaps'
   | 'skuOneForAll'
   | 'fewTags'
-  | 'skuFormat'
   | 'noViews';
 
 export type ProductIssue = {

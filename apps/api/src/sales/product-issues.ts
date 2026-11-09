@@ -17,7 +17,6 @@ export type IssueCode =
   | 'skuGaps'
   | 'skuOneForAll'
   | 'fewTags'
-  | 'skuFormat'
   | 'noViews';
 
 export interface Issue {
@@ -67,11 +66,8 @@ const level: Record<IssueCode, IssueLevel> = {
   skuGaps: 'important',
   skuOneForAll: 'important',
   fewTags: 'note',
-  skuFormat: 'note',
   noViews: 'note',
 };
-
-const digitsOnly = (sku: string) => /^\d+$/.test(sku);
 
 /** Issues of every product, by product id (products without any are absent). */
 export function productIssues(
@@ -85,12 +81,6 @@ export function productIssues(
   for (const p of active) {
     for (const sku of p.skus) owners.set(sku, (owners.get(sku) ?? new Set<string>()).add(p.id));
   }
-  // Numeric SKUs are padded with zeros in this shop ("00037012"): one without them stands out
-  // (a number that lost its zeros on the way is what breaks matching with the website).
-  const numeric = active.flatMap((p) => p.skus).filter(digitsOnly);
-  const padded =
-    numeric.length > 0 && numeric.filter((s) => s.startsWith('0')).length > numeric.length / 2;
-
   const result = new Map<string, Issue[]>();
   for (const p of products) {
     const codes: IssueCode[] = [];
@@ -123,8 +113,6 @@ export function productIssues(
         params['skuGaps'] = { have: p.skus.length, groups: p.skuGroups, by: p.skuBy.join(', ') };
       }
       if (p.tags.length > 0 && p.tags.length < MAX_TAGS) codes.push('fewTags');
-      if (padded && p.skus.some((s) => digitsOnly(s) && !s.startsWith('0')))
-        codes.push('skuFormat');
       if (
         p.views === 0 &&
         p.listedAt &&

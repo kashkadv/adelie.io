@@ -943,7 +943,6 @@
         "noTags": "No tags — Etsy search hardly finds it.",
         "noPins": "No pins lead to this product — no traffic from Pinterest.",
         "fewTags": "Fewer than 13 tags — each free tag is a chance to be found.",
-        "skuFormat": "The SKU has no leading zeros, unlike others in the shop — check it matches the website.",
         "noViews": "No views a month after publishing.",
         "skuGaps": "The SKU goes by {by}: only {have} of {groups} groups have their own SKU — some lack one or share it.",
         "skuOneForAll": "The variations differ by {options}, but one SKU is set for all — most likely a mistake. Choose in the editor what the SKU goes by."

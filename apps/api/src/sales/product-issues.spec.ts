@@ -99,20 +99,9 @@ describe('productIssues', () => {
     ]);
   });
 
-  it('notes: few tags, no views for a month, a SKU that lost its zeros', () => {
+  it('notes: few tags, no views for a month', () => {
     expect(codes([product({ tags: ['a', 'b'] })])).toEqual(['note:fewTags']);
     expect(codes([product({ views: 0 })])).toEqual(['note:noViews']);
     expect(codes([product({ views: 0, listedAt: new Date('2026-11-01T00:00:00Z') })])).toEqual([]);
-    const shop = [
-      product({ id: 'a', skus: ['00031307'] }),
-      product({ id: 'b', skus: ['00031308'] }),
-      product({ id: 'c', skus: ['31309'] }),
-    ];
-    expect(codes(shop, 'c')).toEqual(['note:skuFormat']);
-    expect(codes(shop, 'a')).toEqual([]);
-    // no zero-padding convention in the shop: nothing to flag
-    expect(
-      codes([product({ id: 'a', skus: ['31309'] }), product({ id: 'b', skus: ['41'] })], 'a'),
-    ).toEqual([]);
   });
 });
