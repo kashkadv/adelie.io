@@ -19,6 +19,7 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@adelie/db';
 import {
+  articlesOf,
   isAdapterError,
   productKeys,
   productChangeErrors,
@@ -639,18 +640,21 @@ export class SalesController {
       }
       await db.shopProductChange.create({ data: { ...audit, status: 'applied' } });
       // Our copy follows at once (the next sync would do it too).
+      const savedSkus = [
+        ...new Set(
+          (after.variations.length ? after.variations.map((v) => v.sku) : [after.sku])
+            .map((x) => x.trim())
+            .filter(Boolean),
+        ),
+      ];
       await db.shopProduct.update({
         where: { id: product.id },
         data: {
           title: after.title,
           tags: after.tags,
-          skus: [
-            ...new Set(
-              (after.variations.length ? after.variations.map((v) => v.sku) : [after.sku])
-                .map((x) => x.trim())
-                .filter(Boolean),
-            ),
-          ],
+          skus: savedSkus,
+          // What the product is matched to the other channels by follows its SKUs at once.
+          articles: articlesOf(savedSkus),
           ...skuLayout(after),
           price: after.price?.amount ?? null,
           currency: after.price?.currency ?? undefined,
