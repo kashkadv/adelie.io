@@ -927,7 +927,6 @@
     },
     "issues": {
       "filter": "Issues",
-      "any": "Any issue",
       "count": "{count, plural, one {# issue} other {# issues}}",
       "levels": {
         "critical": "Critical",
@@ -949,7 +948,22 @@
         "skuOneForAll": "The variations differ by {options}, but one SKU is set for all — most likely a mistake. Choose in the editor what the SKU goes by."
       },
       "none": "No issues found",
-      "title": "Possible improvements"
+      "title": "Possible improvements",
+      "short": {
+        "pinToUnavailable": "Pin leads to a product not on sale",
+        "noPrice": "No price",
+        "noPhoto": "No photo",
+        "soldOutActive": "Active, nothing in stock",
+        "duplicateSku": "Duplicate SKU",
+        "noSku": "No SKU",
+        "noTags": "No tags",
+        "noPins": "No pins",
+        "skuGaps": "Not every SKU group has its own",
+        "skuOneForAll": "Several options, one SKU for all",
+        "fewTags": "Fewer than 13 tags",
+        "noViews": "No views in a month"
+      },
+      "selected": "{count} selected"
     }
   }
 }

@@ -19,14 +19,14 @@ import { PeriodControl, resolveRange, type DateRange, type RangeLabels } from '.
 import { FilterChip } from '../ui/filter-chip';
 import { InfoTip } from '../ui/info-tip';
 import { EmptyState, PageHeader } from './page-header';
+import { IssuesFilter } from './issues-filter';
 import { ProductDialog } from './product-dialog';
 import { ProductEditor } from './product-editor';
 import {
-  ISSUE_LEVELS,
   ISSUE_STYLE,
   sortIssues,
   topIssueLevel,
-  type IssueLevel,
+  type IssueCode,
   type ProductIssue,
 } from './product-issues';
 import { useMoney, useSalesBase, useShops } from './sales-data';
@@ -101,8 +101,8 @@ export function Products() {
   const [state, setState] = useState('active');
   /** Products with posts leading to them (ADR-0018): '' = all. */
   const [pins, setPins] = useState<'' | 'with' | 'without'>('');
-  /** Problems filter: '' = all, 'any' = with any problem, else the most serious level. */
-  const [issues, setIssues] = useState('');
+  /** Problems filter: the chosen problems; a product matches if it has any of them. */
+  const [issueCodes, setIssueCodes] = useState<IssueCode[]>([]);
   const [sort, setSort] = useState<Column>('revenue');
   const [search, setSearch] = useState('');
   const [data, setData] = useState<{ key: string; value: Response } | null>(null);
@@ -152,14 +152,21 @@ export function Products() {
     () => STATES.filter((s) => shown?.items.some((p) => p.state === s)),
     [shown],
   );
+  /** How many products have each problem, for the problems filter. */
+  const issueCounts = useMemo(() => {
+    const counts: Partial<Record<IssueCode, number>> = {};
+    for (const p of shown?.items ?? []) {
+      for (const i of p.issues) counts[i.code] = (counts[i.code] ?? 0) + 1;
+    }
+    return counts;
+  }, [shown]);
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
     const list = (shown?.items ?? []).filter(
       (p) =>
         (!state || p.state === state) &&
         (!pins || (pins === 'with' ? p.posts > 0 : p.posts === 0)) &&
-        (!issues ||
-          (issues === 'any' ? p.issues.length > 0 : topIssueLevel(p.issues) === issues)) &&
+        (!issueCodes.length || p.issues.some((i) => issueCodes.includes(i.code))) &&
         (!q ||
           p.title.toLowerCase().includes(q) ||
           p.skus.some((x) => x.toLowerCase().includes(q))),
@@ -175,7 +182,7 @@ export function Products() {
       }
       return (b.listedAt ?? '').localeCompare(a.listedAt ?? '');
     });
-  }, [shown, state, pins, issues, search, sort]);
+  }, [shown, state, pins, issueCodes, search, sort]);
 
   const openIndex = openId ? items.findIndex((p) => p.id === openId) : -1;
 
@@ -271,21 +278,14 @@ export function Products() {
           }))}
           clearLabel={tc('clearFilter')}
         />
-        <FilterChip
-          label={t('issues.filter')}
-          value={issues}
-          onChange={(v) => {
-            setIssues(v);
+        <IssuesFilter
+          selected={issueCodes}
+          onChange={(codes) => {
+            setIssueCodes(codes);
             // A pin to a product that is not on sale lives in a non-active state.
-            if (v) setState('');
+            if (codes.length) setState('');
           }}
-          options={[
-            { value: 'any', label: t('issues.any') },
-            ...ISSUE_LEVELS.map((l) => ({
-              value: l,
-              label: t(`issues.levels.${l as IssueLevel}`),
-            })),
-          ]}
+          counts={issueCounts}
           clearLabel={tc('clearFilter')}
         />
         <span className="xl:hidden">
