@@ -936,7 +936,7 @@
         "skuGaps": "The SKU goes by {by}: only {have} of {groups} groups have their own SKU — some lack one or share it."
       },
       "none": "No issues found",
-      "title": "Issues to look at"
+      "title": "Possible improvements"
     }
   }
 }

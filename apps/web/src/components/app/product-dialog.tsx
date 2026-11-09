@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Check,
   ChevronLeft,
+  ChevronDown,
   CircleAlert,
   ChevronRight,
   ExternalLink,
@@ -71,6 +72,62 @@ type Detail = {
  * A product in a glass dialog (like the post card): its picture and data, sales all time and by
  * month, latest orders, and the pins leading to it (ADR-0018). ←/→ move through the list.
  */
+/**
+ * Possible improvements of the product, above its statistics: an accordion, open by default (the
+ * chevron in the header says it can be closed). Worst first; a green check when there are none.
+ */
+function Improvements({ issues }: { issues: ProductIssue[] }) {
+  const ti = useTranslations('Sales.issues');
+  const [open, setOpen] = useState(true);
+  const bodyId = useId();
+  if (!issues.length) {
+    return (
+      <p className="mt-6 flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+        <Check size={16} strokeWidth={2.25} aria-hidden="true" />
+        {ti('none')}
+      </p>
+    );
+  }
+  return (
+    <section className="mt-6 rounded-2xl bg-hover">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 rounded-2xl px-4 py-3 text-left"
+      >
+        <h3 className="text-sm font-semibold">{ti('title')}</h3>
+        <span className="tabular rounded-full bg-hover px-2 text-xs leading-5 text-muted">
+          {issues.length}
+        </span>
+        <ChevronDown
+          size={16}
+          aria-hidden="true"
+          className={`ml-auto shrink-0 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && (
+        <ul id={bodyId} className="grid gap-2 px-4 pb-4">
+          {sortIssues(issues).map((i) => (
+            <li key={i.code} className="flex items-start gap-2 text-sm">
+              <CircleAlert
+                size={16}
+                className={`mt-0.5 shrink-0 ${ISSUE_STYLE[i.level].text}`}
+                aria-hidden="true"
+              />
+              <span>
+                {ti(`codes.${i.code}`, i.params)}{' '}
+                <span className="text-xs text-muted">({ti(`levels.${i.level}`)})</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export function ProductDialog({
   base,
   productId,
@@ -264,41 +321,6 @@ export function ProductDialog({
                     )}
                   </div>
 
-                  {/* Problems come first: what to fix is the point of opening the card. */}
-                  {issues &&
-                    (issues.length ? (
-                      <section
-                        aria-label={ti('title')}
-                        className="mt-5 grid gap-2 rounded-2xl border border-line p-4"
-                      >
-                        <h3 className="text-sm font-semibold">
-                          {ti('title')} · {issues.length}
-                        </h3>
-                        <ul className="grid gap-1.5">
-                          {sortIssues(issues).map((i) => (
-                            <li key={i.code} className="flex items-start gap-2 text-sm">
-                              <CircleAlert
-                                size={16}
-                                className={`mt-0.5 shrink-0 ${ISSUE_STYLE[i.level].text}`}
-                                aria-hidden="true"
-                              />
-                              <span>
-                                {ti(`codes.${i.code}`, i.params)}{' '}
-                                <span className="text-xs text-muted">
-                                  ({ti(`levels.${i.level}`)})
-                                </span>
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </section>
-                    ) : (
-                      <p className="mt-5 flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
-                        <Check size={16} strokeWidth={2.25} aria-hidden="true" />
-                        {ti('none')}
-                      </p>
-                    ))}
-
                   {/* SKUs: what links the product to the same one on the website (ADR-0021). */}
                   <div className="mt-5">
                     <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
@@ -352,6 +374,8 @@ export function ProductDialog({
                   </div>
                 </div>
               </div>
+
+              {issues && <Improvements issues={issues} />}
 
               <dl className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                 {stats.map((s) => (
