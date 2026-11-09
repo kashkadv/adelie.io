@@ -292,10 +292,13 @@ export function init(env: Env): Flipper | null {
     enqueue(event);
   });
 
-  const pageview = safe(() => {
+  // A route change that leaves the address as it was (a framework tidying the query, an option
+  // chosen on a product page) is not a new page: only a different address counts. A page asked
+  // for by hand with flipper('pageview') counts unless it came within half a second of the last.
+  const pageview = safe((manual?: unknown) => {
     const u = cleanUrl(win.location.href, allow);
     const t = now();
-    if (u === lastPage && t - lastPageAt < 500) return;
+    if (u === lastPage && (manual !== true || t - lastPageAt < 500)) return;
     lastPage = u;
     lastPageAt = t;
     track('PageView');
@@ -309,7 +312,7 @@ export function init(env: Env): Flipper | null {
       safe(method as (...a: unknown[]) => void)(...rest);
   }) as Flipper;
   api.track = track;
-  api.pageview = pageview;
+  api.pageview = () => pageview(true);
   api.consent = safe((state: 'granted' | 'denied') => {
     if (state !== 'granted' && state !== 'denied') return;
     // What was waiting was collected under the old state: it goes out under it.

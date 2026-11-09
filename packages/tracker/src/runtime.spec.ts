@@ -247,6 +247,19 @@ describe('events', () => {
     }
   });
 
+  it('a route change that keeps the address is not a second page view', () => {
+    load();
+    vi.advanceTimersByTime(100);
+    history.replaceState(null, '', location.href);
+    vi.advanceTimersByTime(800);
+    history.replaceState(null, '', location.href + '?variant=2');
+    vi.advanceTimersByTime(2000);
+    const views = bodies()
+      .flatMap((b) => b.e)
+      .filter((e) => e.n === 'PageView');
+    expect(views).toHaveLength(1);
+  });
+
   it('purchase carries the order number and sums the lines', () => {
     const f = load({ 'auto-pageview': 'false' })!;
     f.purchase({

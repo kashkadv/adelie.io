@@ -1366,6 +1366,7 @@
       "campaign": "Campaign",
       "content": "Content",
       "term": "Term"
-    }
+    },
+    "tileVisitors": "{count, plural, one {# visitor} other {# visitors}}"
   }
 }

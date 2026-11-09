@@ -340,8 +340,9 @@ export class FlipperController {
     const db = this.prisma.client;
     const sid = site.id;
     const [counts, daily, funnel, channels, products, consent] = await Promise.all([
-      db.$queryRaw<{ name: string; events: number }[]>`
-        SELECT name, count(*)::int AS events FROM website_event
+      db.$queryRaw<{ name: string; events: number; visitors: number }[]>`
+        SELECT name, count(*)::int AS events,
+               count(DISTINCT coalesce("visitorId", "dailyId"))::int AS visitors FROM website_event
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
         GROUP BY name ORDER BY events DESC`,
       db.$queryRaw<{ day: string; visitors: number; views: number }[]>`

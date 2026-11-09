@@ -33,7 +33,7 @@ type Site = {
 
 type Summary = {
   days: number;
-  counts: { name: string; events: number }[];
+  counts: { name: string; events: number; visitors: number }[];
   daily: { day: string; visitors: number; views: number }[];
   funnel: { name: string; visitors: number }[];
   channels: { channel: string; visits: number }[];
@@ -196,6 +196,7 @@ export function Flipper() {
     format.dateTime(new Date(iso), { dateStyle: 'medium', timeStyle: 'short' });
   const time = (iso: string) => format.dateTime(new Date(iso), { timeStyle: 'medium' });
   const count = (name: string) => summary?.counts.find((c) => c.name === name)?.events ?? 0;
+  const people = (name: string) => summary?.counts.find((c) => c.name === name)?.visitors ?? 0;
 
   if (sites && sites.length === 0) {
     return (
@@ -395,6 +396,11 @@ export function Flipper() {
                     <dd className="tabular mt-1 font-display text-xl font-semibold">
                       {summary ? format.number(count(n)) : '—'}
                     </dd>
+                    {summary && (
+                      <dd className="tabular text-xs text-muted">
+                        {t('tileVisitors', { count: people(n) })}
+                      </dd>
+                    )}
                   </div>
                 ))}
               </dl>

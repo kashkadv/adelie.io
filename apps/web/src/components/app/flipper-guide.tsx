@@ -35,7 +35,9 @@ export function CodeBlock({ code, label }: { code: string; label?: string }) {
       <button
         type="button"
         onClick={copy}
-        className="absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-lg border border-line bg-[var(--card,transparent)] px-2.5 py-1 text-xs text-muted hover:text-foreground"
+        className={`absolute right-2.5 ${
+          code.includes('\n') ? 'top-2.5' : 'top-1/2 -translate-y-1/2'
+        } inline-flex items-center gap-1.5 rounded-lg border border-line bg-[var(--card,transparent)] px-2.5 py-1 text-xs text-muted hover:text-foreground`}
       >
         {copied ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
         {copied ? t('copied') : t('copy')}
