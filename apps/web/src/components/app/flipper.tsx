@@ -61,7 +61,7 @@ type LiveEvent = {
   visitor: string | null;
 };
 
-type Tab = 'analytics' | 'sources' | 'settings';
+type Tab = 'analytics' | 'sources' | 'live' | 'settings';
 
 const PAGE_SIZE = 25;
 
@@ -126,13 +126,14 @@ export function Flipper() {
 
   const current = sites?.find((s) => s.id === chosen) ?? sites?.[0];
   const site = current?.site ?? null;
+  const tab: Tab = tabChoice ?? (site?.lastEventAt ? 'analytics' : 'settings');
 
   // What arrived: the summary for the period, and the latest events — fresh every few seconds.
   useEffect(() => {
     if (!base || !current || !site) return;
     let cancelled = false;
     const load = () => {
-      if (document.visibilityState === 'hidden') return;
+      if (document.visibilityState === 'hidden' || tab !== 'live') return;
       void api<{ total: number; rows: LiveEvent[] }>(
         `${base}/${current.id}/events?limit=${PAGE_SIZE}&page=${page}`,
       ).then(
@@ -154,7 +155,7 @@ export function Flipper() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [base, current, site, days, page]);
+  }, [base, current, site, days, page, tab]);
 
   async function enable() {
     if (!base || !current) return;
@@ -216,7 +217,6 @@ export function Flipper() {
     );
   }
 
-  const tab: Tab = tabChoice ?? (site?.lastEventAt ? 'analytics' : 'settings');
   const live = site?.lastEventAt && now - new Date(site.lastEventAt).getTime() < 24 * 3600 * 1000;
   const total = summary ? summary.consent.consenting + summary.consent.anonymous : 0;
   const funnelTop = Math.max(1, ...(summary?.funnel.map((f) => f.visitors) ?? [0]));
@@ -283,6 +283,7 @@ export function Flipper() {
               options={[
                 { value: 'analytics', label: t('tabAnalytics') },
                 { value: 'sources', label: t('tabSources') },
+                { value: 'live', label: t('live') },
                 { value: 'settings', label: t('tabSettings') },
               ]}
             />
@@ -368,6 +369,84 @@ export function Flipper() {
           )}
 
           {tab === 'sources' && base && <FlipperSources base={base} accountId={current.id} />}
+
+          {tab === 'live' && (
+            <>
+              <section className="card animate-rise mb-6 overflow-hidden rounded-[24px]">
+                <h2 className="flex items-center gap-1.5 border-b border-line px-5 py-4 text-sm font-semibold">
+                  {t('live')}
+                  <InfoTip text={t('liveHint')} />
+                </h2>
+                {!events ? (
+                  <p className="px-5 py-8 text-center text-sm text-muted">…</p>
+                ) : events.length === 0 ? (
+                  <p className="px-5 py-8 text-center text-sm text-muted">{t('noEvents')}</p>
+                ) : (
+                  <ul className="divide-y divide-line">
+                    {events.map((e) => (
+                      <li
+                        key={e.id}
+                        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2.5 text-sm"
+                      >
+                        <span className="tabular w-20 shrink-0 text-xs text-muted">
+                          {time(e.occurredAt)}
+                        </span>
+                        <span className="w-32 shrink-0 font-medium">{e.name}</span>
+                        <span className="min-w-0 flex-1 truncate text-muted" title={e.url}>
+                          {shortUrl(e.url)}
+                        </span>
+                        {e.channel && (
+                          <span className="rounded-full border border-line px-2 text-xs leading-5">
+                            {e.channel}
+                          </span>
+                        )}
+                        {e.visitor && (
+                          <span
+                            className="tabular text-xs text-muted"
+                            title={e.consent ? t('known') : t('anonymous')}
+                          >
+                            {e.consent ? '●' : '○'} {e.visitor}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {eventsTotal > PAGE_SIZE && (
+                  <nav
+                    aria-label={t('live')}
+                    className="flex items-center justify-end gap-3 border-t border-line px-5 py-3 text-xs text-muted"
+                  >
+                    <span className="tabular">
+                      {t('liveRange', {
+                        from: (page - 1) * PAGE_SIZE + 1,
+                        to: Math.min(page * PAGE_SIZE, eventsTotal),
+                        total: eventsTotal,
+                      })}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={page <= 1}
+                      onClick={() => setPage((n) => n - 1)}
+                      aria-label={t('livePrev')}
+                      className="rounded-lg border border-line p-1.5 hover:text-foreground"
+                    >
+                      <ChevronLeft size={14} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={page * PAGE_SIZE >= eventsTotal}
+                      onClick={() => setPage((n) => n + 1)}
+                      aria-label={t('liveNext')}
+                      className="rounded-lg border border-line p-1.5 hover:text-foreground"
+                    >
+                      <ChevronRight size={14} aria-hidden="true" />
+                    </button>
+                  </nav>
+                )}
+              </section>
+            </>
+          )}
 
           {tab === 'analytics' && (
             <>
@@ -470,114 +549,39 @@ export function Flipper() {
                       ))}
                     </ul>
                   )}
-                  {summary && summary.products.length > 0 && (
-                    <>
-                      <h2 className="mt-5 mb-3 text-sm font-semibold">{t('topProducts')}</h2>
-                      <ul className="grid gap-2 text-sm">
-                        {summary.products.map((p) => (
-                          <li key={p.item} className="flex items-start justify-between gap-3">
-                            <span className="min-w-0">
-                              {p.url ? (
-                                <a
-                                  href={p.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="block truncate hover:underline"
-                                  title={p.title ?? p.item}
-                                >
-                                  {p.title ?? p.item}
-                                </a>
-                              ) : (
-                                <span className="block truncate">{p.title ?? p.item}</span>
-                              )}
-                              {p.title && (
-                                <span className="tabular text-xs text-muted">{p.item}</span>
-                              )}
-                            </span>
-                            <span className="tabular text-muted">
-                              {t('productViews', { views: p.views, visitors: p.visitors })}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
                 </section>
               </div>
 
-              <section className="card animate-rise mb-6 overflow-hidden rounded-[24px]">
-                <h2 className="flex items-center gap-1.5 border-b border-line px-5 py-4 text-sm font-semibold">
-                  {t('live')}
-                  <InfoTip text={t('liveHint')} />
-                </h2>
-                {!events ? (
-                  <p className="px-5 py-8 text-center text-sm text-muted">…</p>
-                ) : events.length === 0 ? (
-                  <p className="px-5 py-8 text-center text-sm text-muted">{t('noEvents')}</p>
-                ) : (
-                  <ul className="divide-y divide-line">
-                    {events.map((e) => (
-                      <li
-                        key={e.id}
-                        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2.5 text-sm"
-                      >
-                        <span className="tabular w-20 shrink-0 text-xs text-muted">
-                          {time(e.occurredAt)}
+              {summary && summary.products.length > 0 && (
+                <section className="card animate-rise mb-6 rounded-[24px] p-5">
+                  <h2 className="mb-3 text-sm font-semibold">{t('topProducts')}</h2>
+                  <ul className="grid gap-2 text-sm">
+                    {summary.products.map((p) => (
+                      <li key={p.item} className="flex items-start justify-between gap-3">
+                        <span className="min-w-0">
+                          {p.url ? (
+                            <a
+                              href={p.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block truncate hover:underline"
+                              title={p.title ?? p.item}
+                            >
+                              {p.title ?? p.item}
+                            </a>
+                          ) : (
+                            <span className="block truncate">{p.title ?? p.item}</span>
+                          )}
+                          {p.title && <span className="tabular text-xs text-muted">{p.item}</span>}
                         </span>
-                        <span className="w-32 shrink-0 font-medium">{e.name}</span>
-                        <span className="min-w-0 flex-1 truncate text-muted" title={e.url}>
-                          {shortUrl(e.url)}
+                        <span className="tabular text-muted">
+                          {t('productViews', { views: p.views, visitors: p.visitors })}
                         </span>
-                        {e.channel && (
-                          <span className="rounded-full border border-line px-2 text-xs leading-5">
-                            {e.channel}
-                          </span>
-                        )}
-                        {e.visitor && (
-                          <span
-                            className="tabular text-xs text-muted"
-                            title={e.consent ? t('known') : t('anonymous')}
-                          >
-                            {e.consent ? '●' : '○'} {e.visitor}
-                          </span>
-                        )}
                       </li>
                     ))}
                   </ul>
-                )}
-                {eventsTotal > PAGE_SIZE && (
-                  <nav
-                    aria-label={t('live')}
-                    className="flex items-center justify-end gap-3 border-t border-line px-5 py-3 text-xs text-muted"
-                  >
-                    <span className="tabular">
-                      {t('liveRange', {
-                        from: (page - 1) * PAGE_SIZE + 1,
-                        to: Math.min(page * PAGE_SIZE, eventsTotal),
-                        total: eventsTotal,
-                      })}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={page <= 1}
-                      onClick={() => setPage((n) => n - 1)}
-                      aria-label={t('livePrev')}
-                      className="rounded-lg border border-line p-1.5 hover:text-foreground"
-                    >
-                      <ChevronLeft size={14} aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={page * PAGE_SIZE >= eventsTotal}
-                      onClick={() => setPage((n) => n + 1)}
-                      aria-label={t('liveNext')}
-                      className="rounded-lg border border-line p-1.5 hover:text-foreground"
-                    >
-                      <ChevronRight size={14} aria-hidden="true" />
-                    </button>
-                  </nav>
-                )}
-              </section>
+                </section>
+              )}
             </>
           )}
         </>
