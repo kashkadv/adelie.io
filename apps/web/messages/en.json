@@ -1340,6 +1340,9 @@
     "serverMakeKey": "Create key",
     "serverNewKey": "New key",
     "serverRegenerate": "The old key will stop working at once. Continue?",
-    "serverShownOnce": "Copy the key now: it is shown only once."
+    "serverShownOnce": "Copy the key now: it is shown only once.",
+    "liveRange": "{from}–{to} of {total}",
+    "livePrev": "Newer events",
+    "liveNext": "Older events"
   }
 }

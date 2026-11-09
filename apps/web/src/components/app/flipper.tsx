@@ -1,6 +1,6 @@
 'use client';
 
-import { Footprints, Globe } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Footprints, Globe } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -36,7 +36,13 @@ type Summary = {
   daily: { day: string; visitors: number; views: number }[];
   funnel: { name: string; visitors: number }[];
   channels: { channel: string; visits: number }[];
-  products: { item: string; views: number; visitors: number }[];
+  products: {
+    item: string;
+    views: number;
+    visitors: number;
+    title: string | null;
+    url: string | null;
+  }[];
   consent: { consenting: number; anonymous: number };
 };
 
@@ -53,6 +59,8 @@ type LiveEvent = {
   properties: Record<string, unknown> | null;
   visitor: string | null;
 };
+
+const PAGE_SIZE = 25;
 
 const STANDARD = [
   'PageView',
@@ -88,6 +96,8 @@ export function Flipper() {
   const [days, setDays] = useState<(typeof PERIODS)[number]>('7');
   const [summary, setSummary] = useState<Summary | null>(null);
   const [events, setEvents] = useState<LiveEvent[] | null>(null);
+  const [eventsTotal, setEventsTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [busy, setBusy] = useState(false);
 
   /** Bumped to read the sites again (after switching one on). */
@@ -119,8 +129,14 @@ export function Flipper() {
     let cancelled = false;
     const load = () => {
       if (document.visibilityState === 'hidden') return;
-      void api<LiveEvent[]>(`${base}/${current.id}/events?limit=40`).then(
-        (e) => !cancelled && setEvents(e),
+      void api<{ total: number; rows: LiveEvent[] }>(
+        `${base}/${current.id}/events?limit=${PAGE_SIZE}&page=${page}`,
+      ).then(
+        (e) => {
+          if (cancelled) return;
+          setEvents(e.rows);
+          setEventsTotal(e.total);
+        },
         () => undefined,
       );
     };
@@ -134,7 +150,7 @@ export function Flipper() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [base, current, site, days]);
+  }, [base, current, site, days, page]);
 
   async function enable() {
     if (!base || !current) return;
@@ -213,6 +229,7 @@ export function Flipper() {
                 setChosen(id);
                 setSummary(null);
                 setEvents(null);
+                setPage(1);
               }}
               options={sites.map((s) => ({
                 value: s.id,
@@ -376,12 +393,12 @@ export function Flipper() {
                       <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
                         <span>{t(`events.${step.name as 'ViewCategory'}`)}</span>
                         <span className="tabular">
-                          {format.number(step.visitors)}
                           {i > 0 && previous > 0 && (
-                            <span className="ml-2 text-xs text-muted">
+                            <span className="mr-2 text-xs text-muted">
                               {Math.round((step.visitors / previous) * 100)}%
                             </span>
                           )}
+                          {format.number(step.visitors)}
                         </span>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-hover">
@@ -415,8 +432,23 @@ export function Flipper() {
                   <h2 className="mt-5 mb-3 text-sm font-semibold">{t('topProducts')}</h2>
                   <ul className="grid gap-2 text-sm">
                     {summary.products.map((p) => (
-                      <li key={p.item} className="flex justify-between gap-3">
-                        <span className="tabular">{p.item}</span>
+                      <li key={p.item} className="flex items-start justify-between gap-3">
+                        <span className="min-w-0">
+                          {p.url ? (
+                            <a
+                              href={p.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block truncate hover:underline"
+                              title={p.title ?? p.item}
+                            >
+                              {p.title ?? p.item}
+                            </a>
+                          ) : (
+                            <span className="block truncate">{p.title ?? p.item}</span>
+                          )}
+                          {p.title && <span className="tabular text-xs text-muted">{p.item}</span>}
+                        </span>
                         <span className="tabular text-muted">
                           {t('productViews', { views: p.views, visitors: p.visitors })}
                         </span>
@@ -467,6 +499,38 @@ export function Flipper() {
                   </li>
                 ))}
               </ul>
+            )}
+            {eventsTotal > PAGE_SIZE && (
+              <nav
+                aria-label={t('live')}
+                className="flex items-center justify-end gap-3 border-t border-line px-5 py-3 text-xs text-muted"
+              >
+                <span className="tabular">
+                  {t('liveRange', {
+                    from: (page - 1) * PAGE_SIZE + 1,
+                    to: Math.min(page * PAGE_SIZE, eventsTotal),
+                    total: eventsTotal,
+                  })}
+                </span>
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage((n) => n - 1)}
+                  aria-label={t('livePrev')}
+                  className="rounded-lg border border-line p-1.5 hover:text-foreground"
+                >
+                  <ChevronLeft size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  disabled={page * PAGE_SIZE >= eventsTotal}
+                  onClick={() => setPage((n) => n + 1)}
+                  aria-label={t('liveNext')}
+                  className="rounded-lg border border-line p-1.5 hover:text-foreground"
+                >
+                  <ChevronRight size={14} aria-hidden="true" />
+                </button>
+              </nav>
             )}
           </section>
 

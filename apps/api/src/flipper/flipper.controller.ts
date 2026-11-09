@@ -66,7 +66,7 @@ export class FlipperController {
     await this.visibleProject(ctx, projectId);
     const site = await this.prisma.client.trackedSite.findFirst({
       where: { accountId, projectId, workspaceId: ctx.workspaceId },
-      select: { id: true, publicId: true },
+      select: { id: true, publicId: true, accountId: true },
     });
     if (!site) throw new NotFoundException();
     return site;
@@ -219,34 +219,44 @@ export class FlipperController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('accountId', ParseUUIDPipe) accountId: string,
     @Query('limit') limit: string | undefined,
+    @Query('page') page: string | undefined,
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     const site = await this.siteOf(request.workspace, projectId, accountId);
-    const rows = await this.prisma.client.websiteEvent.findMany({
-      where: { siteId: site.id, isBot: false },
-      orderBy: { occurredAt: 'desc' },
-      take: Math.min(Math.max(Number(limit) || 50, 1), 200),
-      select: {
-        id: true,
-        name: true,
-        occurredAt: true,
-        consent: true,
-        visitorId: true,
-        dailyId: true,
-        url: true,
-        channel: true,
-        source: true,
-        medium: true,
-        campaign: true,
-        device: true,
-        properties: true,
-      },
-    });
+    const take = Math.min(Math.max(Number(limit) || 25, 1), 200);
+    const where = { siteId: site.id, isBot: false };
+    const [total, rows] = await Promise.all([
+      this.prisma.client.websiteEvent.count({ where }),
+      this.prisma.client.websiteEvent.findMany({
+        where,
+        orderBy: { occurredAt: 'desc' },
+        take,
+        skip: (Math.max(Number(page) || 1, 1) - 1) * take,
+        select: {
+          id: true,
+          name: true,
+          occurredAt: true,
+          consent: true,
+          visitorId: true,
+          dailyId: true,
+          url: true,
+          channel: true,
+          source: true,
+          medium: true,
+          campaign: true,
+          device: true,
+          properties: true,
+        },
+      }),
+    ]);
     // The visitor as a short label (never the id itself): enough to tell people apart in a list.
-    return rows.map(({ visitorId, dailyId, ...e }) => ({
-      ...e,
-      visitor: (visitorId ?? dailyId)?.slice(0, 6) ?? null,
-    }));
+    return {
+      total,
+      rows: rows.map(({ visitorId, dailyId, ...e }) => ({
+        ...e,
+        visitor: (visitorId ?? dailyId)?.slice(0, 6) ?? null,
+      })),
+    };
   }
 
   /**
@@ -306,6 +316,21 @@ export class FlipperController {
         FROM website_event
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"`,
     ]);
+    // The viewed products by name, from the site's own catalogue (the article is the feed's g:id).
+    const articles = products.map((p) => p.item);
+    const catalogue = articles.length
+      ? await db.shopProduct.findMany({
+          where: {
+            accountId: site.accountId,
+            OR: [{ externalId: { in: articles } }, { articles: { hasSome: articles } }],
+          },
+          select: { externalId: true, articles: true, title: true, url: true },
+        })
+      : [];
+    const named = products.map((p) => {
+      const found = catalogue.find((c) => c.externalId === p.item || c.articles.includes(p.item));
+      return { ...p, title: found?.title ?? null, url: found?.url ?? null };
+    });
     const byName = new Map(funnel.map((f) => [f.name, f.visitors]));
     return {
       days: n,
@@ -313,7 +338,7 @@ export class FlipperController {
       daily,
       funnel: FUNNEL.map((name) => ({ name, visitors: byName.get(name) ?? 0 })),
       channels,
-      products,
+      products: named,
       consent: consent[0] ?? { consenting: 0, anonymous: 0 },
     };
   }
