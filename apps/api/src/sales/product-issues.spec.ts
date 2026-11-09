@@ -180,6 +180,34 @@ describe('productIssues', () => {
     ).toBeUndefined();
   });
 
+  it('the same article on Etsy and on the sites is not a duplicate', () => {
+    const list = [
+      product({ id: 'e1', skus: ['00040607'], articles: ['00040607'] }),
+      product({
+        id: 'ua',
+        platform: 'WEBSITE',
+        skus: ['00040607'],
+        articles: ['00040607'],
+        tags: [],
+      }),
+      product({
+        id: 'world',
+        platform: 'WEBSITE',
+        skus: ['00040607'],
+        articles: ['00040607'],
+        tags: [],
+      }),
+    ];
+    const channels = { site: new Set(['00040607']), etsy: new Set(['00040607']) };
+    const all = productIssues(list, NOW, channels);
+    expect(all.get('e1')).toBeUndefined();
+    expect(all.get('ua')).toBeUndefined();
+    expect(all.get('world')).toBeUndefined();
+    // two Etsy listings with it still are
+    const dup = productIssues([...list, product({ id: 'e2', skus: ['00040607'] })], NOW, channels);
+    expect(dup.get('e1')?.map((i) => i.code)).toEqual(['duplicateSku']);
+  });
+
   it('important: no tags, no pins — with or without sales', () => {
     expect(codes([product({ tags: [], posts: 0 })])).toEqual([
       'important:noTags',

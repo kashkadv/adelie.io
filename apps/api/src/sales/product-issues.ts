@@ -128,7 +128,9 @@ export function productIssues(
   now: Date = new Date(),
   channels: ChannelArticles = { site: null, etsy: null },
 ): Map<string, Issue[]> {
-  const active = products.filter((p) => p.state === 'active');
+  // Shop listings only: the same article on Etsy and on a site (or on two sites) is the point
+  // of matching them, not a duplicate.
+  const active = products.filter((p) => p.state === 'active' && p.platform !== 'WEBSITE');
 
   // The same SKU on several active listings: the link to the website would be ambiguous.
   // Twins (listings of one group) count as one owner.
