@@ -414,7 +414,7 @@ export function Flipper() {
                         <span className="tabular w-20 shrink-0 text-xs text-muted">
                           {time(e.occurredAt)}
                         </span>
-                        <span className="w-32 shrink-0 font-medium">{e.name}</span>
+                        <span className="w-56 shrink-0 truncate font-medium">{e.name}</span>
                         <span className="min-w-0 flex-1 truncate text-muted" title={e.url}>
                           {shortUrl(e.url)}
                         </span>
