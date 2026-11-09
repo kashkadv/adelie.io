@@ -314,12 +314,7 @@ export function Products() {
               onChange={switchChannel}
               options={shops.map((sh) => ({
                 value: sh.id,
-                label: (
-                  <>
-                    {sh.displayName || sh.username || ''}
-                    <span className="tabular text-xs text-muted">{sh._count?.products ?? ''}</span>
-                  </>
-                ),
+                label: sh.displayName || sh.username || '',
               }))}
             />
           ) : undefined
