@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { PeriodControl, resolveRange, type DateRange, type RangeLabels } from '../ui/date-range';
 import { FilterChip } from '../ui/filter-chip';
+import { PlatformIcon } from '../ui/platform-icon';
 import { Segmented } from '../ui/segmented';
 import { InfoTip } from '../ui/info-tip';
 import { EmptyState, PageHeader } from './page-header';
@@ -314,7 +315,17 @@ export function Products() {
               onChange={switchChannel}
               options={shops.map((sh) => ({
                 value: sh.id,
-                label: sh.displayName || sh.username || '',
+                label: (
+                  <>
+                    <PlatformIcon
+                      platform={sh.platform}
+                      size={14}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                    />
+                    {sh.displayName || sh.username || ''}
+                  </>
+                ),
               }))}
             />
           ) : undefined
@@ -449,7 +460,7 @@ export function Products() {
                 key={p.id}
                 className={`transition-colors duration-700 ${p.id === lit ? 'bg-hover' : ''}`}
               >
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 xl:flex-nowrap">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4 xl:flex-nowrap">
                   {/* The product itself opens its card (sales, orders, pins). */}
                   <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
                     <span className="flex w-5 shrink-0 justify-center">
@@ -485,7 +496,7 @@ export function Products() {
                         >
                           {p.title}
                         </button>
-                        <p className="flex items-center gap-2 text-xs text-muted">
+                        <p className="mt-1.5 flex items-center gap-2 text-xs text-muted">
                           {p.state !== 'active' && (
                             <span className="rounded-full border border-line px-1.5 leading-4">
                               {t(`states.${p.state as (typeof STATES)[number]}`)}
