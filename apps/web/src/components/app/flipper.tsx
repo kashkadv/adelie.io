@@ -350,6 +350,8 @@ export function Flipper() {
                     {site.serverKeyHint ? t('serverNewKey') : t('serverMakeKey')}
                   </button>
                 </div>
+                <p className="mb-2 text-xs text-muted">{t('serverUrl')}</p>
+                <CodeBlock code={`POST ${apiUrl}/collect/server`} label={t('serverUrl')} />
                 {newKey && (
                   <>
                     <p className="mb-2 text-xs text-amber-700 dark:text-amber-300">

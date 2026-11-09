@@ -1367,6 +1367,7 @@
       "content": "Content",
       "term": "Term"
     },
-    "tileVisitors": "{count, plural, one {# visitor} other {# visitors}}"
+    "tileVisitors": "{count, plural, one {# visitor} other {# visitors}}",
+    "serverUrl": "Address and method. The key goes in the header Authorization: Bearer YOUR_KEY; the body is JSON (see the guide below)."
   }
 }

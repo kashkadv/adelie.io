@@ -87,7 +87,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 }`;
 
 const SERVER = `// On your server, when the payment is confirmed (webhook, poll or cron — repeats are safe).
-await fetch('https://dev-api.adelie.space/collect/server', {
+await fetch('__API__/collect/server', {
   method: 'POST',
   headers: {
     'content-type': 'application/json',
@@ -251,7 +251,7 @@ export function FlipperGuide({ scriptUrl, siteId }: { scriptUrl: string; siteId:
         t('server.title'),
         <>
           {p('server.lead')}
-          <CodeBlock code={SERVER} />
+          <CodeBlock code={SERVER.replace('__API__', scriptUrl.replace(/\/flipper\.js.*$/, ''))} />
           {p('server.after')}
         </>,
       )}

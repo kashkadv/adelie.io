@@ -1367,6 +1367,7 @@
       "content": "Контент",
       "term": "Термін"
     },
-    "tileVisitors": "{count, plural, one {# відвідувач} few {# відвідувачі} many {# відвідувачів} other {# відвідувача}}"
+    "tileVisitors": "{count, plural, one {# відвідувач} few {# відвідувачі} many {# відвідувачів} other {# відвідувача}}",
+    "serverUrl": "Адреса й метод. Ключ іде в заголовку Authorization: Bearer ВАШ_КЛЮЧ; тіло — JSON (див. гайд нижче)."
   }
 }
