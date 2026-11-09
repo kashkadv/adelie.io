@@ -62,8 +62,11 @@ export function ImpressionsChart({
     const solid: string[] = [];
     const dashed: string[] = [];
     const areas: string[] = [];
+    const dots: number[] = [];
     let run: number[] = [];
     const flush = () => {
+      // A day with data between two gaps has no line to draw: it gets a dot.
+      if (run.length === 1) dots.push(run[0]!);
       if (run.length > 1) {
         const line = run.map((i, k) => `${k ? 'L' : 'M'}${x(i)},${y(points[i]!.value!)}`).join('');
         areas.push(`${line}L${x(run.at(-1)!)},${y(0)}L${x(run[0]!)},${y(0)}Z`);
@@ -83,7 +86,7 @@ export function ImpressionsChart({
     flush();
 
     const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => ({ value: max * f, y: y(max * f) }));
-    return { x, y, solid, dashed, areas, ticks, innerW };
+    return { x, y, solid, dashed, areas, dots, ticks, innerW };
   }, [points, width]);
 
   const label = (date: string, long = false) =>
@@ -165,6 +168,15 @@ export function ImpressionsChart({
               strokeWidth={2}
               strokeDasharray="4 4"
               strokeLinecap="round"
+            />
+          ))}
+          {geometry.dots.map((i) => (
+            <circle
+              key={i}
+              cx={geometry.x(i)}
+              cy={geometry.y(points[i]!.value!)}
+              r={4}
+              fill="var(--series-1)"
             />
           ))}
           {h && hover !== null && (

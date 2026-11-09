@@ -66,6 +66,25 @@ type Tab = 'analytics' | 'sources' | 'checkout' | 'live' | 'settings';
 
 const PAGE_SIZE = 25;
 
+/** Every day of the period, days without visitors as zero (the server sends only days with data). */
+function daily(summary: Summary | null) {
+  if (!summary) return [];
+  const byDay = new Map(summary.daily.map((d) => [d.day, d.visitors]));
+  const today = new Date();
+  return Array.from({ length: summary.days }, (_, i) => {
+    const day = new Date(
+      Date.UTC(
+        today.getUTCFullYear(),
+        today.getUTCMonth(),
+        today.getUTCDate() - (summary.days - 1 - i),
+      ),
+    )
+      .toISOString()
+      .slice(0, 10);
+    return { date: day, value: byDay.get(day) ?? 0, status: 'READY' as const };
+  });
+}
+
 const STANDARD = [
   'PageView',
   'ViewCategory',
@@ -495,14 +514,7 @@ export function Flipper() {
                   {t('visitorsPerDay')}
                   <InfoTip text={t('visitorsHint')} />
                 </h2>
-                <ImpressionsChart
-                  points={(summary?.daily ?? []).map((d) => ({
-                    date: d.day,
-                    value: d.visitors,
-                    status: 'READY' as const,
-                  }))}
-                  ariaLabel={t('visitorsPerDay')}
-                />
+                <ImpressionsChart points={daily(summary)} ariaLabel={t('visitorsPerDay')} />
               </section>
 
               <div className="mb-6 grid gap-6 lg:grid-cols-2">
