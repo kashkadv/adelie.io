@@ -585,6 +585,19 @@ export function ProductEditor({
                       </div>
                     </div>
                   )}
+                  {/* SKU does not vary: one SKU for the whole product, edited once. */}
+                  {values.skuOnProperty.length === 0 && (
+                    <label className="mb-3 block">
+                      <span className="mb-1.5 block px-3.5 text-xs text-muted">
+                        {t('productSku')}
+                      </span>
+                      <input
+                        className="field tabular"
+                        value={values.variations[0]?.sku ?? ''}
+                        onChange={(e) => setSku(values.variations[0]?.id ?? '', e.target.value)}
+                      />
+                    </label>
+                  )}
                   {/* A shared price or quantity is edited once for every variation. */}
                   {(!data.current.priceVaries || !data.current.quantityVaries) && (
                     <div className="mb-3 grid grid-cols-2 gap-4">
@@ -633,13 +646,16 @@ export function ProductEditor({
                         <span className="min-w-0 flex-1 basis-40 truncate" title={optionsOf(v.id)}>
                           {optionsOf(v.id)}
                         </span>
-                        <input
-                          className="field tabular h-9 w-40 py-1"
-                          aria-label={t('variationSku', { variation: optionsOf(v.id) })}
-                          placeholder={t('fields.sku')}
-                          value={v.sku}
-                          onChange={(e) => setSku(v.id, e.target.value)}
-                        />
+                        {values.skuOnProperty.length > 0 && (
+                          <input
+                            className="field tabular h-9 w-40 py-1"
+                            aria-label={t('variationSku', { variation: optionsOf(v.id) })}
+                            placeholder={t('fields.sku')}
+                            value={v.sku}
+                            onChange={(e) => setSku(v.id, e.target.value)}
+                          />
+                        )}
+
                         {data.current!.priceVaries ? (
                           <input
                             className="field tabular h-9 w-28 py-1 text-right"

@@ -14,7 +14,7 @@ export type IssueCode =
   | 'noSku'
   | 'noTags'
   | 'noPins'
-  | 'sharedSku'
+  | 'skuColor'
   | 'skuGaps'
   | 'fewTags'
   | 'skuFormat'
@@ -40,6 +40,8 @@ export interface IssueProduct {
   variationCount: number | null;
   /** Options the SKU goes by; empty = one SKU for the whole listing. */
   skuBy: string[];
+  /** Names of the options the variations are made of. */
+  variationOptions: string[];
   /** SKUs the product should have (one per combination of the `skuBy` options); null = unknown. */
   skuGroups: number | null;
   listedAt: Date | null;
@@ -62,12 +64,15 @@ const level: Record<IssueCode, IssueLevel> = {
   noSku: 'important',
   noTags: 'important',
   noPins: 'important',
-  sharedSku: 'important',
+  skuColor: 'important',
   skuGaps: 'important',
   fewTags: 'note',
   skuFormat: 'note',
   noViews: 'note',
 };
+
+/** Etsy's colour options are named "Primary color", "Secondary color" or "Color". */
+const COLOUR = /colou?r|колір|цвет/i;
 
 const digitsOnly = (sku: string) => /^\d+$/.test(sku);
 
@@ -104,8 +109,13 @@ export function productIssues(
       if (!p.tags.length) codes.push('noTags');
       // No pins, with or without sales: a product nobody is sent to has no traffic from there.
       if (p.posts === 0) codes.push('noPins');
-      // Several variations but the SKU goes by none of their options: one SKU for all of them.
-      if ((p.variationCount ?? 0) > 1 && !p.skuBy.length && p.skus.length) codes.push('sharedSku');
+      // Colours of one product that share a SKU: the SKU does not go by the colour option.
+      // (Sizes alone sharing one SKU is a fine way to keep a product — nothing to say.)
+      const colours = p.variationOptions.filter((o) => COLOUR.test(o) && !p.skuBy.includes(o));
+      if ((p.variationCount ?? 0) > 1 && colours.length && p.skus.length) {
+        codes.push('skuColor');
+        params['skuColor'] = { options: colours.join(', ') };
+      }
       // The SKU goes by some options (colour…) but not every colour has a SKU of its own.
       if (
         p.skuBy.length &&
