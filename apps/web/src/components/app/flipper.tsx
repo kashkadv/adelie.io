@@ -620,22 +620,26 @@ export function Flipper() {
                         .map((p) => (
                           <tr key={p.item}>
                             <td className="max-w-0 px-5 py-2.5">
-                              {p.url ? (
-                                <a
-                                  href={p.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="block truncate hover:underline"
-                                  title={p.title ?? p.item}
-                                >
-                                  {p.title ?? p.item}
-                                </a>
-                              ) : (
-                                <span className="block truncate">{p.title ?? p.item}</span>
-                              )}
-                              {p.title && (
-                                <span className="tabular text-xs text-muted">{p.item}</span>
-                              )}
+                              <div className="flex items-baseline">
+                                {p.url ? (
+                                  <a
+                                    href={p.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="min-w-0 truncate hover:underline"
+                                    title={p.title ?? p.item}
+                                  >
+                                    {p.title ?? p.item}
+                                  </a>
+                                ) : (
+                                  <span className="min-w-0 truncate">{p.title ?? p.item}</span>
+                                )}
+                                {p.title && (
+                                  <span className="tabular ml-2 shrink-0 text-xs text-muted">
+                                    {p.item}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="tabular px-3 py-2.5 text-right">
                               {format.number(p.views)}
