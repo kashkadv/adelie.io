@@ -24,6 +24,30 @@ export function CodeBlock({ code, label }: { code: string; label?: string }) {
       // the text stays selectable
     }
   }
+  const icon = copied ? (
+    <Check size={13} aria-hidden="true" />
+  ) : (
+    <Copy size={13} aria-hidden="true" />
+  );
+  const buttonClass =
+    'inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-[var(--card,transparent)] px-2.5 py-1 text-xs text-muted hover:text-foreground';
+  // One line (an address, a key): text and button share a row, so they are centred together.
+  if (!code.includes('\n')) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-2xl bg-hover px-4 py-3">
+        <pre
+          aria-label={label}
+          className="scroll-thin min-w-0 flex-1 overflow-x-auto py-0.5 text-xs leading-none"
+        >
+          <code>{code}</code>
+        </pre>
+        <button type="button" onClick={copy} className={buttonClass}>
+          {icon}
+          {copied ? t('copied') : t('copy')}
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="relative">
       <pre
@@ -32,14 +56,8 @@ export function CodeBlock({ code, label }: { code: string; label?: string }) {
       >
         <code>{code}</code>
       </pre>
-      <button
-        type="button"
-        onClick={copy}
-        className={`absolute right-2.5 ${
-          code.includes('\n') ? 'top-2.5' : 'top-1/2 -translate-y-1/2'
-        } inline-flex items-center gap-1.5 rounded-lg border border-line bg-[var(--card,transparent)] px-2.5 py-1 text-xs text-muted hover:text-foreground`}
-      >
-        {copied ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+      <button type="button" onClick={copy} className={`absolute top-2.5 right-2.5 ${buttonClass}`}>
+        {icon}
         {copied ? t('copied') : t('copy')}
       </button>
     </div>
