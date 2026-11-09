@@ -68,6 +68,15 @@ export interface Flipper {
     currency?: string;
     coupon?: string;
   }): void;
+  purchase(order: {
+    id?: string | number;
+    items?: Product[];
+    value?: number;
+    currency?: string;
+    coupon?: string;
+    shipping?: number;
+    tax?: number;
+  }): void;
   debug(on?: boolean): void;
   version: string;
   loaded: true;
@@ -325,6 +334,20 @@ export function init(env: Env): Flipper | null {
       value: cart.value ?? Math.round(sum * 100) / 100,
       currency: cart.currency ?? items[0]?.currency,
       coupon: cart.coupon,
+      item_count: items.reduce((n, p) => n + (p.quantity ?? 1), 0),
+      items: items.map(productProps),
+    });
+  };
+  api.purchase = (o) => {
+    const items = o.items ?? [];
+    const sum = items.reduce((n, p) => n + (p.price ?? 0) * (p.quantity ?? 1), 0);
+    track('Purchase', {
+      transaction_id: o.id === undefined ? undefined : String(o.id),
+      value: o.value ?? (items.length ? Math.round(sum * 100) / 100 : undefined),
+      currency: o.currency ?? items[0]?.currency,
+      coupon: o.coupon,
+      shipping: o.shipping,
+      tax: o.tax,
       item_count: items.reduce((n, p) => n + (p.quantity ?? 1), 0),
       items: items.map(productProps),
     });

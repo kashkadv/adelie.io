@@ -1162,7 +1162,8 @@
       "ViewCategory": "Category views",
       "ProductView": "Product views",
       "AddToCart": "Added to cart",
-      "BeginCheckout": "Checkout started"
+      "BeginCheckout": "Checkout started",
+      "Purchase": "Purchases"
     },
     "visitorsPerDay": "Unique visitors per day",
     "visitorsHint": "Each person is counted once a day: with consent by a persistent id, without it by an anonymous daily hash that does not link days. This is an estimate.",
@@ -1193,7 +1194,7 @@
       },
       "events": {
         "title": "3. Shop events",
-        "lead": "Four events follow the buyer’s way. Names and properties are standard, so reports and the funnel work without extra set-up.",
+        "lead": "Five events follow the buyer’s way, from the category to payment. Names and properties are standard, so reports and the funnel work without extra set-up. If your site already sends events to Google (GA4 dataLayer), Flipper will pick them up itself — soon.",
         "where": "The simplest is to call them from your site’s code when the thing has really happened (not on the click: a click does not mean the product was added).",
         "next": "In Next.js a page view is tracked by a component, and add-to-cart in the button handler, after the cart accepted the product.",
         "types": "So that TypeScript knows window.flipper:",
@@ -1201,13 +1202,103 @@
           "viewCategory": "ViewCategory",
           "productView": "ProductView",
           "addToCart": "AddToCart",
-          "beginCheckout": "BeginCheckout"
+          "beginCheckout": "BeginCheckout",
+          "purchase": "Purchase"
         },
         "when": {
           "viewCategory": "a category page was opened",
           "productView": "a product page was opened (id is the article, the same as g:id in your feed)",
           "addToCart": "a product was added to the cart (after the cart answered)",
-          "beginCheckout": "checkout was started"
+          "beginCheckout": "checkout was started",
+          "purchase": "payment was made (once per order)"
+        },
+        "propsTitle": "Properties",
+        "howTitle": "How to add it",
+        "codeTitle": "Code",
+        "mistakesTitle": "Common mistakes",
+        "testTitle": "How to check",
+        "htmlNote": "Attributes work for simple values only. For a list of products use JavaScript.",
+        "needs": {
+          "required": "required",
+          "recommended": "recommended",
+          "optional": "optional",
+          "auto": "filled in itself"
+        },
+        "tabs": {
+          "js": "JavaScript",
+          "html": "HTML attributes",
+          "next": "Next.js"
+        },
+        "props": {
+          "category_id": "The category id or slug, for example runners.",
+          "category_name": "The name the visitor sees.",
+          "item_count": "How many products are in items (counted by Flipper).",
+          "items": "The products: a list of objects with id, name, price, quantity (up to 20).",
+          "item_id": "The article — the same as g:id in your feed and the SKU in Etsy. This is how the product is matched across channels.",
+          "item_name": "The product name.",
+          "price": "The unit price in the main currency unit (29000, not kopecks).",
+          "currency": "The three-letter currency code: UAH, USD.",
+          "category": "The product category.",
+          "brand": "The brand.",
+          "variant": "The chosen option, for example the colour or size.",
+          "quantity": "How many units (1 by default).",
+          "value": "The total, price times quantity. Flipper counts it if you do not pass it.",
+          "coupon": "The promo code, if one was entered.",
+          "transaction_id": "The order number. Without it an order cannot be told apart from a repeat.",
+          "shipping": "The delivery cost.",
+          "tax": "The tax amount."
+        },
+        "cards": {
+          "viewCategory": {
+            "title": "Category view",
+            "when": "Fires when a category (catalogue) page has shown its products.",
+            "step1": "Find the code that renders the category page.",
+            "step2": "Call viewCategory once when the page opens, not on every re-render.",
+            "step3": "Pass the category id and name; the list of products is optional.",
+            "mistake1": "Calling it on every filter or sort change: one visit then looks like many.",
+            "mistake2": "Sending the whole catalogue in items: only 20 products are kept.",
+            "test": "Open a category with ?flipper_debug=1 and look in the browser console for an event line, then find ViewCategory in Live events."
+          },
+          "productView": {
+            "title": "Product view",
+            "when": "Fires when a product page has shown the product. This is the most important event: top products and the funnel are built from it.",
+            "step1": "Find the product page component.",
+            "step2": "Call productView when the product is loaded.",
+            "step3": "Pass the article as id — exactly as it is in the feed.",
+            "mistake1": "Passing the database id instead of the article: the product will not match Etsy and the other site.",
+            "mistake2": "Price in kopecks or with a currency sign: send a plain number.",
+            "test": "Open a product page with ?flipper_debug=1: item_id must equal the article. In Top products the product appears with its name."
+          },
+          "addToCart": {
+            "title": "Added to cart",
+            "when": "Fires after the cart has accepted the product.",
+            "step1": "Find the handler of the Add to cart button.",
+            "step2": "Call addToCart after the cart answered successfully.",
+            "step3": "Pass the product and the quantity.",
+            "mistake1": "Calling it on the click: if the cart refuses, the event is wrong.",
+            "mistake2": "Forgetting the quantity when more than one unit is added.",
+            "test": "Press the button: a new AddToCart with value appears in Live events."
+          },
+          "beginCheckout": {
+            "title": "Checkout started",
+            "when": "Fires when the buyer starts checkout: presses Checkout in the cart or opens the checkout page.",
+            "step1": "Choose one place: the cart button or the checkout page.",
+            "step2": "Call beginCheckout with the cart lines.",
+            "step3": "Send the currency and the promo code if there is one.",
+            "mistake1": "Calling it in both places: every checkout is counted twice.",
+            "mistake2": "Calling it on every change of the delivery form.",
+            "test": "Go to checkout: BeginCheckout appears with item_count and value."
+          },
+          "purchase": {
+            "title": "Purchase",
+            "when": "Fires once when the order is paid. It closes the funnel and gives revenue.",
+            "step1": "Choose the moment of payment: the payment callback on the server, or the thank-you page.",
+            "step2": "Call purchase with the order number and the lines.",
+            "step3": "Make sure it is sent once per order.",
+            "mistake1": "Sending it again when the thank-you page is reloaded: guard it with the order number.",
+            "mistake2": "Sending it for an unpaid order. Prefer the moment the payment is confirmed.",
+            "test": "Make a test order: one Purchase with the order number appears."
+          }
         }
       },
       "attributes": {

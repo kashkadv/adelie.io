@@ -180,6 +180,19 @@ describe('events', () => {
     expect(events[3]!.p).toMatchObject({ value: 25, item_count: 3, currency: 'USD' });
   });
 
+  it('purchase carries the order number and sums the lines', () => {
+    const f = load({ 'auto-pageview': 'false' })!;
+    f.purchase({
+      id: 'ORD-1',
+      items: [{ id: '1', price: 10, quantity: 2, currency: 'UAH' }],
+      shipping: 5,
+    });
+    vi.advanceTimersByTime(2000);
+    const e = bodies().flatMap((b) => b.e)[0]!;
+    expect(e.n).toBe('Purchase');
+    expect(e.p).toMatchObject({ transaction_id: 'ORD-1', value: 20, currency: 'UAH', shipping: 5 });
+  });
+
   it('data-flipper-event on an element fires on click, with its data-flipper-* properties', () => {
     load({ 'auto-pageview': 'false' });
     document.body.innerHTML =

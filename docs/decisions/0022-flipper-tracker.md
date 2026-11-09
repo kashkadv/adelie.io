@@ -32,7 +32,7 @@
    переважно українська, банера немає); `gushka.world` — завжди анонімний (покупці з ЄС), доки не буде банера згоди.
    Відповідальність за підставу обробки — на власнику сайту.
 5. **Події.** Автоматично: `PageView` (з SPA-переходами через History API), `OutboundClick`. Магазин:
-   `ViewCategory`, `ProductView`, `AddToCart`, `BeginCheckout` (стандартні властивості: `item_id` — артикул = `g:id`,
+   `ViewCategory`, `ProductView`, `AddToCart`, `BeginCheckout`, `Purchase` (клієнтська подія оплати з `transaction_id`; серверну додамо пізніше) (стандартні властивості: `item_id` — артикул = `g:id`,
    `item_name`, `price`, `currency`, `quantity`, `value`, `items`). `Purchase` — **лише з сервера** (окремий етап).
    Способи підключення: JS API і `data-flipper-*` (зроблено); автовиявлення (GA4 `dataLayer`, JSON-LD `Product`) і
    правила з кабінету (шаблони адрес, CSS-селектори) — наступні кроки.

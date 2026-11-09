@@ -1,5 +1,7 @@
 'use client';
 
+import { EventCards } from './flipper-events';
+
 import { Check, ChevronDown, Copy } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -41,35 +43,6 @@ export function CodeBlock({ code, label }: { code: string; label?: string }) {
     </div>
   );
 }
-
-const CATEGORY = `// A category page opened (the list of products on it is optional)
-flipper.viewCategory({
-  id: 'runners',            // your category id or slug
-  name: 'Runner rugs',
-  items: products.map((p) => ({ id: p.sku, name: p.title, price: p.price, currency: 'UAH' })),
-});`;
-
-const PRODUCT = `// A product page opened — "id" is the article (SKU / g:id of your feed)
-flipper.productView({
-  id: '00022502',
-  name: 'Rug “HUK Stone”',
-  price: 29000,
-  currency: 'UAH',
-  category: 'Rugs',
-});`;
-
-const CART = `// A product put in the cart — after the cart accepted it
-flipper.addToCart(
-  { id: '00022502', name: 'Rug “HUK Stone”', price: 29000, currency: 'UAH' },
-  1, // quantity
-);`;
-
-const CHECKOUT = `// Checkout started: the cart page's "Checkout" button, or the checkout page opened
-flipper.beginCheckout({
-  currency: 'UAH',
-  items: cart.lines.map((l) => ({ id: l.sku, name: l.title, price: l.price, quantity: l.qty })),
-  coupon: cart.coupon, // optional
-});`;
 
 const ATTRIBUTES = `<!-- No JavaScript needed: data-flipper-* on the element fires the event on click -->
 <button
@@ -205,18 +178,16 @@ export function FlipperGuide({ scriptUrl, siteId }: { scriptUrl: string; siteId:
         <>
           {p('events.lead')}
           <ul className="grid gap-2">
-            {(['viewCategory', 'productView', 'addToCart', 'beginCheckout'] as const).map((k) => (
+            {(
+              ['viewCategory', 'productView', 'addToCart', 'beginCheckout', 'purchase'] as const
+            ).map((k) => (
               <li key={k} className="flex flex-wrap gap-x-3 gap-y-1">
                 <span className="font-medium text-foreground">{t(`events.names.${k}`)}</span>
                 <span>{t(`events.when.${k}`)}</span>
               </li>
             ))}
           </ul>
-          {p('events.where')}
-          <CodeBlock code={CATEGORY} />
-          <CodeBlock code={PRODUCT} />
-          <CodeBlock code={CART} />
-          <CodeBlock code={CHECKOUT} />
+          <EventCards />
           {p('events.next')}
           <CodeBlock code={NEXT_EVENTS} />
           {p('events.types')}

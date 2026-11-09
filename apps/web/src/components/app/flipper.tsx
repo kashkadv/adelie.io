@@ -52,7 +52,14 @@ type LiveEvent = {
   visitor: string | null;
 };
 
-const STANDARD = ['PageView', 'ViewCategory', 'ProductView', 'AddToCart', 'BeginCheckout'] as const;
+const STANDARD = [
+  'PageView',
+  'ViewCategory',
+  'ProductView',
+  'AddToCart',
+  'BeginCheckout',
+  'Purchase',
+] as const;
 const PERIODS = ['7', '30', '90'] as const;
 
 /** A path and what it asks for, as a short line: "/product/00022502". */

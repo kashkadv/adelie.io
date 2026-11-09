@@ -33,7 +33,13 @@ const hostOf = (url: string): string | null => {
 };
 
 /** The funnel of a shop, in the order a customer goes through it. */
-export const FUNNEL = ['ViewCategory', 'ProductView', 'AddToCart', 'BeginCheckout'] as const;
+export const FUNNEL = [
+  'ViewCategory',
+  'ProductView',
+  'AddToCart',
+  'BeginCheckout',
+  'Purchase',
+] as const;
 
 /**
  * Flipper in the cabinet (ADR-0022): which of the project's sites send events, how to install it,
