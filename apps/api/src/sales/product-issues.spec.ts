@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { productIssues, type IssueProduct } from './product-issues.js';
+import { baseSku, productIssues, type IssueProduct } from './product-issues.js';
 
 const NOW = new Date('2026-11-09T12:00:00Z');
 const product = (over: Partial<IssueProduct> = {}): IssueProduct => ({
@@ -105,6 +105,22 @@ describe('productIssues', () => {
     expect(odd).toEqual([
       { code: 'skuPattern', level: 'important', params: { skus: '1896 AP_18/02/2021' } },
     ]);
+  });
+
+  it('"/n" marks one more variation of the same article: valid, and the article is what counts', () => {
+    expect(baseSku('00011512/1')).toBe('00011512');
+    expect(baseSku('00011512')).toBe('00011512');
+    // valid, not flagged
+    expect(codes([product({ skus: ['00011512', '00011512/1'], variationCount: 2 })])).toEqual([]);
+    // the same article in two listings is a duplicate, whatever the suffix
+    const two = [
+      product({ id: 'a', skus: ['00011512'] }),
+      product({ id: 'b', skus: ['00011512/1'] }),
+    ];
+    expect(codes(two, 'a')).toEqual(['critical:duplicateSku']);
+    expect(codes(two, 'b')).toEqual(['critical:duplicateSku']);
+    // a suffix that is not a number is not valid
+    expect(codes([product({ skus: ['00011512/a'] })])).toEqual(['important:skuPattern']);
   });
 
   it('important: no tags, no pins — with or without sales', () => {

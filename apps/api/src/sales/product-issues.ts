@@ -50,8 +50,17 @@ export interface IssueProduct {
 }
 
 /** Etsy allows 13 tags: fewer is a missed chance to be found. */
-/** A SKU as the shop keeps them: digits only. */
-const NUMERIC_SKU = /^\d+$/;
+/**
+ * A SKU as the shop keeps them: a numeric code, optionally with a "/n" suffix for one more
+ * variation of the same article ("00011512/1").
+ */
+const VALID_SKU = /^\d+(\/\d+)?$/;
+
+/**
+ * The article a SKU belongs to: "00011512/1" is the article "00011512" (what the website's
+ * product is matched by, ADR-0021).
+ */
+export const baseSku = (sku: string): string => sku.split('/')[0]!;
 const MAX_TAGS = 13;
 /** A listing with no views at all this long after publishing is not being found. */
 const NO_VIEWS_DAYS = 30;
@@ -83,7 +92,10 @@ export function productIssues(
   // The same SKU on several active listings: the link to the website would be ambiguous.
   const owners = new Map<string, Set<string>>();
   for (const p of active) {
-    for (const sku of p.skus) owners.set(sku, (owners.get(sku) ?? new Set<string>()).add(p.id));
+    // By article: "0001" and "0001/1" in two listings point to one product on the website.
+    for (const sku of p.skus) {
+      owners.set(baseSku(sku), (owners.get(baseSku(sku)) ?? new Set<string>()).add(p.id));
+    }
   }
   const result = new Map<string, Issue[]>();
   for (const p of products) {
@@ -95,11 +107,11 @@ export function productIssues(
       if (p.price === null || p.price <= 0) codes.push('noPrice');
       if (!p.imageUrl) codes.push('noPhoto');
       if (p.quantity === 0) codes.push('soldOutActive');
-      if (p.skus.some((s) => (owners.get(s)?.size ?? 0) > 1)) codes.push('duplicateSku');
+      if (p.skus.some((s) => (owners.get(baseSku(s))?.size ?? 0) > 1)) codes.push('duplicateSku');
       if (!p.skus.length) codes.push('noSku');
-      // Our SKUs are numeric codes ("0040622"); anything else (old schemes such as
+      // Our SKUs are numeric codes ("0040622", "0040622/1"); anything else (old schemes such as
       // "1896 AP_18/02/2021") is most likely a wrong one.
-      const odd = p.skus.filter((sku) => !NUMERIC_SKU.test(sku));
+      const odd = p.skus.filter((sku) => !VALID_SKU.test(sku));
       if (odd.length) {
         codes.push('skuPattern');
         params['skuPattern'] = { skus: odd.join(', ') };
