@@ -945,7 +945,8 @@
         "fewTags": "Fewer than 13 tags — each free tag is a chance to be found.",
         "noViews": "No views a month after publishing.",
         "skuGaps": "The SKU goes by {by}: only {have} of {groups} groups have their own SKU — some lack one or share it.",
-        "skuOneForAll": "The variations differ by {options}, but one SKU is set for all — most likely a mistake. Choose in the editor what the SKU goes by."
+        "skuOneForAll": "The variations differ by {options}, but one SKU is set for all — most likely a mistake. Choose in the editor what the SKU goes by.",
+        "skuPattern": "SKU {skus} does not look like your numeric codes (digits only) — probably a wrong one."
       },
       "none": "No issues found",
       "title": "Possible improvements",
@@ -961,7 +962,8 @@
         "skuGaps": "Not every SKU group has its own",
         "skuOneForAll": "Several options, one SKU for all",
         "fewTags": "Fewer than 13 tags",
-        "noViews": "No views in a month"
+        "noViews": "No views in a month",
+        "skuPattern": "SKU is not a numeric code"
       },
       "selected": "{count} selected"
     }

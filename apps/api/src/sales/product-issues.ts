@@ -12,6 +12,7 @@ export type IssueCode =
   | 'soldOutActive'
   | 'duplicateSku'
   | 'noSku'
+  | 'skuPattern'
   | 'noTags'
   | 'noPins'
   | 'skuGaps'
@@ -49,6 +50,8 @@ export interface IssueProduct {
 }
 
 /** Etsy allows 13 tags: fewer is a missed chance to be found. */
+/** A SKU as the shop keeps them: digits only. */
+const NUMERIC_SKU = /^\d+$/;
 const MAX_TAGS = 13;
 /** A listing with no views at all this long after publishing is not being found. */
 const NO_VIEWS_DAYS = 30;
@@ -61,6 +64,7 @@ const level: Record<IssueCode, IssueLevel> = {
   soldOutActive: 'critical',
   duplicateSku: 'critical',
   noSku: 'important',
+  skuPattern: 'important',
   noTags: 'important',
   noPins: 'important',
   skuGaps: 'important',
@@ -93,6 +97,13 @@ export function productIssues(
       if (p.quantity === 0) codes.push('soldOutActive');
       if (p.skus.some((s) => (owners.get(s)?.size ?? 0) > 1)) codes.push('duplicateSku');
       if (!p.skus.length) codes.push('noSku');
+      // Our SKUs are numeric codes ("0040622"); anything else (old schemes such as
+      // "1896 AP_18/02/2021") is most likely a wrong one.
+      const odd = p.skus.filter((sku) => !NUMERIC_SKU.test(sku));
+      if (odd.length) {
+        codes.push('skuPattern');
+        params['skuPattern'] = { skus: odd.join(', ') };
+      }
       if (!p.tags.length) codes.push('noTags');
       // No pins, with or without sales: a product nobody is sent to has no traffic from there.
       if (p.posts === 0) codes.push('noPins');

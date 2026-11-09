@@ -14,6 +14,7 @@ const LEVEL_OF: Record<IssueCode, IssueLevel> = {
   soldOutActive: 'critical',
   duplicateSku: 'critical',
   noSku: 'important',
+  skuPattern: 'important',
   noTags: 'important',
   noPins: 'important',
   skuGaps: 'important',

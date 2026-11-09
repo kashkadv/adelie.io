@@ -70,17 +70,24 @@ describe('productIssues', () => {
           variationOptions: ['Color', 'Size'],
           skuBy: ['Color'],
           skuGroups: 2,
-          skus: ['J-BLK', 'J-BLU'],
+          skus: ['0040621', '0040622'],
         }),
       ]),
     ).toEqual([]);
     // a single colour with several sizes: one SKU is right
     expect(
-      codes([product({ variationCount: 4, skuBy: ['Color'], skuGroups: 1, skus: ['J-BLK'] })]),
+      codes([product({ variationCount: 4, skuBy: ['Color'], skuGroups: 1, skus: ['0040621'] })]),
     ).toEqual([]);
     // 4 sizes with a SKU each wanted, only 3 filled or distinct
     const gap = productIssues(
-      [product({ variationCount: 4, skuBy: ['Size'], skuGroups: 4, skus: ['R-1', 'R-2', 'R-3'] })],
+      [
+        product({
+          variationCount: 4,
+          skuBy: ['Size'],
+          skuGroups: 4,
+          skus: ['0050001', '0050002', '0050003'],
+        }),
+      ],
       NOW,
     ).get('p1');
     expect(gap).toEqual([
@@ -90,6 +97,14 @@ describe('productIssues', () => {
     expect(codes([product({ variationCount: null })])).toEqual([]);
     // a SKU repeated on an inactive listing is not ambiguous for sales
     expect(codes([product({ id: 'a' }), product({ id: 'b', state: 'inactive' })], 'a')).toEqual([]);
+  });
+
+  it('important: a SKU that is not a numeric code looks wrong', () => {
+    expect(codes([product({ skus: ['0040622'] })])).toEqual([]);
+    const odd = productIssues([product({ skus: ['1896 AP_18/02/2021'] })], NOW).get('p1');
+    expect(odd).toEqual([
+      { code: 'skuPattern', level: 'important', params: { skus: '1896 AP_18/02/2021' } },
+    ]);
   });
 
   it('important: no tags, no pins — with or without sales', () => {

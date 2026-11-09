@@ -8,6 +8,7 @@ export type IssueCode =
   | 'soldOutActive'
   | 'duplicateSku'
   | 'noSku'
+  | 'skuPattern'
   | 'noTags'
   | 'noPins'
   | 'skuGaps'
