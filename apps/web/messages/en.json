@@ -887,7 +887,8 @@
       "sku": "{count, plural, =0 {SKU} other {SKU · #}}",
       "skuHint": "Article code from Etsy’s inventory. The same code as the id in the website feed links this product to the website.",
       "noSku": "No SKU — set one so the product can be linked to the website.",
-      "skuBy": "SKU varies by: {options}"
+      "skuBy": "SKU varies by: {options}",
+      "viewOn": "View on {platform}"
     },
     "orderCard": {
       "close": "Close",

@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { api } from '@/lib/api';
 import { downloadCsv, toCsv } from '@/lib/csv';
@@ -316,7 +317,13 @@ export function Content() {
       ),
     [accounts],
   );
-  const [chosenPlatform, setPlatform] = useState<Platform | null>(null);
+  // A link from elsewhere (a product card) can name a platform and a post to open.
+  const urlParams = useSearchParams();
+  const pathname = usePathname();
+  const [chosenPlatform, setPlatform] = useState<Platform | null>(() => {
+    const wanted = urlParams.get('platform');
+    return wanted && wanted in ALL_COLUMNS ? (wanted as Platform) : null;
+  });
   const platform =
     chosenPlatform && platforms.includes(chosenPlatform) ? chosenPlatform : platforms[0];
 
@@ -341,7 +348,7 @@ export function Content() {
   const setSort = (v: Sort) => setFilter('sort', v);
   const setSearch = (v: string) => setFilter('search', v);
   const setLeads = (v: '' | Leads) => setFilter('leads', v);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(() => urlParams.get('post'));
   // The search sent to the API, a moment after typing stops; another platform's is never used.
   const [typed, setTyped] = useState<{ platform?: Platform; q: string }>({ q: '' });
   const debounced = typed.platform === platform ? typed.q : search.trim();
@@ -437,7 +444,11 @@ export function Content() {
 
   const items = [...(data?.items ?? []), ...extra];
   const openIndex = openId ? items.findIndex((p) => p.id === openId) : -1;
-  const closePost = useCallback(() => setOpenId(null), []);
+  const closePost = useCallback(() => {
+    setOpenId(null);
+    // The link that opened the post is spent: a reload must not open it again.
+    if (window.location.search) window.history.replaceState(null, '', pathname);
+  }, [pathname]);
   const selectedCount = items.filter((p) => selected.has(p.id)).length;
   const allChecked: boolean | 'mixed' =
     selectedCount === 0 ? false : selectedCount === items.length ? true : 'mixed';

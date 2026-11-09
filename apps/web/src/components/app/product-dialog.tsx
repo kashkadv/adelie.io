@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
@@ -60,6 +61,7 @@ type Detail = {
     thumbnailUrl: string | null;
     url: string | null;
     publishedAt: string | null;
+    account: { platform: 'PINTEREST' | 'INSTAGRAM' };
     latest: {
       impressions: number | null;
       saves: number | null;
@@ -439,12 +441,12 @@ export function ProductDialog({
                   {detail.posts.length ? (
                     <ul className="divide-y divide-line rounded-2xl border border-line">
                       {detail.posts.map((p) => (
-                        <li key={p.id}>
-                          <a
-                            href={p.url ?? undefined}
+                        <li key={p.id} className="flex items-center gap-2 pr-3 hover:bg-hover">
+                          {/* The post's card in Adelie (Content), in a new tab. */}
+                          <Link
+                            href={`/content?platform=${p.account.platform}&post=${p.id}`}
                             target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-hover"
+                            className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-sm"
                           >
                             <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-hover">
                               {p.thumbnailUrl && (
@@ -467,7 +469,21 @@ export function ProductDialog({
                                 })}
                               </span>
                             </span>
-                          </a>
+                          </Link>
+                          {p.url && (
+                            <a
+                              href={p.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-line px-2.5 py-1 text-xs hover:bg-hover"
+                            >
+                              <ExternalLink size={13} aria-hidden="true" />
+                              {t('viewOn', {
+                                platform:
+                                  p.account.platform === 'INSTAGRAM' ? 'Instagram' : 'Pinterest',
+                              })}
+                            </a>
+                          )}
                         </li>
                       ))}
                     </ul>
