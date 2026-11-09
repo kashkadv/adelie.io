@@ -241,6 +241,7 @@ export function Flipper() {
 
   const live = site?.lastEventAt && now - new Date(site.lastEventAt).getTime() < 24 * 3600 * 1000;
   const total = summary ? summary.consent.consenting + summary.consent.anonymous : 0;
+  const channelTotal = (summary?.channels ?? []).reduce((n, c) => n + c.visits, 0);
   const funnelTop = Math.max(1, ...(summary?.funnel.map((f) => f.visitors) ?? [0]));
 
   return (
@@ -571,13 +572,29 @@ export function Flipper() {
                   {summary && summary.channels.length === 0 ? (
                     <p className="text-sm text-muted">{t('noChannels')}</p>
                   ) : (
-                    <ul className="grid gap-2 text-sm">
-                      {(summary?.channels ?? []).map((c) => (
-                        <li key={c.channel} className="flex justify-between gap-3">
-                          <span>{c.channel}</span>
-                          <span className="tabular text-muted">{format.number(c.visits)}</span>
-                        </li>
-                      ))}
+                    <ul className="grid gap-3">
+                      {(summary?.channels ?? []).map((c) => {
+                        const share = channelTotal ? (c.visits / channelTotal) * 100 : 0;
+                        return (
+                          <li key={c.channel}>
+                            <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
+                              <span>{c.channel}</span>
+                              <span className="tabular">
+                                <span className="mr-2 text-xs text-muted">
+                                  {Math.round(share)}%
+                                </span>
+                                {format.number(c.visits)}
+                              </span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-hover">
+                              <div
+                                className="h-full rounded-full bg-accent"
+                                style={{ width: `${share}%` }}
+                              />
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </section>
