@@ -25,6 +25,7 @@ import {
   minorDigits,
   money,
   productChangeErrors,
+  skuStructure,
   unescapeHtml,
   mapReceipt,
   mapShop,
@@ -293,6 +294,8 @@ export class EtsyAdapter implements PlatformAdapter {
         ...base,
         sku: live[0]?.sku ?? '',
         variations: [],
+        skuProperties: [],
+        skuOnProperty: [],
         priceVaries: false,
         quantityVaries: false,
       };
@@ -301,6 +304,8 @@ export class EtsyAdapter implements PlatformAdapter {
       ...base,
       sku: '',
       variations: live.map(toVariation),
+      skuProperties: skuProperties(live),
+      skuOnProperty: (inventory?.sku_on_property ?? []).map(String),
       priceVaries: (inventory?.price_on_property ?? []).length > 0,
       quantityVaries: (inventory?.quantity_on_property ?? []).length > 0,
     };
@@ -335,6 +340,7 @@ export class EtsyAdapter implements PlatformAdapter {
       changes.price !== undefined ||
       changes.quantity !== undefined ||
       changes.sku !== undefined ||
+      changes.skuOnProperty !== undefined ||
       changes.variations !== undefined
     ) {
       const inventory = await this.get<EtsyInventory>(ctx, `/listings/${listingId}/inventory`);
@@ -348,20 +354,40 @@ export class EtsyAdapter implements PlatformAdapter {
       ) {
         throw new AdapterError('NOT_AVAILABLE', 'Listings with variations change per variation');
       }
-      // A SKU per variation needs `sku_on_property` to cover every property the variations are
-      // made of; otherwise Etsy keeps one SKU for the whole listing.
-      const propertyIds = [
-        ...new Set(products.flatMap((p) => (p.property_values ?? []).map((v) => v.property_id))),
-      ].filter((id): id is number => typeof id === 'number');
-      const skuChanged = (changes.variations ?? []).some(
-        (v) =>
-          v.sku !== undefined &&
-          v.sku.trim() !== (products.find((p) => String(p.product_id) === v.id)?.sku ?? ''),
-      );
-      const skuOnProperty =
-        skuChanged && propertyIds.some((id) => !(inventory.sku_on_property ?? []).includes(id))
-          ? propertyIds
-          : (inventory.sku_on_property ?? []);
+      // The options the SKU goes by: as they are, or as asked. Variations that agree on those
+      // options are one group and must carry one SKU (Etsy keeps the same rule).
+      const propertyIds = skuProperties(products).map((p) => Number(p.id));
+      let skuOnProperty = inventory.sku_on_property ?? [];
+      if (changes.skuOnProperty !== undefined) {
+        const wanted = changes.skuOnProperty.map(Number);
+        if (wanted.some((id) => !propertyIds.includes(id))) {
+          throw new AdapterError('INVALID', 'SKU can go only by the options of the variations');
+        }
+        skuOnProperty = wanted;
+      }
+      const nextSku = (p: (typeof products)[number]) =>
+        ((single ? changes.sku : byId.get(String(p.product_id))?.sku) ?? p.sku ?? '').trim();
+      const skuTouched =
+        changes.skuOnProperty !== undefined ||
+        changes.sku !== undefined ||
+        (changes.variations ?? []).some((v) => v.sku !== undefined);
+      if (skuTouched) {
+        const groups = new Map<string, Set<string>>();
+        for (const p of products) {
+          const key = skuOnProperty
+            .map((id) =>
+              (p.property_values ?? []).find((v) => v.property_id === id)?.values?.join(),
+            )
+            .join('\u0000');
+          groups.set(key, (groups.get(key) ?? new Set<string>()).add(nextSku(p)));
+        }
+        if ([...groups.values()].some((skus) => skus.size > 1)) {
+          throw new AdapterError(
+            'INVALID',
+            'Variations that agree on the options the SKU goes by must share one SKU',
+          );
+        }
+      }
       if (
         products.every(
           (p) => !(byId.get(String(p.product_id))?.enabled ?? liveOffering(p)!.is_enabled ?? true),
@@ -383,7 +409,7 @@ export class EtsyAdapter implements PlatformAdapter {
                   10 ** minorDigits(currency),
               );
             return {
-              sku: ((single ? changes.sku : change?.sku) ?? p.sku ?? '').trim(),
+              sku: nextSku(p),
               property_values: (p.property_values ?? []).map((v) => ({
                 property_id: v.property_id,
                 property_name: v.property_name ?? undefined,
@@ -468,6 +494,12 @@ export class EtsyAdapter implements PlatformAdapter {
         const live = liveProducts(inventory);
         product.skus = [...new Set(live.map((p) => (p.sku ?? '').trim()).filter(Boolean))];
         product.variationCount = live.length;
+        const structure = skuStructure(
+          live.map(toVariation),
+          (inventory.sku_on_property ?? []).map(String),
+        );
+        product.skuBy = structure.by;
+        product.skuGroups = structure.groups;
       } catch (error) {
         if (ctx.signal?.aborted) throw error;
       }
@@ -539,11 +571,27 @@ function liveOffering(p: NonNullable<EtsyInventory['products']>[number]) {
   return p.offerings?.find((o) => !o.is_deleted);
 }
 
+/** The options the products are made of, in the order Etsy lists them. */
+function skuProperties(
+  products: NonNullable<EtsyInventory['products']>,
+): { id: string; name: string }[] {
+  const seen = new Map<string, string>();
+  for (const p of products) {
+    for (const v of p.property_values ?? []) {
+      if (!seen.has(String(v.property_id))) {
+        seen.set(String(v.property_id), unescapeHtml(v.property_name ?? ''));
+      }
+    }
+  }
+  return [...seen].map(([id, name]) => ({ id, name }));
+}
+
 function toVariation(p: NonNullable<EtsyInventory['products']>[number]): ProductVariation {
   const o = liveOffering(p)!;
   return {
     id: String(p.product_id ?? ''),
     options: (p.property_values ?? []).map((v) => ({
+      propertyId: String(v.property_id),
       name: unescapeHtml(v.property_name ?? ''),
       value: unescapeHtml((v.values ?? []).join(', ')),
     })),

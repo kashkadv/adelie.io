@@ -114,6 +114,10 @@ export interface ProductData {
   skus?: string[];
   /** Live variations (inventory products); absent = not read this time. */
   variationCount?: number;
+  /** Names of the options the SKU goes by (e.g. "Color"); empty = one SKU for the whole listing. */
+  skuBy?: string[];
+  /** How many SKUs the product should have: one per combination of the `skuBy` options. */
+  skuGroups?: number;
   listedAt?: Date;
 }
 
@@ -147,7 +151,7 @@ export interface OrderData {
 /** One variation of a product (e.g. a colour): its options, price, quantity, on sale or not. */
 export interface ProductVariation {
   id: string;
-  options: { name: string; value: string }[];
+  options: { propertyId: string; name: string; value: string }[];
   price: Money | null;
   quantity: number | null;
   enabled: boolean;
@@ -169,6 +173,10 @@ export interface ProductEditable {
   sku: string;
   /** Empty without variations. */
   variations: ProductVariation[];
+  /** The options the variations are made of (colour, size…) — what a SKU can go by. */
+  skuProperties: { id: string; name: string }[];
+  /** Ids of the options the SKU goes by; empty = one SKU for all variations. */
+  skuOnProperty: string[];
   /** Whether each variation has its own price / quantity (otherwise one value for all). */
   priceVaries: boolean;
   quantityVaries: boolean;
@@ -192,6 +200,8 @@ export interface ProductChanges {
   quantity?: number;
   /** The SKU of a product without variations; with variations — per variation. */
   sku?: string;
+  /** Which options the SKU goes by (ids from `skuProperties`). */
+  skuOnProperty?: string[];
   variations?: VariationChange[];
 }
 

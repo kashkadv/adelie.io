@@ -22,7 +22,7 @@ type Editable = {
   sku: string;
   variations: {
     id: string;
-    options: { name: string; value: string }[];
+    options: { propertyId: string; name: string; value: string }[];
     price: { amount: number; currency: string } | null;
     quantity: number | null;
     enabled: boolean;
@@ -31,8 +31,12 @@ type Editable = {
   /** Each variation has its own price / quantity; otherwise one value for all. */
   priceVaries: boolean;
   quantityVaries: boolean;
+  /** The options variations are made of, and the ones the SKU goes by. */
+  skuProperties: { id: string; name: string }[];
+  skuOnProperty: string[];
 };
-type Field = 'title' | 'description' | 'tags' | 'sku' | 'price' | 'quantity' | 'variations';
+type Field =
+  'title' | 'description' | 'tags' | 'sku' | 'price' | 'quantity' | 'skuOnProperty' | 'variations';
 /** A variation as edited: price in minor units. */
 type Var = {
   id: string;
@@ -62,13 +66,24 @@ type Values = {
   sku: string;
   price: number | null;
   quantity: number | null;
+  /** Ids of the options the SKU goes by, sorted. */
+  skuOnProperty: string[];
   variations: Var[];
 };
 
 /** Etsy's limits (the API checks the same, packages/platforms etsy/mapping.ts). */
 const LIMITS = { title: 140, tags: 13, tag: 20, quantity: 999, sku: 32 };
 const TAG = /^[\p{L}\p{N}\s\-'™©®]+$/u;
-const FIELDS: Field[] = ['title', 'description', 'tags', 'sku', 'price', 'quantity', 'variations'];
+const FIELDS: Field[] = [
+  'title',
+  'description',
+  'tags',
+  'sku',
+  'price',
+  'quantity',
+  'skuOnProperty',
+  'variations',
+];
 
 const valuesOf = (p: Editable): Values => ({
   title: p.title,
@@ -77,6 +92,7 @@ const valuesOf = (p: Editable): Values => ({
   sku: p.sku,
   price: p.price?.amount ?? null,
   quantity: p.quantity,
+  skuOnProperty: [...p.skuOnProperty].sort(),
   // Sorted by id, like the API compares them.
   variations: p.variations
     .map((v) => ({
@@ -258,6 +274,43 @@ export function ProductEditor({
       .find((v) => v.id === id)
       ?.options.map((o) => o.value)
       .join(' · ') ?? id;
+  /** The variation's value of an option (e.g. its colour) — what groups variations by SKU. */
+  const optionValue = (variationId: string, propertyId: string) =>
+    variationsOf.find((v) => v.id === variationId)?.options.find((o) => o.propertyId === propertyId)
+      ?.value ?? '';
+  const groupKey = (variationId: string, on: string[]) =>
+    on.map((id) => optionValue(variationId, id)).join('\u0000');
+  /** A SKU belongs to the whole group of variations that agree on the options it goes by. */
+  const setSku = (id: string, sku: string) =>
+    values &&
+    setValues({
+      ...values,
+      variations: values.variations.map((v) =>
+        groupKey(v.id, values.skuOnProperty) === groupKey(id, values.skuOnProperty)
+          ? { ...v, sku }
+          : v,
+      ),
+    });
+  /** Choosing what the SKU goes by regroups the variations; each group keeps one SKU. */
+  const toggleSkuOn = (propertyId: string) => {
+    if (!values) return;
+    const on = values.skuOnProperty.includes(propertyId)
+      ? values.skuOnProperty.filter((x) => x !== propertyId)
+      : [...values.skuOnProperty, propertyId].sort();
+    const first = new Map<string, string>();
+    for (const v of values.variations) {
+      const key = groupKey(v.id, on);
+      if (!first.get(key) && v.sku.trim()) first.set(key, v.sku.trim());
+    }
+    setValues({
+      ...values,
+      skuOnProperty: on,
+      variations: values.variations.map((v) => ({
+        ...v,
+        sku: first.get(groupKey(v.id, on)) ?? '',
+      })),
+    });
+  };
   /** One variation changed — or all of them, when the value is shared. */
   const setVar = (id: string, patch: Partial<Var>) =>
     values &&
@@ -382,6 +435,12 @@ export function ProductEditor({
     if (v === null || v === undefined || v === '') return '—';
     if (f === 'price') return money(v as number, currency);
     if (f === 'tags') return (v as string[]).join(', ');
+    if (f === 'skuOnProperty') {
+      const names = (v as string[]).map(
+        (id) => data?.current?.skuProperties.find((p) => p.id === id)?.name ?? id,
+      );
+      return names.length ? names.join(', ') : '—';
+    }
     return String(v);
   };
 
@@ -497,6 +556,35 @@ export function ProductEditor({
               {data.current?.hasVariations ? (
                 <div>
                   {label('variations', currency)}
+                  {/* What the SKU goes by: colour, size… or nothing (one SKU for all). */}
+                  {data.current.skuProperties.length > 0 && (
+                    <div className="mb-3">
+                      <span className="mb-1.5 flex items-center gap-1.5 px-3.5 text-xs text-muted">
+                        {t('skuBy')}
+                        <InfoTip text={t('skuByHint')} />
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {data.current.skuProperties.map((pr) => {
+                          const on = values.skuOnProperty.includes(pr.id);
+                          return (
+                            <button
+                              key={pr.id}
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() => toggleSkuOn(pr.id)}
+                              className={`h-9 rounded-full border px-3.5 text-sm transition-colors duration-150 ${
+                                on
+                                  ? 'border-transparent bg-hover text-foreground'
+                                  : 'border-line text-muted hover:text-foreground'
+                              }`}
+                            >
+                              {pr.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   {/* A shared price or quantity is edited once for every variation. */}
                   {(!data.current.priceVaries || !data.current.quantityVaries) && (
                     <div className="mb-3 grid grid-cols-2 gap-4">
@@ -550,7 +638,7 @@ export function ProductEditor({
                           aria-label={t('variationSku', { variation: optionsOf(v.id) })}
                           placeholder={t('fields.sku')}
                           value={v.sku}
-                          onChange={(e) => setVar(v.id, { sku: e.target.value })}
+                          onChange={(e) => setSku(v.id, e.target.value)}
                         />
                         {data.current!.priceVaries ? (
                           <input

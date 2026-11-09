@@ -11,11 +11,16 @@ export type IssueCode =
   | 'noTags'
   | 'noPins'
   | 'sharedSku'
+  | 'skuGaps'
   | 'fewTags'
   | 'skuFormat'
   | 'noViews';
 
-export type ProductIssue = { code: IssueCode; level: IssueLevel };
+export type ProductIssue = {
+  code: IssueCode;
+  level: IssueLevel;
+  params?: Record<string, string | number>;
+};
 
 /** Most serious first. */
 export const ISSUE_LEVELS: IssueLevel[] = ['critical', 'important', 'note'];

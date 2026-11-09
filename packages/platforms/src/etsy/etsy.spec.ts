@@ -3,7 +3,14 @@ import { HttpClient } from '../http.js';
 import { isAdapterError } from '../errors.js';
 import type { ProductData } from '../types.js';
 import { EtsyAdapter } from './adapter.js';
-import { ledgerCategory, mapReceipt, money, productChangeErrors, unescapeHtml } from './mapping.js';
+import {
+  ledgerCategory,
+  mapReceipt,
+  money,
+  productChangeErrors,
+  skuStructure,
+  unescapeHtml,
+} from './mapping.js';
 
 const TODAY = '2026-11-08';
 const PKCE = { verifier: 'v'.repeat(43), challenge: 'c'.repeat(43) };
@@ -176,6 +183,8 @@ describe('EtsyAdapter data', () => {
     for await (const p of adapter.listProducts(ctx(client, '345'))) products.push(...p);
     expect(products[0]!.skus).toEqual(['RUG-1', 'RUG-2']);
     expect(products[0]!.variationCount).toBe(4);
+    expect(products[0]!.skuBy).toEqual([]);
+    expect(products[0]!.skuGroups).toBe(1);
     expect(products[1]!.skus).toBeUndefined();
   });
 
@@ -485,7 +494,7 @@ describe('Etsy variations', () => {
     expect(p).toMatchObject({ hasVariations: true, priceVaries: true, quantityVaries: false });
     expect(p.variations[1]).toEqual({
       id: '2',
-      options: [{ name: 'Primary color', value: 'Brown' }],
+      options: [{ propertyId: '200', name: 'Primary color', value: 'Brown' }],
       price: { amount: 24000, currency: 'USD' },
       quantity: 2,
       enabled: true,
@@ -493,22 +502,106 @@ describe('Etsy variations', () => {
     });
   });
 
-  it('gives each variation its own SKU: sku_on_property grows to every property', async () => {
-    const { client, seen } = http({
-      '/v3/application/listings/7/inventory': [inventory, {}, inventory],
-      '/v3/application/listings/7': [listing],
-    });
-    await adapter.updateProduct(ctx(client), '7', {
-      variations: [
-        { id: '1', sku: 'PILLOW-NAT' },
-        { id: '2', sku: 'PILLOW-BRN' },
+  describe('SKU by option', () => {
+    // A jacket: colour × size; the CRM keeps one SKU per colour.
+    const jacketProduct = (id: number, color: string, size: string, sku: string) => ({
+      product_id: id,
+      sku,
+      is_deleted: false,
+      property_values: [
+        { property_id: 200, property_name: 'Color', value_ids: [1], values: [color] },
+        { property_id: 300, property_name: 'Size', value_ids: [2], values: [size] },
       ],
+      offerings: [{ price: usd(76000), quantity: 6, is_enabled: true, readiness_state_id: 5 }],
     });
-    const body = JSON.parse(String(seen.find((x) => x.init.method === 'PUT')!.init.body));
-    expect(body.products.map((p: { sku: string }) => p.sku)).toEqual(['PILLOW-NAT', 'PILLOW-BRN']);
-    expect(body.sku_on_property).toEqual([200]);
-    // price stays as it was
-    expect(body.products[1].offerings[0].price).toBe(240);
+    const jacket = (skuOn: number[], skus: string[]) => ({
+      products: [
+        jacketProduct(1, 'Black', 'XS', skus[0]!),
+        jacketProduct(2, 'Black', 'S', skus[1]!),
+        jacketProduct(3, 'Blue', 'XS', skus[2]!),
+        jacketProduct(4, 'Blue', 'S', skus[3]!),
+      ],
+      price_on_property: [],
+      quantity_on_property: [],
+      sku_on_property: skuOn,
+    });
+
+    it('describes how SKUs are organised: by which options, in how many groups', () => {
+      const vars = jacket([], ['', '', '', '']).products.map((p) => ({
+        options: p.property_values.map((v) => ({
+          propertyId: String(v.property_id),
+          name: v.property_name,
+          value: v.values[0]!,
+        })),
+      }));
+      expect(skuStructure(vars, [])).toEqual({ by: [], groups: 1 });
+      expect(skuStructure(vars, ['200'])).toEqual({ by: ['Color'], groups: 2 });
+      expect(skuStructure(vars, ['200', '300'])).toEqual({ by: ['Color', 'Size'], groups: 4 });
+      expect(skuStructure([], [])).toEqual({ by: [], groups: 1 });
+    });
+
+    it('reads which options the SKU goes by', async () => {
+      const { client } = http({
+        '/v3/application/listings/7': [{ ...listing, has_variations: true }],
+        '/v3/application/listings/7/inventory': [
+          jacket([200], ['J-BLK', 'J-BLK', 'J-BLU', 'J-BLU']),
+        ],
+      });
+      const p = await adapter.getProductForEdit(ctx(client), '7');
+      expect(p.skuProperties).toEqual([
+        { id: '200', name: 'Color' },
+        { id: '300', name: 'Size' },
+      ]);
+      expect(p.skuOnProperty).toEqual(['200']);
+    });
+
+    it('sets the SKU by colour: one SKU per colour, sku_on_property is the colour', async () => {
+      const { client, seen } = http({
+        '/v3/application/listings/7': [{ ...listing, has_variations: true }],
+        '/v3/application/listings/7/inventory': [
+          jacket([], ['X', 'X', 'X', 'X']),
+          {},
+          jacket([], ['', '', '', '']),
+        ],
+      });
+      await adapter.updateProduct(ctx(client), '7', {
+        skuOnProperty: ['200'],
+        variations: [
+          { id: '1', sku: 'J-BLK' },
+          { id: '2', sku: 'J-BLK' },
+          { id: '3', sku: 'J-BLU' },
+          { id: '4', sku: 'J-BLU' },
+        ],
+      });
+      const body = JSON.parse(String(seen.find((x) => x.init.method === 'PUT')!.init.body));
+      expect(body.sku_on_property).toEqual([200]);
+      expect(body.products.map((p: { sku: string }) => p.sku)).toEqual([
+        'J-BLK',
+        'J-BLK',
+        'J-BLU',
+        'J-BLU',
+      ]);
+    });
+
+    it('refuses two sizes of one colour with different SKUs when the SKU goes by colour', async () => {
+      const { client } = http({
+        '/v3/application/listings/7/inventory': [
+          jacket([200], ['J-BLK', 'J-BLK', 'J-BLU', 'J-BLU']),
+        ],
+      });
+      await expect(
+        adapter.updateProduct(ctx(client), '7', { variations: [{ id: '2', sku: 'J-BLK-S' }] }),
+      ).rejects.toSatisfy((e) => isAdapterError(e, 'INVALID'));
+    });
+
+    it('refuses an option the variations are not made of', async () => {
+      const { client } = http({
+        '/v3/application/listings/7/inventory': [jacket([], ['X', 'X', 'X', 'X'])],
+      });
+      await expect(
+        adapter.updateProduct(ctx(client), '7', { skuOnProperty: ['999'] }),
+      ).rejects.toSatisfy((e) => isAdapterError(e, 'INVALID'));
+    });
   });
 
   it('leaves sku_on_property alone when no SKU changes', async () => {

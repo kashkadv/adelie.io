@@ -12,6 +12,8 @@ const product = (over: Partial<IssueProduct> = {}): IssueProduct => ({
   tags: Array.from({ length: 13 }, (_, i) => `tag${i}`),
   skus: ['00031307'],
   variationCount: 1,
+  skuBy: [],
+  skuGroups: 1,
   listedAt: new Date('2026-01-01T00:00:00Z'),
   posts: 2,
   ...over,
@@ -46,7 +48,26 @@ describe('productIssues', () => {
     const dup = [product({ id: 'a' }), product({ id: 'b' })];
     expect(codes(dup, 'a')).toEqual(['critical:duplicateSku']);
     expect(codes(dup, 'b')).toEqual(['critical:duplicateSku']);
+    // several variations, the SKU goes by none of their options: one SKU for all
     expect(codes([product({ variationCount: 4 })])).toEqual(['important:sharedSku']);
+    // SKU by colour, every colour has its own: fine however many sizes there are
+    expect(
+      codes([
+        product({ variationCount: 8, skuBy: ['Color'], skuGroups: 2, skus: ['J-BLK', 'J-BLU'] }),
+      ]),
+    ).toEqual([]);
+    // a single colour with several sizes: one SKU is right
+    expect(
+      codes([product({ variationCount: 4, skuBy: ['Color'], skuGroups: 1, skus: ['J-BLK'] })]),
+    ).toEqual([]);
+    // 4 sizes with a SKU each wanted, only 3 filled or distinct
+    const gap = productIssues(
+      [product({ variationCount: 4, skuBy: ['Size'], skuGroups: 4, skus: ['R-1', 'R-2', 'R-3'] })],
+      NOW,
+    ).get('p1');
+    expect(gap).toEqual([
+      { code: 'skuGaps', level: 'important', params: { have: 3, groups: 4, by: 'Size' } },
+    ]);
     // variations not read yet: nothing to say
     expect(codes([product({ variationCount: null })])).toEqual([]);
     // a SKU repeated on an inactive listing is not ambiguous for sales

@@ -15,6 +15,7 @@ export type IssueCode =
   | 'noTags'
   | 'noPins'
   | 'sharedSku'
+  | 'skuGaps'
   | 'fewTags'
   | 'skuFormat'
   | 'noViews';
@@ -22,6 +23,8 @@ export type IssueCode =
 export interface Issue {
   code: IssueCode;
   level: IssueLevel;
+  /** Numbers and names the message quotes. */
+  params?: Record<string, string | number>;
 }
 
 export interface IssueProduct {
@@ -35,6 +38,10 @@ export interface IssueProduct {
   skus: string[];
   /** Live variations (inventory products); null = not read yet. */
   variationCount: number | null;
+  /** Options the SKU goes by; empty = one SKU for the whole listing. */
+  skuBy: string[];
+  /** SKUs the product should have (one per combination of the `skuBy` options); null = unknown. */
+  skuGroups: number | null;
   listedAt: Date | null;
   /** Posts (pins, captions) that lead to the product. */
   posts: number;
@@ -56,6 +63,7 @@ const level: Record<IssueCode, IssueLevel> = {
   noTags: 'important',
   noPins: 'important',
   sharedSku: 'important',
+  skuGaps: 'important',
   fewTags: 'note',
   skuFormat: 'note',
   noViews: 'note',
@@ -84,6 +92,7 @@ export function productIssues(
   const result = new Map<string, Issue[]>();
   for (const p of products) {
     const codes: IssueCode[] = [];
+    const params: Partial<Record<IssueCode, Issue['params']>> = {};
     if (p.state !== 'active') {
       if (p.posts > 0) codes.push('pinToUnavailable');
     } else {
@@ -95,7 +104,18 @@ export function productIssues(
       if (!p.tags.length) codes.push('noTags');
       // No pins, with or without sales: a product nobody is sent to has no traffic from there.
       if (p.posts === 0) codes.push('noPins');
-      if ((p.variationCount ?? 0) > 1 && p.skus.length === 1) codes.push('sharedSku');
+      // Several variations but the SKU goes by none of their options: one SKU for all of them.
+      if ((p.variationCount ?? 0) > 1 && !p.skuBy.length && p.skus.length) codes.push('sharedSku');
+      // The SKU goes by some options (colour…) but not every colour has a SKU of its own.
+      if (
+        p.skuBy.length &&
+        p.skuGroups !== null &&
+        p.skus.length > 0 &&
+        p.skus.length < p.skuGroups
+      ) {
+        codes.push('skuGaps');
+        params['skuGaps'] = { have: p.skus.length, groups: p.skuGroups, by: p.skuBy.join(', ') };
+      }
       if (p.tags.length > 0 && p.tags.length < MAX_TAGS) codes.push('fewTags');
       if (padded && p.skus.some((s) => digitsOnly(s) && !s.startsWith('0')))
         codes.push('skuFormat');
@@ -107,11 +127,16 @@ export function productIssues(
         codes.push('noViews');
       }
     }
-    if (codes.length)
+    if (codes.length) {
       result.set(
         p.id,
-        codes.map((code) => ({ code, level: level[code] })),
+        codes.map((code) => ({
+          code,
+          level: level[code],
+          ...(params[code] ? { params: params[code] } : {}),
+        })),
       );
+    }
   }
   return result;
 }

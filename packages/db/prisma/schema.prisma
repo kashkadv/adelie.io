@@ -666,6 +666,10 @@ model ShopProduct {
   skus        String[]      @default([])
   /// Live variations (Etsy inventory products); null = not read yet.
   variationCount Int?
+  /// Options the SKU goes by (e.g. ["Color"]); empty = one SKU for the whole listing.
+  skuBy       String[]      @default([])
+  /// How many SKUs the product should have: one per combination of the `skuBy` options.
+  skuGroups   Int?
   listedAt    DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt

@@ -583,6 +583,8 @@ export async function runSync(
               // Unset = the inventory could not be read this time: keep what is stored.
               ...(p.skus ? { skus: p.skus } : {}),
               ...(p.variationCount !== undefined ? { variationCount: p.variationCount } : {}),
+              ...(p.skuBy ? { skuBy: p.skuBy } : {}),
+              ...(p.skuGroups !== undefined ? { skuGroups: p.skuGroups } : {}),
               listedAt: p.listedAt ?? null,
             };
             await prisma.shopProduct.upsert({

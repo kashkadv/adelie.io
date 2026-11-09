@@ -77,7 +77,7 @@ function Issues({ product }: { product: Product }) {
     <InfoTip
       text={t('count', { count: product.issues.length })}
       lines={sortIssues(product.issues).map((i) => ({
-        text: t(`codes.${i.code}`),
+        text: t(`codes.${i.code}`, i.params),
         dotClassName: ISSUE_STYLE[i.level].dot,
       }))}
       trigger={<CircleAlert size={16} aria-hidden="true" />}

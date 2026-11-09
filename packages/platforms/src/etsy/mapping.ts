@@ -313,3 +313,23 @@ export function productChangeErrors(changes: {
   }
   return errors;
 }
+
+/**
+ * How the SKUs of a listing are organised: which options they go by and how many SKUs that makes
+ * (one per combination of those options' values — two colours × four sizes with SKU by colour is
+ * two groups). Without variations, or with SKU by nothing, it is one group.
+ */
+export function skuStructure(
+  variations: { options: { propertyId: string; name: string; value: string }[] }[],
+  skuOnProperty: string[],
+): { by: string[]; groups: number } {
+  const names = new Map<string, string>();
+  for (const v of variations) for (const o of v.options) names.set(o.propertyId, o.name);
+  const by = skuOnProperty.filter((id) => names.has(id));
+  const groups = new Set(
+    variations.map((v) =>
+      by.map((id) => v.options.find((o) => o.propertyId === id)?.value ?? '').join('\u0000'),
+    ),
+  );
+  return { by: by.map((id) => names.get(id)!), groups: Math.max(groups.size, 1) };
+}

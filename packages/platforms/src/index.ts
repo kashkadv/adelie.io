@@ -12,4 +12,9 @@ export {
   ETSY_WRITE_SCOPES,
   etsyScopes,
 } from './etsy/adapter.js';
-export { ETSY_LIMITS, productChangeErrors, type ProductChangeError } from './etsy/mapping.js';
+export {
+  ETSY_LIMITS,
+  productChangeErrors,
+  skuStructure,
+  type ProductChangeError,
+} from './etsy/mapping.js';

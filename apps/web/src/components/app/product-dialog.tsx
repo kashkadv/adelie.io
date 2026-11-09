@@ -33,6 +33,8 @@ type Detail = {
   favorers: number | null;
   tags: string[];
   skus: string[];
+  /** Options the SKU goes by ("Color"); empty = one SKU for the whole listing. */
+  skuBy: string[];
   listedAt: string | null;
   account: { username: string | null; displayName: string | null; platform: 'ETSY' };
   sales: {
@@ -281,7 +283,7 @@ export function ProductDialog({
                                 aria-hidden="true"
                               />
                               <span>
-                                {ti(`codes.${i.code}`)}{' '}
+                                {ti(`codes.${i.code}`, i.params)}{' '}
                                 <span className="text-xs text-muted">
                                   ({ti(`levels.${i.level}`)})
                                 </span>
@@ -303,6 +305,11 @@ export function ProductDialog({
                       {t('sku', { count: detail.skus.length })}
                       <InfoTip text={t('skuHint')} />
                     </p>
+                    {detail.skuBy.length > 0 && (
+                      <p className="mb-2 text-xs text-muted">
+                        {t('skuBy', { options: detail.skuBy.join(', ') })}
+                      </p>
+                    )}
                     {detail.skus.length ? (
                       <div className="flex flex-wrap gap-1.5">
                         {detail.skus.map((sku) => (

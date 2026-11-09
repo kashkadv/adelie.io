@@ -19,6 +19,7 @@ import {
   isAdapterError,
   productKeys,
   productChangeErrors,
+  skuStructure,
   type ProductChanges,
   type ProductEditable,
 } from '@adelie/platforms';
@@ -232,6 +233,8 @@ export class SalesController {
         favorers: true,
         tags: true,
         skus: true,
+        skuBy: true,
+        skuGroups: true,
         listedAt: true,
         updatedAt: true,
         account: { select: { id: true, username: true, displayName: true, platform: true } },
@@ -366,7 +369,9 @@ export class SalesController {
             }))
           : k === 'sku'
             ? c.sku?.trim()
-            : c[k];
+            : k === 'skuOnProperty'
+              ? [...(c.skuOnProperty ?? [])].sort()
+              : c[k];
       const conflict = (Object.keys(changes) as (keyof ProductChanges)[]).some(
         (k) => k in expected && !same(valueOf(live, k), asked(expected, k)),
       );
@@ -440,6 +445,7 @@ export class SalesController {
                 .filter(Boolean),
             ),
           ],
+          ...skuLayout(after),
           price: after.price?.amount ?? null,
           currency: after.price?.currency ?? undefined,
           quantity: after.quantity,
@@ -531,6 +537,8 @@ export class SalesController {
           tags: true,
           skus: true,
           variationCount: true,
+          skuBy: true,
+          skuGroups: true,
           listedAt: true,
           account: { select: { id: true, username: true, platform: true } },
         },
@@ -579,7 +587,7 @@ export class SalesController {
     }
     return {
       period: period ? { from: period.from, to: period.to } : null,
-      items: products.map(({ externalId, tags, variationCount, ...p }) => ({
+      items: products.map(({ externalId, tags, variationCount, skuGroups, ...p }) => ({
         ...p,
         sold: sold.get(p.id)?.units ?? 0,
         revenue: sold.get(p.id)?.revenue ?? 0,
@@ -806,7 +814,18 @@ function normalizeVariations(
 function valueOf(p: ProductEditable, key: keyof ProductChanges): unknown {
   if (key === 'price') return p.price?.amount ?? null;
   if (key === 'variations') return normalizeVariations(p.variations);
+  if (key === 'skuOnProperty') return [...p.skuOnProperty].sort();
   return p[key];
+}
+
+/** Our copy of how the product's SKUs are organised, after a save. */
+function skuLayout(p: ProductEditable) {
+  const { by, groups } = skuStructure(p.variations, p.skuOnProperty);
+  return {
+    variationCount: p.variations.length || 1,
+    skuBy: by,
+    skuGroups: groups,
+  };
 }
 
 function same(a: unknown, b: unknown): boolean {
@@ -831,6 +850,9 @@ function parseChanges(raw: unknown): ProductChanges {
   if (typeof r['price'] === 'number') out.price = r['price'];
   if (typeof r['quantity'] === 'number') out.quantity = r['quantity'];
   if (typeof r['sku'] === 'string') out.sku = r['sku'].trim();
+  if (Array.isArray(r['skuOnProperty']) && r['skuOnProperty'].every((x) => typeof x === 'string')) {
+    out.skuOnProperty = r['skuOnProperty'] as string[];
+  }
   if (Array.isArray(r['variations'])) {
     const list = (r['variations'] as Record<string, unknown>[]).filter(
       (v) => v && typeof v['id'] === 'string',
