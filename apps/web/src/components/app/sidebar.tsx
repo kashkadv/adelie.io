@@ -2,6 +2,7 @@
 
 import {
   FileChartColumn,
+  Footprints,
   Images,
   ChartColumn,
   House,
@@ -24,6 +25,7 @@ type NavKey =
   | 'content'
   | 'products'
   | 'orders'
+  | 'flipper'
   | 'reports'
   | 'connections'
   | 'settings';
@@ -33,7 +35,7 @@ type NavItem = { key: NavKey; href: string; icon: LucideIcon };
  * Sections by the question they answer (ADR-0018): Promotion — "where am I seen and what comes of
  * it?", Sales — "what do people buy?". Connections are set-up, not a place for analysis.
  */
-const NAV: { group?: 'promotion' | 'sales'; items: NavItem[] }[] = [
+const NAV: { group?: 'promotion' | 'sales' | 'site'; items: NavItem[] }[] = [
   {
     items: [
       { key: 'home', href: '/', icon: House },
@@ -48,6 +50,8 @@ const NAV: { group?: 'promotion' | 'sales'; items: NavItem[] }[] = [
       { key: 'orders', href: '/orders', icon: ReceiptText },
     ],
   },
+  // Flipper: what visitors do on the site (ADR-0022).
+  { group: 'site', items: [{ key: 'flipper', href: '/flipper', icon: Footprints }] },
   {
     items: [
       { key: 'reports', href: '/reports', icon: FileChartColumn },

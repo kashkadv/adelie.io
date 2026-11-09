@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { auth } from './auth/auth.js';
+import { FlipperController } from './flipper/flipper.controller.js';
+import { FlipperIngestController } from './flipper/flipper-ingest.controller.js';
 import { ContentController } from './content/content.controller.js';
 import { HealthController } from './health.controller.js';
 import { OverviewController } from './overview/overview.controller.js';
@@ -21,6 +23,8 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
   imports: [AuthModule.forRoot({ auth })],
   controllers: [
     ContentController,
+    FlipperController,
+    FlipperIngestController,
     HealthController,
     InvitationsController,
     OverviewController,

@@ -51,8 +51,10 @@
     "closeMenu": "Close menu",
     "groups": {
       "promotion": "Promotion",
-      "sales": "Sales"
-    }
+      "sales": "Sales",
+      "site": "Site"
+    },
+    "flipper": "Flipper"
   },
   "Overview": {
     "title": "Statistics",
@@ -1133,6 +1135,101 @@
         "INVALID_URL": "the address is not valid",
         "TOO_LARGE": "the page is too large",
         "BAD_STATUS": "unexpected answer"
+      }
+    }
+  },
+  "Flipper": {
+    "title": "Flipper",
+    "subtitle": "What visitors do on your site: views, the funnel, traffic sources.",
+    "noSitesTitle": "Connect a site first",
+    "noSitesText": "Flipper works for sites connected to the project through a product feed. Connect a site and its install code appears here.",
+    "connectSite": "Connect a site",
+    "site": "Site",
+    "enableTitle": "Switch Flipper on for {site}",
+    "enableText": "We create the site id and the install code: two lines that go on your pages. Events start arriving right after that.",
+    "enable": "Switch on",
+    "noPermission": "Flipper can be switched on by an owner, an admin or a manager.",
+    "install": "Install code",
+    "lastEvent": "Last event: {date}",
+    "waiting": "Waiting for the first event",
+    "siteId": "Site id",
+    "period": "Period",
+    "days": "{count} days",
+    "consentShare": "{percent}% of events come from visitors who agreed",
+    "consentHint": "Without cookie consent Flipper counts views and unique visitors per day, but does not recognise a person across pages and days. The funnel and returning visitors count only those who agreed.",
+    "events": {
+      "PageView": "Page views",
+      "ViewCategory": "Category views",
+      "ProductView": "Product views",
+      "AddToCart": "Added to cart",
+      "BeginCheckout": "Checkout started"
+    },
+    "visitorsPerDay": "Unique visitors per day",
+    "visitorsHint": "Each person is counted once a day: with consent by a persistent id, without it by an anonymous daily hash that does not link days. This is an estimate.",
+    "funnel": "Funnel (with consent only)",
+    "funnelHint": "How many unique visitors who agreed reached each step. The percentage is of the previous step.",
+    "channels": "Channels (page views)",
+    "noChannels": "Sources appear when visits with utm labels or from other sites arrive.",
+    "topProducts": "Most viewed products",
+    "live": "Live events",
+    "liveHint": "The latest events, refreshed by themselves. ● the visitor agreed and is recognised, ○ anonymous (a hash for the day). Bots are not shown.",
+    "noEvents": "No events yet. Add the code to your site and open it.",
+    "known": "Recognised visitor (consent given)",
+    "anonymous": "Anonymous (no consent)",
+    "guideTitle": "How to install and set up events",
+    "copy": "Copy",
+    "copied": "Copied",
+    "guide": {
+      "install": {
+        "title": "1. Installation",
+        "lead": "Add two lines to the head of every page (or once in a shared template). The first is a tiny stub so calls made before the script loads are not lost. The second is the script itself: it loads asynchronously, does not slow the site down and its errors never break the page.",
+        "next": "In Next.js this goes in the root layout. If one codebase serves several domains, the id is chosen by host (the example is for gushka.ua and gushka.world).",
+        "options": "Options are attributes of the script tag: data-consent=\"granted\" (do not wait for consent — see below), data-spa=\"false\" (do not count route changes as page views), data-auto-pageview=\"false\" (do not count the page view automatically), data-allow-params=\"page,sort\" (which more address parameters may be sent; by default only utm and click ids), data-link-domains=\"gushka.world\" (carry the visitor to your other domain)."
+      },
+      "consent": {
+        "title": "2. Cookie consent",
+        "lead": "By default Flipper is anonymous: it writes nothing to the browser, sets no cookie, and counts views and unique visitors per day. When the visitor agrees to analytics, call consent — then there is a persistent visitor, sessions, the funnel and the source they came from. If the visitor declines, call consent denied and Flipper stops sending.",
+        "dnt": "Flipper respects Do Not Track and Global Privacy Control: nothing is sent for such visitors. If your site runs on a basis that does not need consent, put data-consent=\"granted\" on the script tag."
+      },
+      "events": {
+        "title": "3. Shop events",
+        "lead": "Four events follow the buyer’s way. Names and properties are standard, so reports and the funnel work without extra set-up.",
+        "where": "The simplest is to call them from your site’s code when the thing has really happened (not on the click: a click does not mean the product was added).",
+        "next": "In Next.js a page view is tracked by a component, and add-to-cart in the button handler, after the cart accepted the product.",
+        "types": "So that TypeScript knows window.flipper:",
+        "names": {
+          "viewCategory": "ViewCategory",
+          "productView": "ProductView",
+          "addToCart": "AddToCart",
+          "beginCheckout": "BeginCheckout"
+        },
+        "when": {
+          "viewCategory": "a category page was opened",
+          "productView": "a product page was opened (id is the article, the same as g:id in your feed)",
+          "addToCart": "a product was added to the cart (after the cart answered)",
+          "beginCheckout": "checkout was started"
+        }
+      },
+      "attributes": {
+        "title": "4. No code: data attributes",
+        "lead": "For buttons and links you can do without JavaScript: add the attributes and a click on the element sends the event.",
+        "note": "All data-flipper-* attributes become properties of the event: data-flipper-item-id becomes item_id. Numbers are recognised automatically. Handy for simple sites and site builders."
+      },
+      "domains": {
+        "title": "5. Two domains",
+        "lead": "Each domain is a separate site with its own id, so markets (hryvnia and dollars) are counted apart. So that a visitor who moves from one of your domains to the other is not counted as two people, put the other address in data-link-domains: links between the domains carry the visitor id (only with their consent), and on the second domain it is picked up and removed from the address.",
+        "geo": "If you have a geo redirect (for instance gushka.world → gushka.ua for Ukrainian IPs), make sure it keeps the address parameters: then utm labels are not lost and the source stays the original one."
+      },
+      "sources": {
+        "title": "6. Traffic sources",
+        "lead": "The source comes from the address the visitor arrived on (utm labels and click ids: gclid, fbclid, ttclid, epik, msclkid), and without them from the site they came from. An example link for a Pinterest post:",
+        "rules": "Write values in lower case, without spaces, the same for one source (always pinterest). Do not add labels to links inside your site. Source, medium and channel (Organic Social, Paid Search, Email, Referral, Direct…) are stored separately."
+      },
+      "check": {
+        "title": "7. Checking",
+        "lead": "Open a page of the site with the parameter flipper_debug=1: every event appears in the browser console. Then look at “Live events” on this page.",
+        "problems": "No events? Check: the script loaded (Network tab, the request to flipper.js), the collect request returned 204, the site is opened from an allowed domain, an ad blocker has not blocked the script.",
+        "purchase": "Purchase is deliberately not sent from the browser: a click or a “thank you” page is not proof of payment. We will add it separately, as a server event from your backend after the payment is confirmed."
       }
     }
   }

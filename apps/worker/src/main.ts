@@ -95,6 +95,8 @@ const systemWorker = new Worker<HeartbeatJob>(
 // ---------- Sync queue ----------
 const syncQueue = new Queue<SyncAccountJob | Record<string, never>>(QUEUES.sync, { connection });
 let lastPurgeDay = '';
+/** How long website events are kept (ADR-0022). */
+const EVENT_RETENTION_DAYS = 425;
 
 /** Enqueues a sync for every account that is due; one job per account (job id dedupes). */
 async function tick(): Promise<number> {
@@ -125,6 +127,14 @@ async function tick(): Promise<number> {
     lastPurgeDay = today;
     const purged = await purgeOldPayloads(prisma, now);
     if (purged) console.log(`[sync] purged ${purged} raw payloads older than 90 days`);
+    // Flipper's events are kept as long as the data minimisation allows: 14 months.
+    const events = await prisma.websiteEvent.deleteMany({
+      where: { occurredAt: { lt: new Date(now.getTime() - EVENT_RETENTION_DAYS * 86_400_000) } },
+    });
+    if (events.count)
+      console.log(
+        `[flipper] purged ${events.count} events older than ${EVENT_RETENTION_DAYS} days`,
+      );
   }
   return queued;
 }

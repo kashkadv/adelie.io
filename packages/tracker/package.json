@@ -1,0 +1,22 @@
+{
+  "name": "@adelie/tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Flipper — Adelie's website tracker: one small script, served from the API.",
+  "exports": {
+    ".": {
+      "default": "./dist/flipper.js"
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "jsdom": "^31.0.0",
+    "vitest": "^4.1.2"
+  }
+}

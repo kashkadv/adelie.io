@@ -339,6 +339,7 @@ model SocialAccount {
   ledger       ShopLedgerEntry[]
   audiences    AccountAudience[]
   invitations  ConnectInvitation[]
+  trackedSite  TrackedSite?
 
   @@unique([workspaceId, platform, externalId])
   @@index([projectId])
@@ -879,4 +880,63 @@ model ProductSeoCheck {
 
   @@index([productId, createdAt])
   @@map("product_seo_check")
+}
+
+/// A website that sends events through Flipper, Adelie's tracker (ADR-0022). One per connected site.
+model TrackedSite {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  workspaceId  String        @db.Uuid
+  projectId    String        @db.Uuid
+  accountId    String        @unique @db.Uuid
+  account      SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// The id in the install snippet: it names the site, it is not a secret ("fl_" + random).
+  publicId     String        @unique
+  /// Hosts the site's events may come from (the feed's host to begin with). A hint against
+  /// misuse, not authentication: browsers can be made to send anything.
+  allowedHosts String[]      @default([])
+  createdAt    DateTime      @default(now())
+
+  events WebsiteEvent[]
+
+  @@index([projectId])
+  @@map("tracked_site")
+}
+
+/// One event of a visitor on a tracked site. Without consent (`consent` false) nothing identifies
+/// the visitor: no visitor or session id, only what happened and where it came from.
+model WebsiteEvent {
+  id           String      @id @default(uuid(7)) @db.Uuid
+  siteId       String      @db.Uuid
+  site         TrackedSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  /// The browser's id for the event: a repeated send is not a second event.
+  eventId      String
+  name         String
+  occurredAt   DateTime
+  receivedAt   DateTime    @default(now())
+  consent      Boolean
+  visitorId    String?
+  sessionId    String?
+  /// Without consent: a hash of what the request carried (address, browser, the site) with a salt
+  /// that changes every day — it counts one visitor once a day and cannot follow anyone across days.
+  dailyId      String?
+  /// The page address without its query (only the allowed parameters are kept elsewhere).
+  url          String
+  title        String?
+  referrerHost String?
+  /// Where the visit came from: separate parts, as read from the landing address and referrer.
+  source       String?
+  medium       String?
+  campaign     String?
+  content      String?
+  term         String?
+  clickIdType  String?
+  channel      String?
+  device       String?
+  isBot        Boolean     @default(false)
+  properties   Json?
+
+  @@unique([siteId, eventId])
+  @@index([siteId, occurredAt])
+  @@index([siteId, name, occurredAt])
+  @@map("website_event")
 }

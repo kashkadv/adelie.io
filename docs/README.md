@@ -10,6 +10,7 @@
 | [decisions/](decisions/) | Архітектурні рішення (ADR) |
 | [plans/](plans/) | Плани реалізації |
 | [specs/tracker.md](specs/tracker.md) | Adelie Tracker: події на сайті, джерела трафіку, атрибуція (концепція) |
+| [guides/flipper.md](guides/flipper.md) | Flipper: швидкий старт (встановлення, події магазину, згода, два домени, джерела) |
 | [specs/pebble.md](specs/pebble.md) | Pebble: пошук трендів і комерційних можливостей (ідея, формат не визначено) |
 | [plans/mvp-1.md](plans/mvp-1.md) | План MVP-1: Pinterest end-to-end (в роботі) |
 | [plans/stage-2-data-model.md](plans/stage-2-data-model.md) | Етап 2: модель даних соцмереж і метрик (узгоджено) |
@@ -41,4 +42,5 @@
 - [ADR-0018](decisions/0018-promotion-and-sales.md) — Джерела даних: просування й продажі (прийнято)
 - [ADR-0019](decisions/0019-connection-access-levels.md) — Рівні доступу підключень (прийнято)
 - [ADR-0020](decisions/0020-connection-features-update-access.md) — Функції підключення й «Оновити доступ» (прийнято)
-- [ADR-0021](decisions/0021-website-catalog-feeds.md) — Каталог сайтів через фід Google Merchant, кілька сайтів-ринків (запропоновано)
+- [ADR-0021](decisions/0021-website-catalog-feeds.md) — Каталог сайтів через фід Google Merchant, кілька сайтів-ринків (прийнято)
+- [ADR-0022](decisions/0022-flipper-tracker.md) — Flipper: трекер подій сайту (прийнято)
