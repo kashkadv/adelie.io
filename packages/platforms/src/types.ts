@@ -122,6 +122,8 @@ export interface ProductData {
   variationOptions?: string[];
   /** A site feed's own fields (description, brand, category…); absent for shops. */
   details?: Record<string, string>;
+  /** The product's category as the channel gives it (a site feed's `product_type`). */
+  category?: string;
   listedAt?: Date;
 }
 

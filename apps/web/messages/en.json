@@ -748,7 +748,8 @@
         "lacks": "Not on {name}",
         "lacksSites": "Not on any site"
       },
-      "linked": "Linked products +{count}"
+      "linked": "Linked products +{count}",
+      "category": "Category"
     },
     "orders": {
       "title": "Orders",

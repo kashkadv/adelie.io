@@ -42,6 +42,8 @@ describe('feed parsing', () => {
       price: { amount: 840000, currency: 'UAH' },
     });
     expect(b?.state).toBe('sold_out');
+    expect(mapFeedItem({ id: '1', title: 'T', product_type: ' Килими ' })?.category).toBe('Килими');
+    expect(mapFeedItem({ id: '1', title: 'T' })?.category).toBeUndefined();
     expect(c).toBeNull();
   });
 });

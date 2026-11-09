@@ -73,6 +73,7 @@ export function mapFeedItem(item: FeedItem): ProductData | null {
     // The id is the article: what the product is matched to Etsy by.
     skus: [id],
     details: detailsOf(item),
+    category: item['product_type']?.trim() || undefined,
   };
 }
 

@@ -891,6 +891,7 @@ export class SalesController {
           tags: true,
           skus: true,
           articles: true,
+          category: true,
           variationCount: true,
           skuBy: true,
           skuGroups: true,

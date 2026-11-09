@@ -46,6 +46,8 @@ type Product = {
   views: number | null;
   favorers: number | null;
   skus: string[];
+  /** The category the channel gives it (a site feed's product type). */
+  category: string | null;
   listedAt: string | null;
   /** null = not known (a site has no orders): shown as "—", never as 0. */
   sold: number | null;
@@ -125,6 +127,8 @@ export function Products() {
   const shops = useShops(true);
   /** The channel (shop or site) whose products are shown; the first one until chosen. */
   const [chosen, setChosen] = useState('');
+  /** The category chosen on a channel that has them (sites); '' = all. */
+  const [category, setCategory] = useState('');
   /** On / not on another channel: '', 'has:<id>', 'lacks:<id>' or 'lacksSites'. */
   const [presence, setPresence] = useState('');
   /** Rows opened to show the same product on the other channels. */
@@ -190,6 +194,14 @@ export function Products() {
     () => STATES.filter((s) => shown?.items.some((p) => p.state === s)),
     [shown],
   );
+  /** The categories of the channel's products, the biggest first. */
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of shown?.items ?? []) {
+      if (p.category) counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+    }
+    return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [shown]);
   /** How many products have each problem, for the problems filter. */
   const issueCounts = useMemo(() => {
     const counts: Partial<Record<IssueCode, number>> = {};
@@ -215,6 +227,7 @@ export function Products() {
       (p) =>
         (!state || p.state === state) &&
         (!pins || (pins === 'with' ? p.posts > 0 : p.posts === 0)) &&
+        (!category || p.category === category) &&
         matchesPresence(p) &&
         (!issueCodes.length || p.issues.some((i) => issueCodes.includes(i.code))) &&
         (!q ||
@@ -233,7 +246,7 @@ export function Products() {
       return (b.listedAt ?? '').localeCompare(a.listedAt ?? '');
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `matchesPresence` follows `presence`
-  }, [shown, state, pins, issueCodes, presence, search, sort]);
+  }, [shown, state, pins, issueCodes, presence, category, search, sort]);
 
   const openIndex = openId ? items.findIndex((p) => p.id === openId) : -1;
 
@@ -241,6 +254,7 @@ export function Products() {
   const switchChannel = (id: string) => {
     setChosen(id);
     setPresence('');
+    setCategory('');
     setIssueCodes([]);
     setPins('');
     setExpanded(new Set());
@@ -352,6 +366,20 @@ export function Products() {
           options={states.map((s) => ({ value: s, label: t(`states.${s}`) }))}
           clearLabel={tc('clearFilter')}
         />
+        {categories.length > 0 && (
+          <FilterChip
+            label={t('products.category')}
+            value={category}
+            onChange={setCategory}
+            options={categories.map(([name, count]) => ({
+              value: name,
+              label: name,
+              hint: String(count),
+            }))}
+            clearLabel={tc('clearFilter')}
+            searchable={categories.length > 8}
+          />
+        )}
         <FilterChip
           label={t('products.pins')}
           value={pins}
