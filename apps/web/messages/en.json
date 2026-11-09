@@ -1345,6 +1345,27 @@
     "livePrev": "Newer events",
     "liveNext": "Older events",
     "tabAnalytics": "Analytics",
-    "tabSettings": "Settings and installation"
+    "tabSettings": "Settings and installation",
+    "tabSources": "Sources",
+    "srcTitle": "Sources in detail",
+    "srcHint": "Visits count arrivals, also of those who did not agree. The steps after the visit (product views, cart, checkout) count the visitors who agreed, because only they can be followed, so for sites in anonymous mode they are lower. Purchases and revenue come from the server report. Click a channel to see its sources and campaigns.",
+    "srcGroupBy": "Group by",
+    "srcChannel": "Channel: {channel}",
+    "srcDrill": "Show the sources of this channel",
+    "srcVisits": "Visits",
+    "srcProductViews": "Product views",
+    "srcAddToCart": "Added to cart",
+    "srcCheckouts": "Checkouts",
+    "srcPurchases": "Purchases",
+    "srcRevenue": "Revenue",
+    "srcBy": {
+      "channel": "Channel",
+      "source_medium": "Source / medium",
+      "source": "Source",
+      "medium": "Medium",
+      "campaign": "Campaign",
+      "content": "Content",
+      "term": "Term"
+    }
   }
 }

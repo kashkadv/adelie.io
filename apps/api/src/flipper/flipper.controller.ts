@@ -37,6 +37,17 @@ const hostOf = (url: string): string | null => {
 };
 
 /** The funnel of a shop, in the order a customer goes through it. */
+/** What the sources report can be grouped by: a fixed list, so no column name comes from outside. */
+const GROUPS = {
+  channel: Prisma.raw('"channel"'),
+  source: Prisma.raw('"source"'),
+  medium: Prisma.raw('"medium"'),
+  source_medium: Prisma.raw(`concat("source", ' / ', "medium")`),
+  campaign: Prisma.raw('"campaign"'),
+  content: Prisma.raw('"content"'),
+  term: Prisma.raw('"term"'),
+} as const;
+
 export const FUNNEL = [
   'ViewCategory',
   'ProductView',
@@ -257,6 +268,58 @@ export class FlipperController {
         visitor: (visitorId ?? dailyId)?.slice(0, 6) ?? null,
       })),
     };
+  }
+
+  /**
+   * Where the visitors came from, in detail: by channel, source, medium, campaign, content or
+   * term (optionally within one channel). Visits count arrivals (also of those who did not agree);
+   * the steps after that count the visitors who agreed, since only they are followed.
+   */
+  @Get(':accountId/sources')
+  async sources(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Query('days') days: string | undefined,
+    @Query('by') by: string | undefined,
+    @Query('channel') channel: string | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const site = await this.siteOf(request.workspace, projectId, accountId);
+    const n = [7, 30, 90].includes(Number(days)) ? Number(days) : 7;
+    const since = new Date(Date.now() - n * 86_400_000);
+    const group = GROUPS[(by ?? 'channel') as keyof typeof GROUPS] ?? GROUPS.channel;
+    const within = channel ? Prisma.sql`AND "channel" = ${channel}` : Prisma.empty;
+    const rows = await this.prisma.client.$queryRaw<
+      {
+        label: string;
+        visits: number;
+        visitors: number;
+        productViews: number;
+        addToCart: number;
+        checkouts: number;
+        purchases: number;
+        revenue: number | null;
+      }[]
+    >`
+      SELECT coalesce(nullif(nullif(${group}, ''), ' / '), '(none)') AS label,
+        (count(DISTINCT "sessionId") FILTER (WHERE consent AND name = 'PageView')
+          + count(*) FILTER (WHERE NOT consent AND name = 'PageView'))::int AS visits,
+        count(DISTINCT "visitorId") FILTER (WHERE name = 'PageView')::int AS visitors,
+        count(DISTINCT "visitorId") FILTER (WHERE name = 'ProductView')::int AS "productViews",
+        count(DISTINCT "visitorId") FILTER (WHERE name = 'AddToCart')::int AS "addToCart",
+        count(DISTINCT "visitorId") FILTER (WHERE name = 'BeginCheckout')::int AS checkouts,
+        count(*) FILTER (WHERE name = 'Purchase')::int AS purchases,
+        sum(CASE WHEN name = 'Purchase' AND jsonb_typeof(properties->'value') = 'number'
+                 THEN (properties->>'value')::numeric END)::float8 AS revenue
+      FROM website_event
+      WHERE "siteId" = ${site.id}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
+        AND "channel" IS NOT NULL ${within}
+      GROUP BY 1 ORDER BY visits DESC, purchases DESC LIMIT 200`;
+    const currency = await this.prisma.client.$queryRaw<{ currency: string | null }[]>`
+      SELECT properties->>'currency' AS currency FROM website_event
+      WHERE "siteId" = ${site.id}::uuid AND name = 'Purchase' AND properties->>'currency' IS NOT NULL
+      ORDER BY "occurredAt" DESC LIMIT 1`;
+    return { days: n, currency: currency[0]?.currency ?? null, rows };
   }
 
   /**
