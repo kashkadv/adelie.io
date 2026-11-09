@@ -282,7 +282,8 @@ export function Products() {
   }
 
   const cell = (p: Product, c: Column) => {
-    if (c === 'price') return money(p.price, p.currency);
+    // A site's prices have no kopecks or cents: shown whole.
+    if (c === 'price') return money(p.price, p.currency, p.account.platform === 'WEBSITE');
     const v = p[c];
     return v === null ? '—' : format.number(v);
   };
@@ -635,7 +636,7 @@ export function Products() {
                           </span>
                         </span>
                         <span className="tabular shrink-0 text-sm">
-                          {money(e.price, e.currency)}
+                          {money(e.price, e.currency, e.account.platform === 'WEBSITE')}
                         </span>
                         {e.url && (
                           <a

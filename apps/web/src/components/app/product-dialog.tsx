@@ -471,7 +471,7 @@ function Elsewhere({ detail }: { detail: Detail }) {
             <span className="min-w-0 flex-1">
               <span className="block truncate">{c.title}</span>
               <span className="text-xs text-muted">
-                {channel(c)} · {money(c.price, c.currency)}
+                {channel(c)} · {money(c.price, c.currency, c.account.platform === 'WEBSITE')}
               </span>
             </span>
             {c.url && (
@@ -698,7 +698,7 @@ export function ProductDialog({
   const isSite = detail?.account.platform === 'WEBSITE';
   const stats: { id: string; value: string; hint?: string }[] = detail
     ? [
-        { id: 'price', value: money(detail.price, detail.currency) },
+        { id: 'price', value: money(detail.price, detail.currency, isSite) },
         { id: 'quantity', value: count(detail.quantity) },
         { id: 'views', value: count(detail.views), hint: ts('products.hints.views') },
         { id: 'favorers', value: count(detail.favorers), hint: ts('products.hints.favorers') },
