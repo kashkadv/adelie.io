@@ -946,7 +946,7 @@
         "noViews": "No views a month after publishing.",
         "skuGaps": "The SKU goes by {by}: only {have} of {groups} groups have their own SKU — some lack one or share it.",
         "skuOneForAll": "The variations differ by {options}, but one SKU is set for all — most likely a mistake. Choose in the editor what the SKU goes by.",
-        "skuPattern": "SKU {skus} does not look like your numeric codes (digits only) — probably a wrong one."
+        "skuPattern": "SKU {skus} does not match the expected format — most likely a wrong one."
       },
       "none": "No issues found",
       "title": "Possible improvements",
@@ -963,7 +963,7 @@
         "skuOneForAll": "Several options, one SKU for all",
         "fewTags": "Fewer than 13 tags",
         "noViews": "No views in a month",
-        "skuPattern": "SKU is not a numeric code"
+        "skuPattern": "Invalid SKU"
       },
       "selected": "{count} selected"
     }
