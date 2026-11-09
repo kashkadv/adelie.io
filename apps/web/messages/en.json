@@ -447,6 +447,20 @@
         "otherProject": "This site is already connected to another project.",
         "failed": "Could not connect the site."
       }
+    },
+    "rename": "Rename",
+    "move": "Move {name}",
+    "renameDialog": {
+      "title": "Name of the connection",
+      "lead": "How it is called in Adelie: in lists, switches and filters.",
+      "name": "Name",
+      "nameHint": "Your own name; syncing keeps it. Reset it to go back to the name the platform gives.",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "close": "Close",
+      "reset": "Reset to the platform’s name",
+      "failed": "Could not save the name."
     }
   },
   "Invite": {

@@ -353,8 +353,8 @@ export async function runSync(
         where: { id: account.id },
         data: {
           username: a.username ?? null,
-          // A site's name is what the member typed when connecting it, not the host.
-          ...(account.platform === 'WEBSITE' ? {} : { displayName: a.displayName ?? null }),
+          // A name the member gave the account stays.
+          ...(account.displayNameCustom ? {} : { displayName: a.displayName ?? null }),
           avatarUrl: a.avatarUrl ?? null,
           accountType: a.accountType ?? null,
           followersCount: a.followersCount,

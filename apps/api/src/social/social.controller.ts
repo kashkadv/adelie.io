@@ -11,6 +11,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Put,
   Post,
   Query,
   Req,
@@ -37,6 +38,7 @@ import {
   type ConnectResult,
 } from './connect.service.js';
 import { invitationStatus } from './invitation-token.js';
+import { orderAccounts } from './account-order.js';
 import { nextManualSync } from './manual-sync.js';
 import { createState, pkceFor, verifyState, type OAuthState } from './oauth-state.js';
 
@@ -68,11 +70,16 @@ export class SocialController {
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     await this.visibleProject(request.workspace, projectId);
-    const accounts = await this.prisma.client.socialAccount.findMany({
+    const project = await this.prisma.client.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { accountOrder: true },
+    });
+    const found = await this.prisma.client.socialAccount.findMany({
       where: { projectId, workspaceId: request.workspace.workspaceId },
-      orderBy: { createdAt: 'asc' },
       select: {
         id: true,
+        createdAt: true,
+        displayNameCustom: true,
         platform: true,
         externalId: true,
         username: true,
@@ -95,9 +102,21 @@ export class SocialController {
         },
       },
     });
+    // The member's own order (Connections is arranged by drag); the rest by when they were connected.
+    const accounts = orderAccounts(found, project.accountOrder);
     return accounts.map(
-      ({ connection, syncRuns, hiddenAt, lastSyncedAt, syncRequestedAt, ...a }) => ({
+      ({
+        connection,
+        syncRuns,
+        hiddenAt,
+        lastSyncedAt,
+        syncRequestedAt,
+        createdAt: _createdAt,
+        displayNameCustom,
+        ...a
+      }) => ({
         ...a,
+        nameCustom: displayNameCustom,
         hidden: hiddenAt !== null,
         // Asked for, not picked up yet: the UI shows "syncing" right away.
         syncRequested: !!syncRequestedAt && (!lastSyncedAt || syncRequestedAt > lastSyncedAt),
@@ -118,7 +137,14 @@ export class SocialController {
     await this.visibleProject(ctx, projectId);
     const account = await this.prisma.client.socialAccount.findFirst({
       where: { id: accountId, projectId, workspaceId: ctx.workspaceId },
-      select: { id: true, connectionId: true, username: true, displayName: true, externalId: true },
+      select: {
+        id: true,
+        connectionId: true,
+        platform: true,
+        username: true,
+        displayName: true,
+        externalId: true,
+      },
     });
     if (!account) throw new NotFoundException();
     return account;
@@ -199,23 +225,67 @@ export class SocialController {
    * Hides an account from Overview/Content (or shows it again). Purely presentational: syncing
    * and the collected data are unaffected.
    */
+  /** Saves the order of the project's connections (the member arranged them by dragging). */
+  @Put('workspaces/:workspaceId/projects/:projectId/accounts/order')
+  @UseGuards(WorkspaceAccessGuard)
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async reorder(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body() body: { accountIds?: unknown },
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    if (!Array.isArray(body?.accountIds) || body.accountIds.some((id) => typeof id !== 'string')) {
+      throw new BadRequestException({ errors: { accountIds: 'invalid' } });
+    }
+    await this.visibleProject(request.workspace, projectId);
+    const existing = await this.prisma.client.socialAccount.findMany({
+      where: { projectId, workspaceId: request.workspace.workspaceId },
+      select: { id: true },
+    });
+    const known = new Set(existing.map((a) => a.id));
+    // Only this project's accounts, each once.
+    const order = [...new Set(body.accountIds as string[])].filter((id) => known.has(id));
+    await this.prisma.client.project.update({
+      where: { id: projectId },
+      data: { accountOrder: order },
+    });
+    return { ok: true };
+  }
+
   @Patch('workspaces/:workspaceId/projects/:projectId/accounts/:accountId')
   @UseGuards(WorkspaceAccessGuard)
   @WorkspaceRoles(...CONNECT_ROLES)
   async update(
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('accountId', ParseUUIDPipe) accountId: string,
-    @Body() body: { hidden?: unknown },
+    @Body() body: { hidden?: unknown; displayName?: unknown },
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
-    if (typeof body?.hidden !== 'boolean') {
-      throw new BadRequestException({ errors: { hidden: 'invalid' } });
+    const data: {
+      hiddenAt?: Date | null;
+      displayName?: string | null;
+      displayNameCustom?: boolean;
+    } = {};
+    if (body?.hidden !== undefined) {
+      if (typeof body.hidden !== 'boolean') {
+        throw new BadRequestException({ errors: { hidden: 'invalid' } });
+      }
+      data.hiddenAt = body.hidden ? new Date() : null;
     }
     const account = await this.projectAccount(request.workspace, projectId, accountId);
-    await this.prisma.client.socialAccount.update({
-      where: { id: account.id },
-      data: { hiddenAt: body.hidden ? new Date() : null },
-    });
+    // The member's own name for the connection (null or empty = back to the platform's name).
+    if (body?.displayName !== undefined) {
+      const name = typeof body.displayName === 'string' ? body.displayName.trim() : '';
+      if (body.displayName !== null && typeof body.displayName !== 'string') {
+        throw new BadRequestException({ errors: { displayName: 'invalid' } });
+      }
+      if (name.length > 80) throw new BadRequestException({ errors: { displayName: 'tooLong' } });
+      data.displayNameCustom = name !== '';
+      // Reset: a site falls back to its host at once; a platform account gets its name at the next sync.
+      data.displayName = name || (account.platform === 'WEBSITE' ? account.username : null);
+    }
+    if (!Object.keys(data).length) throw new BadRequestException({ errors: { body: 'empty' } });
+    await this.prisma.client.socialAccount.update({ where: { id: account.id }, data });
     return { ok: true };
   }
 

@@ -12,6 +12,8 @@ export type ConnectionStatus = 'ACTIVE' | 'REAUTHORIZATION_REQUIRED' | 'REVOKED'
 export type SocialAccount = {
   id: string;
   platform: 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY' | 'WEBSITE';
+  /** The name is the member's own (syncing keeps it; it can be reset). */
+  nameCustom: boolean;
   externalId: string;
   username: string | null;
   displayName: string | null;
@@ -131,6 +133,34 @@ export function useProjectAccounts() {
     [base, reload],
   );
 
+  /** The connection's own name; `null` = back to the platform's. */
+  const rename = useCallback(
+    async (accountId: string, displayName: string | null) => {
+      if (!base) return;
+      await api(`${base}/accounts/${accountId}`, { method: 'PATCH', json: { displayName } });
+      await reload();
+    },
+    [base, reload],
+  );
+
+  /**
+   * Arranges the connections: shown at once, saved when `persist` (the end of a drag, a key press).
+   * The Connections list and the channel switch of Products follow this order.
+   */
+  const reorder = useCallback(
+    async (ids: string[], persist: boolean) => {
+      if (!base) return;
+      setAccounts((list) => (list ? ids.flatMap((id) => list.filter((a) => a.id === id)) : list));
+      if (!persist) return;
+      try {
+        await api(`${base}/accounts/order`, { method: 'PUT', json: { accountIds: ids } });
+      } catch {
+        await reload();
+      }
+    },
+    [base, reload],
+  );
+
   /** Deletes the account with all its data; `confirm` must repeat the account name. */
   const remove = useCallback(
     async (accountId: string, confirm: string) => {
@@ -148,6 +178,8 @@ export function useProjectAccounts() {
     disconnect,
     requestSync,
     setHidden,
+    rename,
+    reorder,
     remove,
     canConnect: !!workspace && CONNECT_ROLES.includes(workspace.role),
   };

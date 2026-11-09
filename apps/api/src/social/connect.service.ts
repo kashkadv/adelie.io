@@ -239,6 +239,13 @@ export class ConnectService {
       where: { connectionId },
       select: { id: true },
     });
+    // A name typed here is the site's own: syncing keeps it.
+    if (name) {
+      await this.prisma.client.socialAccount.update({
+        where: { id: stored.id },
+        data: { displayNameCustom: true },
+      });
+    }
     return { accountId: stored.id };
   }
 

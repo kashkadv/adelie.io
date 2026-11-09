@@ -29,6 +29,7 @@ import {
 import { Session, type UserSession } from '@thallesp/nestjs-better-auth';
 import { CONNECT_ROLES, ConnectService, accessOf } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
+import { orderAccounts } from '../social/account-order.js';
 import { visibleProjectsWhere } from '../workspaces/project-visibility.js';
 import {
   WorkspaceAccessGuard,
@@ -707,16 +708,21 @@ export class SalesController {
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     await this.visibleProject(request.workspace, projectId);
-    // `catalog=1`: sites too (the Products page); otherwise shops with orders.
-    return this.prisma.client.socialAccount.findMany({
+    // `catalog=1`: sites too (the Products page); otherwise shops with orders. In the order the
+    // member arranged the connections: the first one is the page's default channel.
+    const project = await this.prisma.client.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { accountOrder: true },
+    });
+    const shops = await this.prisma.client.socialAccount.findMany({
       where: {
         projectId,
         workspaceId: request.workspace.workspaceId,
         ...(query['catalog'] === '1' ? CATALOG_WHERE : SHOP_WHERE),
       },
-      orderBy: { createdAt: 'asc' },
       select: {
         id: true,
+        createdAt: true,
         platform: true,
         username: true,
         displayName: true,
@@ -725,6 +731,9 @@ export class SalesController {
         _count: { select: { products: { where: { state: { not: 'removed' } } } } },
       },
     });
+    return orderAccounts(shops, project.accountOrder).map(
+      ({ createdAt: _created, ...shop }) => shop,
+    );
   }
 
   /**

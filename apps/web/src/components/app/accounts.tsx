@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  GripVertical,
   AlertTriangle,
   ArrowRight,
   Check,
@@ -20,7 +21,13 @@ import {
   X,
 } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { InfoTip } from '../ui/info-tip';
 import { Select } from '../ui/select';
@@ -35,6 +42,7 @@ import {
 } from './accounts-data';
 import { PlatformIcon } from '../ui/platform-icon';
 import { AccessDialog, type AccessLevel } from './access-dialog';
+import { RenameDialog } from './rename-dialog';
 import { WebsiteDialog } from './website-dialog';
 import { EmptyState, PageHeader } from './page-header';
 
@@ -81,6 +89,7 @@ type RowAction =
   | 'hide'
   | 'unhide'
   | 'sync'
+  | 'rename'
   | 'access'
   | 'upgrade'
   | 'upgradeInvite';
@@ -220,6 +229,7 @@ function RowMenu({
             </>
           )}
           {disconnected ? item('reconnect', t('reconnect')) : item('disconnect', t('disconnect'))}
+          {item('rename', t('rename'))}
           {hidden ? item('unhide', t('unhide')) : item('hide', t('hide'))}
           <div className="my-1 h-px bg-line" />
           {item('remove', t('remove'), true)}
@@ -233,10 +243,19 @@ function RowMenu({
 function AccountRow({
   account,
   onAction,
+  drag,
 }: {
   account: SocialAccount;
   /** Absent for roles that may not manage accounts. */
   onAction?: (action: RowAction) => void;
+  /** Arranging the list by dragging the row's handle (absent for roles that may not). */
+  drag?: {
+    active: boolean;
+    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => void;
+    onPointerMove: (e: ReactPointerEvent<HTMLButtonElement>) => void;
+    onPointerUp: () => void;
+    onKeyDown: (e: ReactKeyboardEvent<HTMLButtonElement>) => void;
+  };
 }) {
   const t = useTranslations('Accounts');
   const format = useFormatter();
@@ -261,6 +280,23 @@ function AccountRow({
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 md:flex-nowrap">
         {/* Who */}
         <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
+          {drag && (
+            <button
+              type="button"
+              aria-label={t('move', { name })}
+              title={t('move', { name })}
+              onPointerDown={drag.onPointerDown}
+              onPointerMove={drag.onPointerMove}
+              onPointerUp={drag.onPointerUp}
+              onPointerCancel={drag.onPointerUp}
+              onKeyDown={drag.onKeyDown}
+              className={`-ml-2 flex h-8 w-6 shrink-0 touch-none items-center justify-center rounded-lg text-muted hover:text-foreground ${
+                drag.active ? 'cursor-grabbing' : 'cursor-grab'
+              }`}
+            >
+              <GripVertical size={15} aria-hidden="true" />
+            </button>
+          )}
           {/* The platform's icon, not the account's logo: where the data comes from at a glance. */}
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
             <PlatformIcon
@@ -563,8 +599,17 @@ function ConnectMenu({
 /** Accounts page: connected accounts of the project and connecting new ones (ADR-0011). */
 export function Accounts() {
   const t = useTranslations('Accounts');
-  const { accounts, connect, canConnect, disconnect, requestSync, setHidden, remove } =
-    useProjectAccounts();
+  const {
+    accounts,
+    connect,
+    canConnect,
+    disconnect,
+    requestSync,
+    setHidden,
+    rename,
+    reorder,
+    remove,
+  } = useProjectAccounts();
   const [platform, setPlatform] = useState('');
   const [showDisconnected, setShowDisconnected] = useStoredFlag(
     'adelie-accounts-show-disconnected',
@@ -580,6 +625,61 @@ export function Accounts() {
       (showDisconnected || a.status !== 'REVOKED') &&
       (showHidden || !a.hidden),
   );
+  const [renaming, setRenaming] = useState<SocialAccount | null>(null);
+
+  // Arranging by dragging a row's handle: the order of what is shown is rearranged inside the full
+  // order (rows hidden by a filter keep their places). Saved when the drag ends.
+  const [dragging, setDragging] = useState<string | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const fullOrder = (accounts ?? []).map((a) => a.id);
+  const withVisibleOrder = (shownIds: string[]) => {
+    const shownSet = new Set(shownIds);
+    const next = [...fullOrder];
+    let k = 0;
+    fullOrder.forEach((id, i) => {
+      if (shownSet.has(id)) next[i] = shownIds[k++]!;
+    });
+    return next;
+  };
+  const moveShown = (id: string, to: number) => {
+    const ids = visible.map((a) => a.id);
+    const from = ids.indexOf(id);
+    if (from < 0 || to < 0 || to >= ids.length || from === to) return null;
+    ids.splice(to, 0, ids.splice(from, 1)[0]!);
+    return withVisibleOrder(ids);
+  };
+  const dragFor = (account: SocialAccount) => ({
+    active: dragging === account.id,
+    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setDragging(account.id);
+    },
+    onPointerMove: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      if (dragging !== account.id || !listRef.current) return;
+      const rows = [...listRef.current.children] as HTMLElement[];
+      // The row whose middle is the last one above the pointer becomes the drop place.
+      let target = 0;
+      rows.forEach((row, i) => {
+        const r = row.getBoundingClientRect();
+        if (e.clientY > r.top + r.height / 2) target = i;
+      });
+      const next = moveShown(account.id, target);
+      if (next) void reorder(next, false);
+    },
+    onPointerUp: () => {
+      if (dragging) void reorder(fullOrder, true);
+      setDragging(null);
+    },
+    onKeyDown: (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+      const at = visible.findIndex((a) => a.id === account.id);
+      const to = e.key === 'ArrowUp' ? at - 1 : e.key === 'ArrowDown' ? at + 1 : -1;
+      const next = to >= 0 ? moveShown(account.id, to) : null;
+      if (!next) return;
+      e.preventDefault();
+      void reorder(next, true);
+    },
+  });
+
   const [dialog, setDialog] = useState<{
     action: 'disconnect' | 'remove';
     account: SocialAccount;
@@ -614,6 +714,10 @@ export function Accounts() {
     if (action === 'access') return;
     if (action === 'sync') {
       requestSync(account.id).catch(() => setNotice('actionFailed'));
+      return;
+    }
+    if (action === 'rename') {
+      setRenaming(account);
       return;
     }
     if (action === 'hide' || action === 'unhide') {
@@ -711,6 +815,16 @@ export function Accounts() {
             // Shows the new site and asks the worker to read its feed right away.
             void requestSync(accountId).catch(() => undefined);
           }}
+        />
+      )}
+
+      {renaming && (
+        <RenameDialog
+          platform={renaming.platform}
+          current={accountName(renaming)}
+          custom={renaming.nameCustom}
+          onSave={(name) => rename(renaming.id, name)}
+          onClose={() => setRenaming(null)}
         />
       )}
 
@@ -849,12 +963,13 @@ export function Accounts() {
       )}
 
       {visible.length > 0 && (
-        <ul className="card animate-rise divide-y divide-line rounded-[24px]">
+        <ul ref={listRef} className="card animate-rise divide-y divide-line rounded-[24px]">
           {visible.map((account) => (
             <AccountRow
               key={account.id}
               account={account}
               onAction={canConnect ? (action) => onRowAction(account, action) : undefined}
+              drag={canConnect ? dragFor(account) : undefined}
             />
           ))}
         </ul>
