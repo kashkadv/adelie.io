@@ -35,6 +35,7 @@ import {
 } from './accounts-data';
 import { PlatformIcon } from '../ui/platform-icon';
 import { AccessDialog, type AccessLevel } from './access-dialog';
+import { WebsiteDialog } from './website-dialog';
 import { EmptyState, PageHeader } from './page-header';
 
 type ConnectResult =
@@ -287,7 +288,9 @@ function AccountRow({
             <p className="flex min-w-0 items-center gap-2 text-sm text-muted">
               <span className="truncate">
                 {t(`platforms.${account.platform}`)}
-                {account.username ? ` · @${account.username}` : ''}
+                {account.username
+                  ? ` · ${account.platform === 'WEBSITE' ? '' : '@'}${account.username}`
+                  : ''}
               </span>
               {/* What this connection gives (ADR-0018). */}
               {ROLES[account.platform].map((role) => (
@@ -390,11 +393,12 @@ function AccountRow({
 }
 
 /** What each connection gives (ADR-0018): its data shows up in Promotion, Sales or both. */
-const ROLES: Record<SocialAccount['platform'], ('content' | 'ads' | 'sales')[]> = {
+const ROLES: Record<SocialAccount['platform'], ('content' | 'ads' | 'sales' | 'catalog')[]> = {
   PINTEREST: ['content'],
   INSTAGRAM: ['content'],
   TIKTOK: ['content'],
   ETSY: ['sales'],
+  WEBSITE: ['catalog'],
 };
 
 /** Platforms that can be connected now, grouped by the section they feed (ADR-0018). */
@@ -422,6 +426,7 @@ function ConnectMenu({
   onConnect,
   onInvite,
   onChooseAccess,
+  onConnectSite,
 }: {
   canConnect: boolean;
   connecting: boolean;
@@ -430,6 +435,8 @@ function ConnectMenu({
   onInvite: (slug: PlatformSlug) => void;
   /** Platforms with access levels open the access dialog instead (ADR-0019). */
   onChooseAccess: (key: 'ETSY', slug: PlatformSlug) => void;
+  /** A website is connected by its product feed's address (ADR-0021). */
+  onConnectSite: () => void;
 }) {
   const t = useTranslations('Accounts');
   const [open, setOpen] = useState(false);
@@ -521,6 +528,26 @@ function ConnectMenu({
                   )}
                 </div>
               ))}
+              {group === 'sales' && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    onConnectSite();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-hover"
+                >
+                  <PlatformIcon
+                    platform="WEBSITE"
+                    size={18}
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                  />
+                  <span className="flex-1">{t('platforms.WEBSITE')}</span>
+                  <ArrowRight size={14} className="text-muted" aria-hidden="true" />
+                </button>
+              )}
               {SOON.filter((s) => s.group === group).map(({ name }) => (
                 <div
                   key={name}
@@ -626,6 +653,7 @@ export function Accounts() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const format = useFormatter();
 
+  const [siteDialog, setSiteDialog] = useState(false);
   const [accessFor, setAccessFor] = useState<{
     key: 'ETSY';
     slug: PlatformSlug;
@@ -678,9 +706,21 @@ export function Accounts() {
             onConnect={onConnect}
             onInvite={onInvite}
             onChooseAccess={(key, slug) => setAccessFor({ key, slug, initial: 'read' })}
+            onConnectSite={() => setSiteDialog(true)}
           />
         }
       />
+
+      {siteDialog && (
+        <WebsiteDialog
+          onClose={() => setSiteDialog(false)}
+          onConnected={(accountId) => {
+            setSiteDialog(false);
+            // Shows the new site and asks the worker to read its feed right away.
+            void requestSync(accountId).catch(() => undefined);
+          }}
+        />
+      )}
 
       {accessFor && (
         <AccessDialog

@@ -5,6 +5,7 @@ import type { PrismaClient, Prisma } from '@adelie/db';
 import {
   AdapterError,
   HttpClient,
+  articlesOf,
   hasFeature,
   isAdapterError,
   postLinks,
@@ -43,7 +44,12 @@ const REFRESH_ACCESS_BEFORE_MS = 7 * 24 * 3600 * 1000;
  */
 const REFRESH_REFRESH_BEFORE_MS = 30 * 24 * 3600 * 1000;
 /** Recorded with every value (ADR-0008 provenance). */
-const API_VERSION: Record<string, string> = { PINTEREST: 'v5', INSTAGRAM: 'v27.0', ETSY: 'v3' };
+const API_VERSION: Record<string, string> = {
+  PINTEREST: 'v5',
+  INSTAGRAM: 'v27.0',
+  ETSY: 'v3',
+  WEBSITE: 'merchant-feed',
+};
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
 const asDate = (yyyyMmDd: string) => new Date(`${yyyyMmDd}T00:00:00Z`);
@@ -347,7 +353,8 @@ export async function runSync(
         where: { id: account.id },
         data: {
           username: a.username ?? null,
-          displayName: a.displayName ?? null,
+          // A site's name is what the member typed when connecting it, not the host.
+          ...(account.platform === 'WEBSITE' ? {} : { displayName: a.displayName ?? null }),
           avatarUrl: a.avatarUrl ?? null,
           accountType: a.accountType ?? null,
           followersCount: a.followersCount,
@@ -567,8 +574,10 @@ export async function runSync(
     // 3c. Points of sale (ADR-0018): products, then orders with their lines.
     if (adapter.listProducts) {
       await step('products', async () => {
+        const seen = new Set<string>();
         for await (const page of adapter.listProducts!(ctx())) {
           for (const p of page) {
+            seen.add(p.externalId);
             const data = {
               title: p.title,
               url: p.url ?? null,
@@ -581,7 +590,7 @@ export async function runSync(
               favorers: p.favorers,
               tags: p.tags,
               // Unset = the inventory could not be read this time: keep what is stored.
-              ...(p.skus ? { skus: p.skus } : {}),
+              ...(p.skus ? { skus: p.skus, articles: articlesOf(p.skus) } : {}),
               ...(p.variationCount !== undefined ? { variationCount: p.variationCount } : {}),
               ...(p.skuBy ? { skuBy: p.skuBy } : {}),
               ...(p.variationOptions ? { variationOptions: p.variationOptions } : {}),
@@ -601,6 +610,19 @@ export async function runSync(
             });
             count('products');
           }
+        }
+        // A site's feed lists what is on sale now: a product that left it is "removed" (its history
+        // stays). Etsy's listing states come from Etsy itself.
+        if (account.platform === 'WEBSITE' && seen.size) {
+          const gone = await prisma.shopProduct.updateMany({
+            where: {
+              accountId: account.id,
+              externalId: { notIn: [...seen] },
+              state: { not: 'removed' },
+            },
+            data: { state: 'removed' },
+          });
+          count('removedProducts', gone.count);
         }
       });
     }

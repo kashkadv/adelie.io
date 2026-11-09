@@ -2,7 +2,7 @@
 // and know nothing about the database; the sync orchestrator (worker) persists them.
 import type { HttpClient } from './http.js';
 
-export type Platform = 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY';
+export type Platform = 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY' | 'WEBSITE';
 
 /** Mirrors the DataStatus enum in the database. */
 export type DataStatus = 'READY' | 'PROCESSING' | 'ESTIMATE' | 'UNAVAILABLE';

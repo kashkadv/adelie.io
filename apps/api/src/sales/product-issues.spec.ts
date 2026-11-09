@@ -4,6 +4,8 @@ import { baseSku, productIssues, type IssueProduct } from './product-issues.js';
 const NOW = new Date('2026-11-09T12:00:00Z');
 const product = (over: Partial<IssueProduct> = {}): IssueProduct => ({
   id: 'p1',
+  platform: 'ETSY',
+  articles: ['00031307'],
   title: 'Wool vest',
   twinGroupId: null,
   state: 'active',
@@ -143,6 +145,39 @@ describe('productIssues', () => {
     expect(codes([twin('a'), twin('b', { price: 1000 })], 'a')).toEqual(['important:twinMismatch']);
     // an inactive twin is not compared
     expect(codes([twin('a'), twin('b', { state: 'inactive', skus: ['9'] })], 'a')).toEqual([]);
+  });
+
+  it('channels: an Etsy article missing on the site, and a site product missing on Etsy', () => {
+    const channels = { site: new Set(['00031307']), etsy: new Set(['00031307', '99']) };
+    // on the site: nothing to say
+    expect(productIssues([product()], NOW, channels).get('p1')).toBeUndefined();
+    // not on the site
+    expect(
+      productIssues([product({ articles: ['55'], skus: ['55'] })], NOW, channels).get('p1'),
+    ).toEqual([{ code: 'notOnSite', level: 'note' }]);
+    // a project without a website has no "not on site"
+    expect(
+      productIssues([product({ articles: ['55'], skus: ['55'] })], NOW, {
+        site: null,
+        etsy: null,
+      }).get('p1'),
+    ).toBeUndefined();
+    // a site product: judged by price, photo and whether Etsy has it
+    const site = (over: Partial<IssueProduct> = {}) =>
+      product({ id: 's1', platform: 'WEBSITE', articles: ['77'], skus: ['77'], tags: [], ...over });
+    expect(productIssues([site()], NOW, channels).get('s1')).toEqual([
+      { code: 'notOnEtsy', level: 'note' },
+    ]);
+    expect(productIssues([site({ articles: ['99'] })], NOW, channels).get('s1')).toBeUndefined();
+    expect(
+      productIssues([site({ price: null, imageUrl: null, posts: 0 })], NOW, channels)
+        .get('s1')
+        ?.map((i) => i.code),
+    ).toEqual(['noPrice', 'noPhoto', 'notOnEtsy']);
+    // a site product has none of the shop-only problems (tags, pins, SKU shape…)
+    expect(
+      productIssues([site({ articles: ['99'], posts: 0 })], NOW, channels).get('s1'),
+    ).toBeUndefined();
   });
 
   it('important: no tags, no pins — with or without sales', () => {

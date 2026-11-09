@@ -7,7 +7,7 @@ import { useWorkspace } from './workspace-context';
 
 export type Shop = {
   id: string;
-  platform: 'ETSY';
+  platform: 'ETSY' | 'WEBSITE';
   username: string | null;
   displayName: string | null;
   avatarUrl: string | null;
@@ -19,21 +19,24 @@ export function useSalesBase(): string | null {
   return workspace && project ? `/workspaces/${workspace.id}/projects/${project.id}/sales` : null;
 }
 
-/** Shops (points of sale) of the current project; null while loading. */
-export function useShops(): Shop[] | null {
+/**
+ * Shops (points of sale) of the current project; null while loading. `catalog`: sites with a
+ * product feed too (the Products page).
+ */
+export function useShops(catalog = false): Shop[] | null {
   const base = useSalesBase();
   const [shops, setShops] = useState<{ base: string; list: Shop[] } | null>(null);
   useEffect(() => {
     if (!base) return;
     let cancelled = false;
-    api<Shop[]>(`${base}/shops`).then(
+    api<Shop[]>(`${base}/shops${catalog ? '?catalog=1' : ''}`).then(
       (list) => !cancelled && setShops({ base, list }),
       () => !cancelled && setShops({ base, list: [] }),
     );
     return () => {
       cancelled = true;
     };
-  }, [base]);
+  }, [base, catalog]);
   return shops && shops.base === base ? shops.list : null;
 }
 

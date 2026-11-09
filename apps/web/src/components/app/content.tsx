@@ -34,7 +34,7 @@ import { PostDialog } from './post-dialog';
 import { usePreferences } from './preferences';
 import { useWorkspace } from './workspace-context';
 
-type Platform = Exclude<SocialAccount['platform'], 'ETSY'>;
+type Platform = Exclude<SocialAccount['platform'], 'ETSY' | 'WEBSITE'>;
 type MetricKey =
   | 'impressions'
   | 'saves'

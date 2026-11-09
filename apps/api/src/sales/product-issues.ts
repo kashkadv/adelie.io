@@ -3,6 +3,8 @@
  * sends them nowhere), `important` (worth fixing, nothing is broken) and `note` (look at it).
  * Everything is judged from what Adelie already stores — no extra platform requests.
  */
+import { baseSku } from '@adelie/platforms';
+
 export type IssueLevel = 'critical' | 'important' | 'note';
 
 export type IssueCode =
@@ -18,6 +20,8 @@ export type IssueCode =
   | 'skuGaps'
   | 'skuOneForAll'
   | 'twinMismatch'
+  | 'notOnSite'
+  | 'notOnEtsy'
   | 'fewTags'
   | 'noViews';
 
@@ -35,6 +39,8 @@ export const ISSUE_CODES: readonly IssueCode[] = [
   'skuGaps',
   'skuOneForAll',
   'twinMismatch',
+  'notOnSite',
+  'notOnEtsy',
   'fewTags',
   'noViews',
 ];
@@ -48,6 +54,10 @@ export interface Issue {
 
 export interface IssueProduct {
   id: string;
+  /** ETSY (a shop) or WEBSITE (a site's feed): a site is judged by far fewer rules. */
+  platform: string;
+  /** The articles of its SKUs (a site product's `g:id`). */
+  articles: string[];
   title: string;
   /** Listings of one group are the same product: not duplicates of each other. */
   twinGroupId: string | null;
@@ -78,11 +88,7 @@ export interface IssueProduct {
  */
 const VALID_SKU = /^\d+(\/\d+)?$/;
 
-/**
- * The article a SKU belongs to: "00011512/1" is the article "00011512" (what the website's
- * product is matched by, ADR-0021).
- */
-export const baseSku = (sku: string): string => sku.split('/')[0]!;
+export { baseSku };
 const MAX_TAGS = 13;
 /** A listing with no views at all this long after publishing is not being found. */
 const NO_VIEWS_DAYS = 30;
@@ -101,14 +107,26 @@ const level: Record<IssueCode, IssueLevel> = {
   skuGaps: 'important',
   skuOneForAll: 'important',
   twinMismatch: 'important',
+  notOnSite: 'note',
+  notOnEtsy: 'note',
   fewTags: 'note',
   noViews: 'note',
 };
 
 /** Issues of every product, by product id (products without any are absent). */
+/**
+ * The articles each channel has, to tell whether a product is also on the other channel; `null` =
+ * the project has no such channel (nothing to compare with).
+ */
+export interface ChannelArticles {
+  site: ReadonlySet<string> | null;
+  etsy: ReadonlySet<string> | null;
+}
+
 export function productIssues(
   products: IssueProduct[],
   now: Date = new Date(),
+  channels: ChannelArticles = { site: null, etsy: null },
 ): Map<string, Issue[]> {
   const active = products.filter((p) => p.state === 'active');
 
@@ -132,7 +150,15 @@ export function productIssues(
   for (const p of products) {
     const codes: IssueCode[] = [];
     const params: Partial<Record<IssueCode, Issue['params']>> = {};
-    if (p.state !== 'active') {
+    if (p.platform === 'WEBSITE') {
+      // A site's product: the feed is all we know. Is it also on Etsy?
+      if (p.state === 'active') {
+        if (p.price === null || p.price <= 0) codes.push('noPrice');
+        if (!p.imageUrl) codes.push('noPhoto');
+        if (channels.etsy && !p.articles.some((a) => channels.etsy!.has(a)))
+          codes.push('notOnEtsy');
+      }
+    } else if (p.state !== 'active') {
       if (p.posts > 0) codes.push('pinToUnavailable');
     } else {
       if (p.price === null || p.price <= 0) codes.push('noPrice');
@@ -147,6 +173,10 @@ export function productIssues(
         params['twinMismatch'] = { twin: other.title };
       }
       if (!p.skus.length) codes.push('noSku');
+      // The article is not on the website (when the project has one).
+      if (channels.site && p.articles.length && !p.articles.some((a) => channels.site!.has(a))) {
+        codes.push('notOnSite');
+      }
       // Our SKUs are numeric codes ("0040622", "0040622/1"); anything else (old schemes such as
       // "1896 AP_18/02/2021") is most likely a wrong one.
       const odd = p.skus.filter((sku) => !VALID_SKU.test(sku));

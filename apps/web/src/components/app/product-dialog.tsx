@@ -50,8 +50,19 @@ type Detail = {
   twins: TwinListing[];
   twinSuggestions: TwinListing[];
   twinCandidates: { id: string; title: string; state: string }[];
+  /** The same article on the other channel: a shop listing's site pages, a site product's listings. */
+  elsewhere: {
+    id: string;
+    title: string;
+    url: string | null;
+    imageUrl: string | null;
+    state: string;
+    price: number | null;
+    currency: string | null;
+    account: { platform: 'ETSY' | 'WEBSITE'; username: string | null; displayName: string | null };
+  }[];
   listedAt: string | null;
-  account: { username: string | null; displayName: string | null; platform: 'ETSY' };
+  account: { username: string | null; displayName: string | null; platform: 'ETSY' | 'WEBSITE' };
   sales: {
     units: number;
     revenue: number;
@@ -199,6 +210,63 @@ function Improvements({
           {ignoredBlock}
         </>
       )}
+    </section>
+  );
+}
+
+/**
+ * The same article on the other channel (ADR-0021): a shop listing's pages on the site (with the
+ * site's price), a site product's Etsy listings. Hidden when there is none — a problem says so.
+ */
+function Elsewhere({ detail }: { detail: Detail }) {
+  const t = useTranslations('Sales.card');
+  const money = useMoney();
+  if (!detail.elsewhere.length) return null;
+  const channel = (c: Detail['elsewhere'][number]) =>
+    c.account.platform === 'ETSY' ? 'Etsy' : c.account.displayName || c.account.username || '';
+  return (
+    <section className="mt-6">
+      <p className="mb-2 flex items-center gap-1.5 px-1 text-xs text-muted">
+        {t(detail.account.platform === 'ETSY' ? 'onSite' : 'onEtsy', {
+          count: detail.elsewhere.length,
+        })}
+        <InfoTip text={t('elsewhereHint')} />
+      </p>
+      <ul className="divide-y divide-line rounded-2xl border border-line">
+        {detail.elsewhere.map((c) => (
+          <li key={c.id} className="flex items-center gap-2.5 px-3 py-2 text-sm">
+            <span className="h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-hover">
+              {c.imageUrl && (
+                // External image: plain <img>, lazy.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={c.imageUrl}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+                />
+              )}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">{c.title}</span>
+              <span className="text-xs text-muted">
+                {channel(c)} · {money(c.price, c.currency)}
+              </span>
+            </span>
+            {c.url && (
+              <a
+                href={c.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-xs hover:bg-hover"
+              >
+                <ExternalLink size={13} aria-hidden="true" />
+                {t('open')}
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -504,7 +572,7 @@ export function ProductDialog({
                         className="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-1.5 text-sm hover:bg-hover"
                       >
                         <ExternalLink size={15} aria-hidden="true" />
-                        {t('openOnEtsy')}
+                        {detail.account.platform === 'ETSY' ? t('openOnEtsy') : t('openOnSite')}
                       </a>
                     )}
                     {onEdit && (
@@ -590,15 +658,19 @@ export function ProductDialog({
                 />
               )}
 
-              <Twins
-                detail={detail}
-                base={base}
-                productId={productId}
-                onChanged={() => {
-                  setReloadKey((k) => k + 1);
-                  onChanged?.();
-                }}
-              />
+              {detail.account.platform === 'ETSY' && (
+                <Twins
+                  detail={detail}
+                  base={base}
+                  productId={productId}
+                  onChanged={() => {
+                    setReloadKey((k) => k + 1);
+                    onChanged?.();
+                  }}
+                />
+              )}
+
+              <Elsewhere detail={detail} />
 
               <dl className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                 {stats.map((s) => (

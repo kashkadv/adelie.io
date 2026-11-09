@@ -7,6 +7,7 @@ import {
   ETSY_API,
   EtsyAdapter,
   PinterestAdapter,
+  WebsiteAdapter,
 } from '@adelie/platforms';
 import {
   QUEUES,
@@ -61,6 +62,8 @@ const etsy =
       })
     : null;
 
+const website = new WebsiteAdapter();
+
 const deps: SyncDeps = {
   prisma,
   cipher,
@@ -71,6 +74,8 @@ const deps: SyncDeps = {
       return { adapter: instagram, baseUrl: META_GRAPH_API };
     }
     if (platform === 'ETSY' && etsy) return { adapter: etsy, baseUrl: ETSY_API };
+    // A website feed: no API, no tokens (the adapter fetches the feed itself).
+    if (platform === 'WEBSITE') return { adapter: website, baseUrl: 'https://feed.invalid' };
     return null;
   },
   log: (message) => console.log(`[sync] ${message}`),

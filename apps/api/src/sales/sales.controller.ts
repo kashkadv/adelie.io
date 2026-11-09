@@ -46,6 +46,13 @@ const PAGE_SIZE = 50;
 /** Shops of the project that are shown: not hidden, not disconnected (their history is kept). */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Shops and sites (a catalogue: products, no orders), for the Products page. */
+const CATALOG_WHERE = {
+  platform: { in: ['ETSY', 'WEBSITE'] },
+  hiddenAt: null,
+  connection: { status: { not: 'REVOKED' } },
+} satisfies Prisma.SocialAccountWhereInput;
+
 const SHOP_WHERE = {
   platform: 'ETSY',
   hiddenAt: null,
@@ -225,7 +232,7 @@ export class SalesController {
         id: productId,
         projectId,
         workspaceId: request.workspace.workspaceId,
-        account: SHOP_WHERE,
+        account: CATALOG_WHERE,
       },
       select: {
         id: true,
@@ -241,6 +248,7 @@ export class SalesController {
         favorers: true,
         tags: true,
         skus: true,
+        articles: true,
         skuBy: true,
         skuGroups: true,
         twinGroupId: true,
@@ -298,15 +306,16 @@ export class SalesController {
     // same SKUs. Candidates: every other listing, for choosing one by hand.
     const twinSelect = { id: true, title: true, imageUrl: true, state: true, skus: true } as const;
     const inShop = { projectId, workspaceId: request.workspace.workspaceId, account: SHOP_WHERE };
+    const isShop = product.account.platform === 'ETSY';
     const [twins, sameSkus, candidates] = await Promise.all([
-      product.twinGroupId
+      isShop && product.twinGroupId
         ? db.shopProduct.findMany({
             where: { ...inShop, twinGroupId: product.twinGroupId, id: { not: productId } },
             select: twinSelect,
             orderBy: { title: 'asc' },
           })
         : Promise.resolve([]),
-      product.skus.length
+      isShop && product.skus.length
         ? db.shopProduct.findMany({
             where: {
               ...inShop,
@@ -317,13 +326,40 @@ export class SalesController {
             select: { ...twinSelect, twinGroupId: true },
           })
         : Promise.resolve([]),
-      db.shopProduct.findMany({
-        where: { ...inShop, id: { not: productId }, state: { not: 'removed' } },
-        select: { id: true, title: true, state: true },
-        orderBy: { title: 'asc' },
-        take: 1000,
-      }),
+      isShop
+        ? db.shopProduct.findMany({
+            where: { ...inShop, id: { not: productId }, state: { not: 'removed' } },
+            select: { id: true, title: true, state: true },
+            orderBy: { title: 'asc' },
+            take: 1000,
+          })
+        : Promise.resolve([]),
     ]);
+    // The same article on the other channel (ADR-0021): a shop listing's site pages, a site
+    // product's Etsy listings.
+    const elsewhere = product.articles.length
+      ? await db.shopProduct.findMany({
+          where: {
+            projectId,
+            workspaceId: request.workspace.workspaceId,
+            id: { not: productId },
+            state: { not: 'removed' },
+            articles: { hasSome: product.articles },
+            account: { ...CATALOG_WHERE, platform: isShop ? 'WEBSITE' : 'ETSY' },
+          },
+          select: {
+            id: true,
+            title: true,
+            url: true,
+            imageUrl: true,
+            state: true,
+            price: true,
+            currency: true,
+            account: { select: { platform: true, username: true, displayName: true } },
+          },
+          orderBy: { title: 'asc' },
+        })
+      : [];
     const mine = [...product.skus].sort().join('\u0000');
     const twinSuggestions = sameSkus
       .filter(
@@ -332,7 +368,12 @@ export class SalesController {
           (!product.twinGroupId || c.twinGroupId !== product.twinGroupId),
       )
       .map(({ twinGroupId: _group, ...c }) => c);
-    const { externalId: _externalId, twinGroupId: _twinGroupId, ...rest } = product;
+    const {
+      externalId: _externalId,
+      twinGroupId: _twinGroupId,
+      articles: _articles,
+      ...rest
+    } = product;
     return {
       ...rest,
       sales: {
@@ -355,6 +396,7 @@ export class SalesController {
       twins,
       twinSuggestions,
       twinCandidates: candidates,
+      elsewhere,
     };
   }
 
@@ -642,12 +684,18 @@ export class SalesController {
     projectId: string,
     ctx: WorkspaceRequestContext,
     accountId: string | undefined,
-  ): { projectId: string; workspaceId: string; accountId?: string; account: typeof SHOP_WHERE } {
+    catalog = false,
+  ): {
+    projectId: string;
+    workspaceId: string;
+    accountId?: string;
+    account: Prisma.SocialAccountWhereInput;
+  } {
     return {
       projectId,
       workspaceId: ctx.workspaceId,
       ...(accountId ? { accountId } : {}),
-      account: SHOP_WHERE,
+      account: catalog ? CATALOG_WHERE : SHOP_WHERE,
     };
   }
 
@@ -655,11 +703,17 @@ export class SalesController {
   @Get('shops')
   async shops(
     @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Query() query: Record<string, string | undefined>,
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     await this.visibleProject(request.workspace, projectId);
+    // `catalog=1`: sites too (the Products page); otherwise shops with orders.
     return this.prisma.client.socialAccount.findMany({
-      where: { projectId, workspaceId: request.workspace.workspaceId, ...SHOP_WHERE },
+      where: {
+        projectId,
+        workspaceId: request.workspace.workspaceId,
+        ...(query['catalog'] === '1' ? CATALOG_WHERE : SHOP_WHERE),
+      },
       orderBy: { createdAt: 'asc' },
       select: { id: true, platform: true, username: true, displayName: true, avatarUrl: true },
     });
@@ -678,7 +732,7 @@ export class SalesController {
   ) {
     await this.visibleProject(request.workspace, projectId);
     const period = this.period(query);
-    const where = this.where(projectId, request.workspace, query['accountId']);
+    const where = this.where(projectId, request.workspace, query['accountId'], true);
     const db = this.prisma.client;
     const [products, lines] = await Promise.all([
       db.shopProduct.findMany({
@@ -699,6 +753,7 @@ export class SalesController {
           favorers: true,
           tags: true,
           skus: true,
+          articles: true,
           variationCount: true,
           skuBy: true,
           skuGroups: true,
@@ -741,7 +796,25 @@ export class SalesController {
       postsByKey.set(l.key, (postsByKey.get(l.key) ?? new Set()).add(l.postId));
     const postsOf = (p: Parameters<typeof keysOf>[0]) =>
       new Set(keysOf(p).flatMap((k) => [...(postsByKey.get(k) ?? [])])).size;
-    const issues = productIssues(products.map((p) => ({ ...p, posts: postsOf(p) })));
+    // What each channel (the shop, the site) has, project-wide — not only the shown shop's.
+    const channelRows = await db.shopProduct.findMany({
+      where: {
+        projectId,
+        workspaceId: request.workspace.workspaceId,
+        state: { not: 'removed' },
+        account: CATALOG_WHERE,
+      },
+      select: { articles: true, account: { select: { platform: true } } },
+    });
+    const articlesOn = (platform: string) => {
+      const rows = channelRows.filter((r) => r.account.platform === platform);
+      return rows.length ? new Set(rows.flatMap((r) => r.articles)) : null;
+    };
+    const issues = productIssues(
+      products.map((p) => ({ ...p, platform: p.account.platform, posts: postsOf(p) })),
+      new Date(),
+      { site: articlesOn('WEBSITE'), etsy: articlesOn('ETSY') },
+    );
     // Problems the user marked "on purpose" are set apart (and can be brought back).
     const ignores = await db.shopProductIssueIgnore.findMany({
       where: {
@@ -774,6 +847,7 @@ export class SalesController {
           variationCount: _variations,
           skuGroups: _groups,
           variationOptions: _options,
+          articles: _articles,
           ...p
         }) => ({
           ...p,

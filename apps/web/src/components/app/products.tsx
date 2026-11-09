@@ -48,6 +48,8 @@ type Product = {
   revenue: number;
   /** Posts (pins) leading to the product. */
   posts: number;
+  /** The shop or site the product is in. */
+  account: { id: string; username: string | null; platform: 'ETSY' | 'WEBSITE' };
   issues: ProductIssue[];
   /** Problems the user marked "on purpose". */
   ignored: ProductIssue[];
@@ -97,7 +99,7 @@ export function Products() {
   const format = useFormatter();
   const money = useMoney();
   const base = useSalesBase();
-  const shops = useShops();
+  const shops = useShops(true);
   const [shopId, setShopId] = useState('');
   const [period, setPeriod] = useState<DateRange>({ preset: 'all' });
   const [state, setState] = useState('active');
@@ -434,7 +436,7 @@ export function Products() {
                   ))}
                 </dl>
                 <span className="flex w-16 shrink-0 justify-end">
-                  {p.state !== 'removed' && (
+                  {p.state !== 'removed' && p.account.platform === 'ETSY' && (
                     <button
                       type="button"
                       onClick={() => setEditing(p.id)}
@@ -451,8 +453,14 @@ export function Products() {
                       target="_blank"
                       rel="noreferrer"
                       className="icon-btn h-8 w-8"
-                      aria-label={tc('openOnPlatform', { platform: 'Etsy' })}
-                      title={tc('openOnPlatform', { platform: 'Etsy' })}
+                      aria-label={tc('openOnPlatform', {
+                        platform:
+                          p.account.platform === 'ETSY' ? 'Etsy' : (p.account.username ?? ''),
+                      })}
+                      title={tc('openOnPlatform', {
+                        platform:
+                          p.account.platform === 'ETSY' ? 'Etsy' : (p.account.username ?? ''),
+                      })}
                     >
                       <ExternalLink size={15} aria-hidden="true" />
                     </a>
@@ -479,7 +487,7 @@ export function Products() {
               : undefined
           }
           onEdit={
-            items[openIndex]?.state !== 'removed'
+            items[openIndex]?.state !== 'removed' && items[openIndex]?.account.platform === 'ETSY'
               ? () => {
                   setEditing(openId);
                   setOpenId(null);

@@ -11,7 +11,7 @@ export type ConnectionStatus = 'ACTIVE' | 'REAUTHORIZATION_REQUIRED' | 'REVOKED'
 
 export type SocialAccount = {
   id: string;
-  platform: 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY';
+  platform: 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY' | 'WEBSITE';
   externalId: string;
   username: string | null;
   displayName: string | null;
@@ -155,7 +155,7 @@ export function useProjectAccounts() {
 
 export type Invitation = {
   id: string;
-  platform: 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY';
+  platform: 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY' | 'WEBSITE';
   access: 'read' | 'write';
   /** Set when the invitation updates access of a connected account (ADR-0020). */
   account: { username: string | null; displayName: string | null } | null;

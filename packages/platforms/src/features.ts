@@ -22,6 +22,8 @@ export const PLATFORM_FEATURES: Record<Platform, readonly PlatformFeature[]> = {
   ],
   ETSY: [{ id: 'core', scopes: ['shops_r', 'listings_r', 'transactions_r'], optional: false }],
   TIKTOK: [],
+  // A website feed needs no permissions.
+  WEBSITE: [],
 };
 
 /** Every scope a new or updated connection asks for. */

@@ -14,6 +14,8 @@ export type IssueCode =
   | 'skuGaps'
   | 'skuOneForAll'
   | 'twinMismatch'
+  | 'notOnSite'
+  | 'notOnEtsy'
   | 'fewTags'
   | 'noViews';
 

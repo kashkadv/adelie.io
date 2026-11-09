@@ -16,6 +16,9 @@ import {
   META_GRAPH_API,
   PINTEREST_API,
   PinterestAdapter,
+  WebsiteAdapter,
+  FeedFetchError,
+  parseFeedUrl,
   type AccountData,
   type AdapterContext,
   type PlatformAdapter,
@@ -37,6 +40,8 @@ export const PLATFORM_SLUGS: Record<SocialPlatform, string> = {
   INSTAGRAM: 'instagram',
   TIKTOK: 'tiktok',
   ETSY: 'etsy',
+  // Not a consent route: a site is connected by its feed address (connectWebsite).
+  WEBSITE: 'website',
 };
 
 /** Read-only or full access (ADR-0019; mirrors AccessLevel of @adelie/platforms). */
@@ -178,6 +183,63 @@ export class ConnectService {
       await refresh();
       return fn(adapter, ctx());
     }
+  }
+
+  /**
+   * Connects a website by its Google Merchant feed (ADR-0021): no consent, no tokens — the address
+   * is the account. The feed is read once here, so a wrong address is refused at once; the first
+   * sync follows. Returns the account id; access checks are the caller's job.
+   */
+  async connectWebsite(input: {
+    workspaceId: string;
+    projectId: string;
+    connectedByUserId: string | null;
+    feedUrl: string;
+    name?: string;
+  }): Promise<{ accountId: string }> {
+    let url: string;
+    try {
+      url = parseFeedUrl(input.feedUrl).toString();
+    } catch (error) {
+      if (error instanceof FeedFetchError) {
+        throw new BadRequestException({
+          reason: error.kind === 'NOT_ALLOWED' ? 'notAllowed' : 'invalidUrl',
+        });
+      }
+      throw error;
+    }
+    let account: AccountData;
+    try {
+      account = await new WebsiteAdapter().getAccount({
+        accessToken: '',
+        accountExternalId: url,
+        http: new HttpClient({ baseUrl: url }),
+      });
+    } catch (error) {
+      if (isAdapterError(error)) {
+        throw new BadRequestException({
+          reason: error.kind === 'TRANSIENT' ? 'unreachable' : 'notAFeed',
+          message: error.message,
+        });
+      }
+      throw error;
+    }
+    const name = input.name?.trim().slice(0, 80);
+    const connectionId = await this.store({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      connectedByUserId: input.connectedByUserId,
+      platform: 'WEBSITE',
+      // Nothing secret to keep, but the connection record has the same shape as the others.
+      tokens: { accessToken: 'feed', scopes: [] },
+      account: { ...account, ...(name ? { displayName: name } : {}) },
+    });
+    if (!connectionId) throw new BadRequestException({ reason: 'otherProject' });
+    const stored = await this.prisma.client.socialAccount.findFirstOrThrow({
+      where: { connectionId },
+      select: { id: true },
+    });
+    return { accountId: stored.id };
   }
 
   redirectUri(slug: string): string {

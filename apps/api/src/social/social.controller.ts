@@ -242,6 +242,29 @@ export class SocialController {
     return { ok: true };
   }
 
+  /** Connects a website by its product feed's address (ADR-0021). */
+  @Post('workspaces/:workspaceId/projects/:projectId/connections/website')
+  @UseGuards(WorkspaceAccessGuard)
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async connectWebsite(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body() body: { feedUrl?: unknown; name?: unknown } | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+    @Session() session: UserSession,
+  ) {
+    if (typeof body?.feedUrl !== 'string' || !body.feedUrl.trim()) {
+      throw new BadRequestException({ reason: 'invalidUrl' });
+    }
+    await this.visibleProject(request.workspace, projectId);
+    return this.connector.connectWebsite({
+      workspaceId: request.workspace.workspaceId,
+      projectId,
+      connectedByUserId: session.user.id,
+      feedUrl: body.feedUrl,
+      ...(typeof body.name === 'string' ? { name: body.name } : {}),
+    });
+  }
+
   /** Starts OAuth for the signed-in member: returns the platform consent URL. */
   @Post('workspaces/:workspaceId/projects/:projectId/connections/:platform')
   @UseGuards(WorkspaceAccessGuard)

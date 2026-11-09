@@ -217,6 +217,8 @@ enum SocialPlatform {
   TIKTOK
   /// Point of sale (ADR-0018): the "account" is the shop.
   ETSY
+  /// A website with a Google Merchant feed (ADR-0021): the "account" is the feed's address.
+  WEBSITE
 }
 
 enum ConnectionStatus {
@@ -664,6 +666,9 @@ model ShopProduct {
   /// Distinct non-empty SKUs of the product's variations (Etsy inventory); links it to the same
   /// product on other channels (ADR-0021).
   skus             String[]      @default([])
+  /// The articles of `skus` (\"00011512/1\" → \"00011512\"): what products of different channels are
+  /// matched by (a website feed's `g:id`).
+  articles         String[]      @default([])
   /// Live variations (Etsy inventory products); null = not read yet.
   variationCount   Int?
   /// Options the SKU goes by (e.g. ["Color"]); empty = one SKU for the whole listing.
