@@ -306,37 +306,38 @@ export function Products() {
             ' '
           )
         }
+        action={
+          shops && shops.length > 1 ? (
+            <Segmented
+              ariaLabel={t('products.channel')}
+              value={channel?.id ?? ''}
+              onChange={switchChannel}
+              options={shops.map((sh) => ({
+                value: sh.id,
+                label: (
+                  <>
+                    {sh.displayName || sh.username || ''}
+                    <span className="tabular text-xs text-muted">{sh._count?.products ?? ''}</span>
+                  </>
+                ),
+              }))}
+            />
+          ) : undefined
+        }
       />
 
       <div className="animate-rise relative z-20 mb-4 flex flex-wrap items-center gap-2">
-        {shops && shops.length > 1 && (
-          <Segmented
-            ariaLabel={t('products.channel')}
-            value={channel?.id ?? ''}
-            onChange={switchChannel}
-            options={shops.map((sh) => ({
-              value: sh.id,
-              label: (
-                <>
-                  {sh.displayName || sh.username || ''}
-                  <span className="tabular text-xs text-muted">{sh._count?.products ?? ''}</span>
-                </>
-              ),
-            }))}
-          />
-        )}
         {!isSite && (
           <>
-            <span className="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
             <PeriodControl
               value={period}
               onChange={setPeriod}
               labels={labels}
               ariaLabel={tc('period.label')}
             />
+            <span className="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
           </>
         )}
-        <span className="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
         <FilterChip
           label={t('products.state')}
           value={state}
