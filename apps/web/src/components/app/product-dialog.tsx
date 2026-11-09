@@ -257,7 +257,7 @@ function Twins({
   );
   const button = 'shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs hover:bg-hover';
   return (
-    <div className="mt-5">
+    <div className="mt-6">
       <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
         {t('twins', { count: detail.twins.length })}
         <InfoTip text={t('twinsHint')} />
@@ -570,16 +570,6 @@ export function ProductDialog({
                       </p>
                     )}
                   </div>
-
-                  <Twins
-                    detail={detail}
-                    base={base}
-                    productId={productId}
-                    onChanged={() => {
-                      setReloadKey((k) => k + 1);
-                      onChanged?.();
-                    }}
-                  />
                 </div>
               </div>
 
@@ -599,6 +589,16 @@ export function ProductDialog({
                   }
                 />
               )}
+
+              <Twins
+                detail={detail}
+                base={base}
+                productId={productId}
+                onChanged={() => {
+                  setReloadKey((k) => k + 1);
+                  onChanged?.();
+                }}
+              />
 
               <dl className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                 {stats.map((s) => (
