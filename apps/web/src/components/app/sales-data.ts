@@ -11,6 +11,8 @@ export type Shop = {
   username: string | null;
   displayName: string | null;
   avatarUrl: string | null;
+  /** Products on the channel (not the ones that left it). */
+  _count?: { products: number };
 };
 
 /** `/workspaces/:id/projects/:id/sales`, or null before the project is known. */

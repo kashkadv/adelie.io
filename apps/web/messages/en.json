@@ -725,6 +725,14 @@
       "pinsFilter": {
         "with": "lead to the product",
         "without": "none lead here"
+      },
+      "channel": "Channel",
+      "elsewhere": "The same product on the other channels",
+      "presence": {
+        "label": "Channels",
+        "has": "On {name}",
+        "lacks": "Not on {name}",
+        "lacksSites": "Not on any site"
       }
     },
     "orders": {

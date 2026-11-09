@@ -725,6 +725,14 @@
       "pinsFilter": {
         "with": "ведуть на товар",
         "without": "жоден не веде"
+      },
+      "channel": "Канал",
+      "elsewhere": "Той самий товар на інших каналах",
+      "presence": {
+        "label": "Канали",
+        "has": "Є на {name}",
+        "lacks": "Немає на {name}",
+        "lacksSites": "Немає на жодному сайті"
       }
     },
     "orders": {

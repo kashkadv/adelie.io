@@ -472,6 +472,9 @@ export function ProductDialog({
     format.dateTime(new Date(iso), { day: 'numeric', month: 'short', year: 'numeric' });
   const count = (v: number | null) => (v === null ? '—' : format.number(v));
 
+  // A site's feed gives a price and nothing else: no sales or views are known, so no tiles for
+  // them (a 0 would be a claim we cannot make).
+  const isSite = detail?.account.platform === 'WEBSITE';
   const stats: { id: string; value: string; hint?: string }[] = detail
     ? [
         { id: 'price', value: money(detail.price, detail.currency) },
@@ -484,7 +487,7 @@ export function ProductDialog({
           value: detail.sales.revenue ? money(detail.sales.revenue, currency) : '—',
           hint: t('revenueHint'),
         },
-      ]
+      ].filter((s) => !isSite || s.id === 'price')
     : [];
 
   return (
@@ -492,7 +495,10 @@ export function ProductDialog({
       <div className="flex items-center gap-1 border-b border-line px-4 py-2.5">
         <span className="flex-1 truncate px-2 text-sm text-muted">
           {detail &&
-            ['Etsy', detail.account.displayName || detail.account.username]
+            [
+              detail.account.platform === 'ETSY' ? 'Etsy' : ts('shopKind.WEBSITE'),
+              detail.account.displayName || detail.account.username,
+            ]
               .filter(Boolean)
               .join(' · ')}
         </span>
@@ -684,48 +690,52 @@ export function ProductDialog({
                 ))}
               </dl>
 
-              <section className="mt-6">
-                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 px-1">
-                  <h3 className="text-sm font-semibold">{t('monthly')}</h3>
-                  <p className="text-xs text-muted">
-                    {t('ordersTotal', { count: detail.sales.orders })}
-                    {detail.sales.firstSale &&
-                      ` · ${t('since', { date: date(detail.sales.firstSale) })}`}
-                  </p>
-                </div>
-                <ImpressionsChart
-                  points={points}
-                  ariaLabel={t('monthly')}
-                  formatValue={(v) =>
-                    currency
-                      ? money(Math.round(v * 10 ** minorDigits(currency)), currency)
-                      : String(v)
-                  }
-                />
-              </section>
+              {!isSite && (
+                <section className="mt-6">
+                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 px-1">
+                    <h3 className="text-sm font-semibold">{t('monthly')}</h3>
+                    <p className="text-xs text-muted">
+                      {t('ordersTotal', { count: detail.sales.orders })}
+                      {detail.sales.firstSale &&
+                        ` · ${t('since', { date: date(detail.sales.firstSale) })}`}
+                    </p>
+                  </div>
+                  <ImpressionsChart
+                    points={points}
+                    ariaLabel={t('monthly')}
+                    formatValue={(v) =>
+                      currency
+                        ? money(Math.round(v * 10 ** minorDigits(currency)), currency)
+                        : String(v)
+                    }
+                  />
+                </section>
+              )}
 
               <div className="mt-6 grid gap-6 md:grid-cols-2">
-                <section>
-                  <h3 className="mb-2 px-1 text-sm font-semibold">{t('latestOrders')}</h3>
-                  {detail.orders.length ? (
-                    <ul className="divide-y divide-line rounded-2xl border border-line">
-                      {detail.orders.map((o) => (
-                        <li key={o.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                          <span className="tabular w-32 shrink-0 whitespace-nowrap text-muted">
-                            {date(o.orderedAt)}
-                          </span>
-                          <span className="flex-1 truncate">{country(o.country)}</span>
-                          <span className="text-xs text-muted">×{o.quantity}</span>
-                          <span className="tabular w-24 shrink-0 text-right whitespace-nowrap">
-                            {money(o.price === null ? null : o.price * o.quantity, o.currency)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="px-1 text-sm text-muted">{t('noOrders')}</p>
-                  )}
-                </section>
+                {!isSite && (
+                  <section>
+                    <h3 className="mb-2 px-1 text-sm font-semibold">{t('latestOrders')}</h3>
+                    {detail.orders.length ? (
+                      <ul className="divide-y divide-line rounded-2xl border border-line">
+                        {detail.orders.map((o) => (
+                          <li key={o.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                            <span className="tabular w-32 shrink-0 whitespace-nowrap text-muted">
+                              {date(o.orderedAt)}
+                            </span>
+                            <span className="flex-1 truncate">{country(o.country)}</span>
+                            <span className="text-xs text-muted">×{o.quantity}</span>
+                            <span className="tabular w-24 shrink-0 text-right whitespace-nowrap">
+                              {money(o.price === null ? null : o.price * o.quantity, o.currency)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="px-1 text-sm text-muted">{t('noOrders')}</p>
+                    )}
+                  </section>
+                )}
 
                 <section>
                   <h3 className="mb-2 flex items-center gap-1.5 px-1 text-sm font-semibold">

@@ -715,7 +715,15 @@ export class SalesController {
         ...(query['catalog'] === '1' ? CATALOG_WHERE : SHOP_WHERE),
       },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, platform: true, username: true, displayName: true, avatarUrl: true },
+      select: {
+        id: true,
+        platform: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true,
+        // Products on sale or kept (not the ones that left the shop or the feed).
+        _count: { select: { products: { where: { state: { not: 'removed' } } } } },
+      },
     });
   }
 
@@ -804,8 +812,33 @@ export class SalesController {
         state: { not: 'removed' },
         account: CATALOG_WHERE,
       },
-      select: { articles: true, account: { select: { platform: true } } },
+      select: {
+        id: true,
+        articles: true,
+        title: true,
+        url: true,
+        imageUrl: true,
+        state: true,
+        price: true,
+        currency: true,
+        account: { select: { id: true, platform: true, username: true, displayName: true } },
+      },
     });
+    // The same article on the other channels (ADR-0021), for the row's expansion and the
+    // "on / not on" filters: article → the products that have it.
+    const byArticle = new Map<string, typeof channelRows>();
+    for (const r of channelRows) {
+      for (const a of r.articles) byArticle.set(a, [...(byArticle.get(a) ?? []), r]);
+    }
+    const elsewhereOf = (p: { id: string; account: { id: string }; articles: string[] }) => {
+      const seen = new Map<string, (typeof channelRows)[number]>();
+      for (const a of p.articles) {
+        for (const r of byArticle.get(a) ?? []) {
+          if (r.account.id !== p.account.id) seen.set(r.id, r);
+        }
+      }
+      return [...seen.values()].slice(0, 40).map(({ articles: _a, ...r }) => r);
+    };
     const articlesOn = (platform: string) => {
       const rows = channelRows.filter((r) => r.account.platform === platform);
       return rows.length ? new Set(rows.flatMap((r) => r.articles)) : null;
@@ -847,15 +880,17 @@ export class SalesController {
           variationCount: _variations,
           skuGroups: _groups,
           variationOptions: _options,
-          articles: _articles,
+          articles,
           ...p
         }) => ({
           ...p,
-          sold: sold.get(p.id)?.units ?? 0,
-          revenue: sold.get(p.id)?.revenue ?? 0,
+          // A site's sales are not known (no orders come from a feed): null, never 0 by assumption.
+          sold: p.account.platform === 'WEBSITE' ? null : (sold.get(p.id)?.units ?? 0),
+          revenue: p.account.platform === 'WEBSITE' ? null : (sold.get(p.id)?.revenue ?? 0),
           posts: postsOf({ ...p, externalId }),
           issues: issuesOf(p.id, false),
           ignored: issuesOf(p.id, true),
+          elsewhere: elsewhereOf({ ...p, articles }),
         }),
       ),
     };
