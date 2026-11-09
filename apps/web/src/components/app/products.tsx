@@ -263,7 +263,17 @@ export function Products() {
       () => undefined,
     );
   };
-  const openLinked = (accountId: string, id: string, fromRow: string) => {
+  /** What the row already says about the linked product that is open (before its list arrives). */
+  const [linked, setLinked] = useState<{ id: string; platform: string; state: string } | null>(
+    null,
+  );
+  const openLinked = (
+    accountId: string,
+    id: string,
+    fromRow: string,
+    known: { platform: string; state: string },
+  ) => {
+    setLinked({ id, ...known });
     setOpenedFrom(fromRow);
     setOpenId(id);
     if (!otherLists[accountId]) loadOther(accountId);
@@ -273,6 +283,11 @@ export function Products() {
     Object.values(otherLists)
       .flat()
       .find((p) => p.id === openId);
+  // Whether the open product can be edited here (an Etsy listing still in the shop).
+  const knownLinked = linked?.id === openId ? linked : undefined;
+  const editable = openProduct
+    ? openProduct.state !== 'removed' && openProduct.account.platform === 'ETSY'
+    : !!knownLinked && knownLinked.state !== 'removed' && knownLinked.platform === 'ETSY';
 
   /** Switching the channel drops what only made sense on the previous one. */
   const switchChannel = (id: string) => {
@@ -670,7 +685,12 @@ export function Products() {
                           {/* Opens that product's card over this list: you stay where you are. */}
                           <button
                             type="button"
-                            onClick={() => openLinked(e.account.id, e.id, p.id)}
+                            onClick={() =>
+                              openLinked(e.account.id, e.id, p.id, {
+                                platform: e.account.platform,
+                                state: e.state,
+                              })
+                            }
                             className="block max-w-full truncate text-left hover:underline hover:underline-offset-2"
                             title={e.title}
                           >
@@ -735,7 +755,7 @@ export function Products() {
               : undefined
           }
           onEdit={
-            openProduct?.state !== 'removed' && openProduct?.account.platform === 'ETSY'
+            editable
               ? () => {
                   // The row it was opened from stays lit through the editing, too.
                   setEditing(openId);
