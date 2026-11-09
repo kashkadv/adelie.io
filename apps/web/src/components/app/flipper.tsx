@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, Footprints, Globe } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Waves, Globe } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -224,7 +224,7 @@ export function Flipper() {
       <>
         <PageHeader title={t('title')} subtitle={t('subtitle')} />
         <EmptyState
-          icon={<Footprints size={24} strokeWidth={1.75} aria-hidden="true" />}
+          icon={<Waves size={24} strokeWidth={1.75} aria-hidden="true" />}
           title={t('noSitesTitle')}
           text={t('noSitesText')}
           action={
@@ -273,7 +273,7 @@ export function Flipper() {
 
       {current && !site && (
         <EmptyState
-          icon={<Footprints size={24} strokeWidth={1.75} aria-hidden="true" />}
+          icon={<Waves size={24} strokeWidth={1.75} aria-hidden="true" />}
           title={t('enableTitle', { site: name(current) })}
           text={t('enableText')}
           action={

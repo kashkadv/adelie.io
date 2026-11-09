@@ -2,7 +2,7 @@
 
 import {
   FileChartColumn,
-  Footprints,
+  Waves,
   Images,
   ChartColumn,
   House,
@@ -51,7 +51,7 @@ const NAV: { group?: 'promotion' | 'sales' | 'site'; items: NavItem[] }[] = [
     ],
   },
   // Flipper: what visitors do on the site (ADR-0022).
-  { group: 'site', items: [{ key: 'flipper', href: '/flipper', icon: Footprints }] },
+  { group: 'site', items: [{ key: 'flipper', href: '/flipper', icon: Waves }] },
   {
     items: [
       { key: 'reports', href: '/reports', icon: FileChartColumn },
