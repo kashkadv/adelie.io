@@ -404,6 +404,14 @@ h3 {
   max-width: 200px;
 }
 
+/* The wordmark's script capital rises above its line box (line-height 1), and the label clips its
+   content for the collapse animation: the clip box gets room above and below, which negative
+   margins take back, so nothing moves. */
+.sidebar .label.wordmark {
+  padding-block: 0.35em;
+  margin-block: -0.35em;
+}
+
 :root[data-sidebar='collapsed'] .sidebar .label {
   opacity: 0;
   max-width: 0;
