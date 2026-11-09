@@ -117,3 +117,104 @@ export function propertiesFromAttributes(
   }
   return cleanProperties(raw);
 }
+
+// ---------- GA4 events already on the page (dataLayer / gtag) ----------
+
+type Rec = Record<string, unknown>;
+const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
+const num = (v: unknown): number | undefined => {
+  const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
+  return typeof n === 'number' && Number.isFinite(n) ? n : undefined;
+};
+const str = (v: unknown): string | undefined =>
+  typeof v === 'string' || typeof v === 'number' ? String(v) : undefined;
+
+/** A GA4 item (item_id, item_name, price, …) as Flipper's product. */
+function productOf(item: unknown, currency?: string): Rec | null {
+  if (!isRec(item)) return null;
+  return {
+    id: str(item.item_id ?? item.id),
+    name: str(item.item_name ?? item.name),
+    price: num(item.price),
+    currency: str(item.currency) ?? currency,
+    category: str(item.item_category ?? item.category),
+    brand: str(item.item_brand ?? item.brand),
+    variant: str(item.item_variant ?? item.variant),
+    quantity: num(item.quantity),
+  };
+}
+
+export type DataLayerCall = {
+  method: 'viewCategory' | 'productView' | 'addToCart' | 'beginCheckout' | 'purchase';
+  args: unknown[];
+};
+
+/**
+ * One entry of `dataLayer` as the Flipper calls it stands for, or an empty list. Understands what
+ * `gtag('event', 'add_to_cart', {…})` pushes (an arguments object) and what Tag Manager sites push
+ * (`{event: 'add_to_cart', ecommerce: {items}}` or the parameters beside `event`).
+ */
+export function fromDataLayer(entry: unknown): DataLayerCall[] {
+  let name: unknown;
+  let params: Rec = {};
+  if (isRec(entry) && typeof (entry as { length?: unknown }).length === 'number') {
+    const a = Array.from(entry as unknown as ArrayLike<unknown>); // gtag pushes `arguments`
+    if (a[0] !== 'event' || !isRec(a[2] ?? {})) return [];
+    name = a[1];
+    params = (a[2] as Rec | undefined) ?? {};
+  } else if (isRec(entry)) {
+    name = entry.event;
+    params = isRec(entry.ecommerce) ? entry.ecommerce : entry;
+  } else if (Array.isArray(entry)) {
+    if (entry[0] !== 'event' || !isRec(entry[2] ?? {})) return [];
+    name = entry[1];
+    params = (entry[2] as Rec | undefined) ?? {};
+  } else return [];
+  if (typeof name !== 'string') return [];
+
+  const currency = str(params.currency);
+  const items = (Array.isArray(params.items) ? params.items : [])
+    .map((i) => productOf(i, currency))
+    .filter((p): p is Rec => p !== null);
+
+  switch (name) {
+    case 'view_item_list':
+    case 'view_item_list_category':
+      return [
+        {
+          method: 'viewCategory',
+          args: [{ id: str(params.item_list_id), name: str(params.item_list_name), items }],
+        },
+      ];
+    case 'view_item':
+      return items[0] ? [{ method: 'productView', args: [items[0]] }] : [];
+    case 'add_to_cart':
+      return items.map((p) => ({ method: 'addToCart' as const, args: [p, p.quantity ?? 1] }));
+    case 'begin_checkout':
+      return [
+        {
+          method: 'beginCheckout',
+          args: [{ items, value: num(params.value), currency, coupon: str(params.coupon) }],
+        },
+      ];
+    case 'purchase':
+      return [
+        {
+          method: 'purchase',
+          args: [
+            {
+              id: str(params.transaction_id),
+              items,
+              value: num(params.value),
+              currency,
+              coupon: str(params.coupon),
+              shipping: num(params.shipping),
+              tax: num(params.tax),
+            },
+          ],
+        },
+      ];
+    default:
+      return [];
+  }
+}

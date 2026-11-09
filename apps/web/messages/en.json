@@ -1194,7 +1194,7 @@
       },
       "events": {
         "title": "3. Shop events",
-        "lead": "Five events follow the buyer’s way, from the category to payment. Names and properties are standard, so reports and the funnel work without extra set-up. If your site already sends events to Google (GA4 dataLayer), Flipper will pick them up itself — soon.",
+        "lead": "Five events follow the buyer’s way, from the category to payment. Names and properties are standard, so reports and the funnel work without extra set-up.",
         "where": "The simplest is to call them from your site’s code when the thing has really happened (not on the click: a click does not mean the product was added).",
         "next": "In Next.js a page view is tracked by a component, and add-to-cart in the button handler, after the cart accepted the product.",
         "types": "So that TypeScript knows window.flipper:",
@@ -1299,7 +1299,8 @@
             "mistake2": "Sending it for an unpaid order. Prefer the moment the payment is confirmed.",
             "test": "Make a test order: one Purchase with the order number appears."
           }
-        }
+        },
+        "ga4": "Already send events to Google Analytics 4 (gtag or Tag Manager)? Then you do nothing: Flipper itself takes view_item_list, view_item, add_to_cart, begin_checkout and purchase from dataLayer and turns them into the events below. The only condition: item_id in these events must be the article (the same as g:id in your feed). Do not also call the same events by hand — they would be counted twice. To switch this off, put data-datalayer=\"false\" on the script tag. The cards below are for sites without GA4 events."
       },
       "attributes": {
         "title": "4. No code: data attributes",

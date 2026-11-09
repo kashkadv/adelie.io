@@ -1,6 +1,7 @@
 // Flipper in the browser (ADR-0022). Written to be harmless: nothing here throws into the page,
 // nothing blocks it, and without consent nothing is stored in the browser at all.
 import {
+  fromDataLayer,
   CAMPAIGN_PARAMS,
   cleanProperties,
   cleanUrl,
@@ -425,6 +426,36 @@ export function init(env: Env): Flipper | null {
     if (doc.visibilityState === 'hidden') safe(flush)();
   });
   win.addEventListener('pagehide', safe(flush));
+
+  // The events the site already sends to Google Analytics (GA4: gtag, Tag Manager) become
+  // Flipper's. The page's own `flipper(...)` calls are not needed for these five.
+  if (attr('datalayer') !== 'false') {
+    const seenOrders = new Set<string>();
+    const handle = safe((entry: unknown) => {
+      for (const call of fromDataLayer(entry)) {
+        if (call.method === 'purchase') {
+          const id = (call.args[0] as { id?: string }).id;
+          if (id && seenOrders.has(id)) continue; // one order, one purchase
+          if (id) seenOrders.add(id);
+        }
+        log('dataLayer', call);
+        (api[call.method] as (...a: unknown[]) => void)(...call.args);
+      }
+    });
+    const w = win as unknown as { dataLayer?: unknown[] & { __flipper?: boolean } };
+    const layer = (w.dataLayer = w.dataLayer ?? []);
+    if (!layer.__flipper) {
+      layer.__flipper = true;
+      const push = layer.push;
+      layer.push = function (this: unknown[], ...items: unknown[]) {
+        const result = push.apply(this, items);
+        items.forEach(handle);
+        return result;
+      };
+      // What was pushed before the script loaded, on this very page.
+      layer.slice().forEach(handle);
+    }
+  }
 
   // What the page asked before the script arrived: `flipper('track', …)` through the stub.
   const stub = existing?.q ?? [];

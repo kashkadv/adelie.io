@@ -192,6 +192,61 @@ describe('events', () => {
     }
   });
 
+  it('takes over GA4 events from dataLayer: gtag, Tag Manager, and what came before the script', () => {
+    const w = window as unknown as { dataLayer?: unknown[] };
+    const gtag = function (..._a: unknown[]) {
+      // eslint-disable-next-line prefer-rest-params
+      w.dataLayer!.push(arguments);
+    };
+    w.dataLayer = [
+      { event: 'view_item', ecommerce: { items: [{ item_id: '7', item_name: 'Rug' }] } },
+    ];
+    try {
+      load({ 'auto-pageview': 'false' });
+      gtag('event', 'add_to_cart', {
+        currency: 'UAH',
+        items: [{ item_id: '7', price: '290', quantity: 2 }],
+      });
+      w.dataLayer.push({
+        event: 'purchase',
+        ecommerce: {
+          transaction_id: 'T1',
+          value: 580,
+          currency: 'UAH',
+          items: [{ item_id: '7', price: 290, quantity: 2 }],
+        },
+      });
+      w.dataLayer.push({ event: 'purchase', ecommerce: { transaction_id: 'T1', value: 580 } });
+      w.dataLayer.push({ event: 'gtm.js' });
+      vi.advanceTimersByTime(2000);
+      const events = bodies().flatMap((b) => b.e);
+      expect(events.map((e) => e.n)).toEqual(['ProductView', 'AddToCart', 'Purchase']);
+      expect(events[0]!.p).toMatchObject({ item_id: '7', item_name: 'Rug' });
+      expect(events[1]!.p).toMatchObject({
+        item_id: '7',
+        quantity: 2,
+        value: 580,
+        currency: 'UAH',
+      });
+      expect(events[2]!.p).toMatchObject({ transaction_id: 'T1', value: 580 });
+    } finally {
+      delete w.dataLayer;
+    }
+  });
+
+  it('data-datalayer="false" leaves dataLayer alone', () => {
+    const w = window as unknown as { dataLayer?: unknown[] };
+    w.dataLayer = [];
+    try {
+      load({ 'auto-pageview': 'false', datalayer: 'false' });
+      w.dataLayer.push({ event: 'view_item', items: [{ item_id: '1' }] });
+      vi.advanceTimersByTime(2000);
+      expect(bodies()).toHaveLength(0);
+    } finally {
+      delete w.dataLayer;
+    }
+  });
+
   it('purchase carries the order number and sums the lines', () => {
     const f = load({ 'auto-pageview': 'false' })!;
     f.purchase({

@@ -175,6 +175,7 @@ export function FlipperGuide({ scriptUrl, siteId }: { scriptUrl: string; siteId:
         t('events.title'),
         <>
           {p('events.lead')}
+          {p('events.ga4')}
           <ul className="grid gap-2">
             {(
               ['viewCategory', 'productView', 'addToCart', 'beginCheckout', 'purchase'] as const
