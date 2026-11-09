@@ -661,6 +661,9 @@ model ShopProduct {
   views       Int?
   favorers    Int?
   tags        String[]      @default([])
+  /// Distinct non-empty SKUs of the product's variations (Etsy inventory); links it to the same
+  /// product on other channels (ADR-0021).
+  skus        String[]      @default([])
   listedAt    DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt

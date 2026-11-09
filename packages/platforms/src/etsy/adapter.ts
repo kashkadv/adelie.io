@@ -279,15 +279,30 @@ export class EtsyAdapter implements PlatformAdapter {
       quantity: typeof raw.quantity === 'number' ? raw.quantity : null,
       state: raw.state ?? 'active',
     };
+    // SKUs live in the inventory, for listings with and without variations. A listing never
+    // edited with Etsy's inventory tools may have no inventory record: then it has no SKU.
+    const inventory = await this.get<EtsyInventory>(ctx, `/listings/${listingId}/inventory`).catch(
+      (error: unknown) => {
+        if (raw.has_variations) throw error;
+        return null;
+      },
+    );
+    const live = inventory ? liveProducts(inventory) : [];
     if (!raw.has_variations) {
-      return { ...base, variations: [], priceVaries: false, quantityVaries: false };
+      return {
+        ...base,
+        sku: live[0]?.sku ?? '',
+        variations: [],
+        priceVaries: false,
+        quantityVaries: false,
+      };
     }
-    const inventory = await this.get<EtsyInventory>(ctx, `/listings/${listingId}/inventory`);
     return {
       ...base,
-      variations: liveProducts(inventory).map(toVariation),
-      priceVaries: (inventory.price_on_property ?? []).length > 0,
-      quantityVaries: (inventory.quantity_on_property ?? []).length > 0,
+      sku: '',
+      variations: live.map(toVariation),
+      priceVaries: (inventory?.price_on_property ?? []).length > 0,
+      quantityVaries: (inventory?.quantity_on_property ?? []).length > 0,
     };
   }
 
@@ -319,6 +334,7 @@ export class EtsyAdapter implements PlatformAdapter {
     if (
       changes.price !== undefined ||
       changes.quantity !== undefined ||
+      changes.sku !== undefined ||
       changes.variations !== undefined
     ) {
       const inventory = await this.get<EtsyInventory>(ctx, `/listings/${listingId}/inventory`);
@@ -326,9 +342,26 @@ export class EtsyAdapter implements PlatformAdapter {
       if (!products.length) throw new AdapterError('INVALID', 'The listing has no inventory');
       const byId = new Map((changes.variations ?? []).map((v) => [v.id, v]));
       const single = products.length === 1 && !(products[0]!.property_values ?? []).length;
-      if (!single && (changes.price !== undefined || changes.quantity !== undefined)) {
+      if (
+        !single &&
+        (changes.price !== undefined || changes.quantity !== undefined || changes.sku !== undefined)
+      ) {
         throw new AdapterError('NOT_AVAILABLE', 'Listings with variations change per variation');
       }
+      // A SKU per variation needs `sku_on_property` to cover every property the variations are
+      // made of; otherwise Etsy keeps one SKU for the whole listing.
+      const propertyIds = [
+        ...new Set(products.flatMap((p) => (p.property_values ?? []).map((v) => v.property_id))),
+      ].filter((id): id is number => typeof id === 'number');
+      const skuChanged = (changes.variations ?? []).some(
+        (v) =>
+          v.sku !== undefined &&
+          v.sku.trim() !== (products.find((p) => String(p.product_id) === v.id)?.sku ?? ''),
+      );
+      const skuOnProperty =
+        skuChanged && propertyIds.some((id) => !(inventory.sku_on_property ?? []).includes(id))
+          ? propertyIds
+          : (inventory.sku_on_property ?? []);
       if (
         products.every(
           (p) => !(byId.get(String(p.product_id))?.enabled ?? liveOffering(p)!.is_enabled ?? true),
@@ -350,7 +383,7 @@ export class EtsyAdapter implements PlatformAdapter {
                   10 ** minorDigits(currency),
               );
             return {
-              sku: p.sku ?? '',
+              sku: ((single ? changes.sku : change?.sku) ?? p.sku ?? '').trim(),
               property_values: (p.property_values ?? []).map((v) => ({
                 property_id: v.property_id,
                 property_name: v.property_name ?? undefined,
@@ -373,7 +406,7 @@ export class EtsyAdapter implements PlatformAdapter {
           }),
           price_on_property: inventory.price_on_property ?? [],
           quantity_on_property: inventory.quantity_on_property ?? [],
-          sku_on_property: inventory.sku_on_property ?? [],
+          sku_on_property: skuOnProperty,
         },
       });
     }
@@ -413,11 +446,38 @@ export class EtsyAdapter implements PlatformAdapter {
           { state, limit: PAGE, offset, includes: 'Images' },
         );
         const results = page.results ?? [];
-        if (results.length) yield results.map(mapListing);
+        if (results.length) yield await this.withSkus(ctx, results.map(mapListing));
         if (results.length < PAGE) break;
         await this.pause();
       }
     }
+  }
+
+  /**
+   * SKUs live in the inventory, one request per listing. A listing whose inventory cannot be read
+   * (never edited with Etsy's inventory tools, or gone) simply keeps `skus` unset — the stored
+   * value stays — instead of failing the sync.
+   */
+  private async withSkus(ctx: AdapterContext, products: ProductData[]): Promise<ProductData[]> {
+    for (const product of products) {
+      try {
+        const inventory = await this.get<EtsyInventory>(
+          ctx,
+          `/listings/${product.externalId}/inventory`,
+        );
+        product.skus = [
+          ...new Set(
+            liveProducts(inventory)
+              .map((p) => (p.sku ?? '').trim())
+              .filter(Boolean),
+          ),
+        ];
+      } catch (error) {
+        if (ctx.signal?.aborted) throw error;
+      }
+      await this.pause();
+    }
+    return products;
   }
 
   /**
@@ -494,5 +554,6 @@ function toVariation(p: NonNullable<EtsyInventory['products']>[number]): Product
     price: money(o.price),
     quantity: typeof o.quantity === 'number' ? o.quantity : null,
     enabled: o.is_enabled ?? true,
+    sku: p.sku ?? '',
   };
 }

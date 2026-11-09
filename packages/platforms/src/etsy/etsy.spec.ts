@@ -142,19 +142,40 @@ describe('EtsyAdapter data', () => {
     const products: ProductData[] = [];
     for await (const p of adapter.listProducts(ctx(client, '345'))) products.push(...p);
     expect(products).toHaveLength(104);
-    expect(seen.map((s) => s.url.searchParams.get('state'))).toEqual([
-      'active',
-      'active',
-      'inactive',
-      'sold_out',
-      'draft',
-      'expired',
-    ]);
+    expect(
+      seen
+        .filter((s) => s.url.pathname.endsWith('/listings'))
+        .map((s) => s.url.searchParams.get('state')),
+    ).toEqual(['active', 'active', 'inactive', 'sold_out', 'draft', 'expired']);
     expect(products[0]).toMatchObject({
       externalId: '0',
       price: { amount: 4500, currency: 'EUR' },
       imageUrl: 'https://img/x.jpg',
     });
+  });
+
+  it('reads the SKUs of each product from its inventory; an unreadable inventory leaves them unset', async () => {
+    const sku = (value: string) => ({
+      sku: value,
+      offerings: [{ price: { amount: 100, divisor: 100, currency_code: 'EUR' } }],
+    });
+    const { client } = http({
+      '/v3/application/shops/345/listings': [
+        { count: 2, results: [{ listing_id: 1 }, { listing_id: 2 }] },
+        { count: 0, results: [] },
+        { count: 0, results: [] },
+        { count: 0, results: [] },
+        { count: 0, results: [] },
+      ],
+      '/v3/application/listings/1/inventory': [
+        { products: [sku('RUG-1'), sku('RUG-2'), sku('RUG-1'), sku('')] },
+      ],
+      // listing 2: no inventory route → 404
+    });
+    const products: ProductData[] = [];
+    for await (const p of adapter.listProducts(ctx(client, '345'))) products.push(...p);
+    expect(products[0]!.skus).toEqual(['RUG-1', 'RUG-2']);
+    expect(products[1]!.skus).toBeUndefined();
   });
 
   it('never records raw receipts — they carry buyers’ personal data', async () => {
@@ -336,6 +357,7 @@ describe('Etsy product editing', () => {
           sku_on_property: [],
         },
         {},
+        { products: [] },
       ],
       '/v3/application/listings/7': [listing],
     });
@@ -356,6 +378,26 @@ describe('Etsy product editing', () => {
       offerings: [{ price: 49.99, quantity: 5, is_enabled: true, readiness_state_id: 99 }],
     });
     expect(after.title).toBe('Wool rug 2"');
+  });
+
+  it('reads and changes the SKU of a listing without variations', async () => {
+    const inventory = {
+      products: [
+        {
+          sku: 'R1',
+          property_values: [],
+          offerings: [{ price: { amount: 4500, divisor: 100, currency_code: 'USD' }, quantity: 3 }],
+        },
+      ],
+    };
+    const { client, seen } = http({
+      '/v3/application/listings/7': [listing, listing],
+      '/v3/application/listings/7/inventory': [inventory, inventory, {}, inventory],
+    });
+    expect((await adapter.getProductForEdit(ctx(client), '7')).sku).toBe('R1');
+    await adapter.updateProduct(ctx(client), '7', { sku: ' RUG-7 ' });
+    const put = seen.find((s) => s.init.method === 'PUT')!;
+    expect(JSON.parse(String(put.init.body)).products[0].sku).toBe('RUG-7');
   });
 
   it('a listing with variations changes per variation, not with one price', async () => {
@@ -446,7 +488,50 @@ describe('Etsy variations', () => {
       price: { amount: 24000, currency: 'USD' },
       quantity: 2,
       enabled: true,
+      sku: 'S',
     });
+  });
+
+  it('gives each variation its own SKU: sku_on_property grows to every property', async () => {
+    const { client, seen } = http({
+      '/v3/application/listings/7/inventory': [inventory, {}, inventory],
+      '/v3/application/listings/7': [listing],
+    });
+    await adapter.updateProduct(ctx(client), '7', {
+      variations: [
+        { id: '1', sku: 'PILLOW-NAT' },
+        { id: '2', sku: 'PILLOW-BRN' },
+      ],
+    });
+    const body = JSON.parse(String(seen.find((x) => x.init.method === 'PUT')!.init.body));
+    expect(body.products.map((p: { sku: string }) => p.sku)).toEqual(['PILLOW-NAT', 'PILLOW-BRN']);
+    expect(body.sku_on_property).toEqual([200]);
+    // price stays as it was
+    expect(body.products[1].offerings[0].price).toBe(240);
+  });
+
+  it('leaves sku_on_property alone when no SKU changes', async () => {
+    const { client, seen } = http({
+      '/v3/application/listings/7/inventory': [inventory, {}, inventory],
+      '/v3/application/listings/7': [listing],
+    });
+    await adapter.updateProduct(ctx(client), '7', { variations: [{ id: '2', quantity: 4 }] });
+    const body = JSON.parse(String(seen.find((x) => x.init.method === 'PUT')!.init.body));
+    expect(body.sku_on_property).toEqual([]);
+    expect(body.products.map((p: { sku: string }) => p.sku)).toEqual(['S', 'S']);
+  });
+
+  it('a listing with variations has no single SKU to set', async () => {
+    const { client } = http({ '/v3/application/listings/7/inventory': [inventory] });
+    await expect(adapter.updateProduct(ctx(client), '7', { sku: 'X' })).rejects.toSatisfy((e) =>
+      isAdapterError(e, 'NOT_AVAILABLE'),
+    );
+  });
+
+  it('SKUs are limited to 32 characters', () => {
+    expect(productChangeErrors({ sku: 'A'.repeat(33) })).toEqual(['skuTooLong']);
+    expect(productChangeErrors({ variations: [{ sku: 'A'.repeat(33) }] })).toEqual(['skuTooLong']);
+    expect(productChangeErrors({ sku: 'A'.repeat(32) })).toEqual([]);
   });
 
   it('changes one variation and sends every other one back as it was', async () => {

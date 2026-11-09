@@ -240,7 +240,7 @@ export function mapLedgerEntry(raw: EtsyLedgerEntry): LedgerEntryData {
 }
 
 /** Etsy's limits for listing fields (developer docs; tags: letters, digits, spaces, - ' ™ © ®). */
-export const ETSY_LIMITS = { title: 140, tags: 13, tag: 20, quantity: 999 } as const;
+export const ETSY_LIMITS = { title: 140, tags: 13, tag: 20, quantity: 999, sku: 32 } as const;
 const TAG = /^[\p{L}\p{N}\s\-'™©®]+$/u;
 
 export type ProductChangeError =
@@ -252,6 +252,7 @@ export type ProductChangeError =
   | 'tagDuplicate'
   | 'priceInvalid'
   | 'quantityInvalid'
+  | 'skuTooLong'
   | 'noVariationOnSale';
 
 /** Problems Etsy would reject a change for — checked before anything is sent. */
@@ -260,7 +261,8 @@ export function productChangeErrors(changes: {
   tags?: string[];
   price?: number;
   quantity?: number;
-  variations?: { price?: number; quantity?: number; enabled?: boolean }[];
+  sku?: string;
+  variations?: { price?: number; quantity?: number; enabled?: boolean; sku?: string }[];
 }): ProductChangeError[] {
   const errors: ProductChangeError[] = [];
   if (changes.title !== undefined) {
@@ -285,6 +287,12 @@ export function productChangeErrors(changes: {
       changes.quantity > ETSY_LIMITS.quantity)
   ) {
     errors.push('quantityInvalid');
+  }
+  if (
+    (changes.sku !== undefined && changes.sku.trim().length > ETSY_LIMITS.sku) ||
+    changes.variations?.some((x) => x.sku !== undefined && x.sku.trim().length > ETSY_LIMITS.sku)
+  ) {
+    errors.push('skuTooLong');
   }
   if (changes.variations) {
     const v = changes.variations;

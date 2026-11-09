@@ -230,6 +230,7 @@ export class SalesController {
         views: true,
         favorers: true,
         tags: true,
+        skus: true,
         listedAt: true,
         updatedAt: true,
         account: { select: { id: true, username: true, displayName: true, platform: true } },
@@ -356,7 +357,15 @@ export class SalesController {
       const live = await adapter.getProductForEdit!(ctx, product.externalId);
       // Requested values in the platform's comparable shape.
       const asked = (c: ProductChanges, k: keyof ProductChanges) =>
-        k === 'variations' ? normalizeVariations(c.variations ?? []) : c[k];
+        k === 'variations'
+          ? normalizeVariations(c.variations ?? []).map((v) => ({
+              ...v,
+              // A request that does not mention a SKU leaves it as it is on the platform.
+              sku: v.sku ?? live.variations.find((l) => l.id === v.id)?.sku ?? '',
+            }))
+          : k === 'sku'
+            ? c.sku?.trim()
+            : c[k];
       const conflict = (Object.keys(changes) as (keyof ProductChanges)[]).some(
         (k) => k in expected && !same(valueOf(live, k), asked(expected, k)),
       );
@@ -423,6 +432,13 @@ export class SalesController {
         data: {
           title: after.title,
           tags: after.tags,
+          skus: [
+            ...new Set(
+              (after.variations.length ? after.variations.map((v) => v.sku) : [after.sku])
+                .map((x) => x.trim())
+                .filter(Boolean),
+            ),
+          ],
           price: after.price?.amount ?? null,
           currency: after.price?.currency ?? undefined,
           quantity: after.quantity,
@@ -511,6 +527,7 @@ export class SalesController {
           quantity: true,
           views: true,
           favorers: true,
+          skus: true,
           listedAt: true,
           account: { select: { id: true, username: true, platform: true } },
         },
@@ -755,6 +772,8 @@ type VariationValue = {
   price: number | null;
   quantity: number | null;
   enabled: boolean;
+  /** null = not given in a request. */
+  sku: string | null;
 };
 
 /** Variations in a comparable shape: by id, price in minor units. */
@@ -764,6 +783,7 @@ function normalizeVariations(
     price?: number | null | { amount: number };
     quantity?: number | null;
     enabled?: boolean;
+    sku?: string | null;
   }[],
 ): VariationValue[] {
   return list
@@ -772,6 +792,7 @@ function normalizeVariations(
       price: typeof v.price === 'object' && v.price !== null ? v.price.amount : (v.price ?? null),
       quantity: v.quantity ?? null,
       enabled: v.enabled ?? true,
+      sku: typeof v.sku === 'string' ? v.sku.trim() : null,
     }))
     .sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -804,6 +825,7 @@ function parseChanges(raw: unknown): ProductChanges {
   }
   if (typeof r['price'] === 'number') out.price = r['price'];
   if (typeof r['quantity'] === 'number') out.quantity = r['quantity'];
+  if (typeof r['sku'] === 'string') out.sku = r['sku'].trim();
   if (Array.isArray(r['variations'])) {
     const list = (r['variations'] as Record<string, unknown>[]).filter(
       (v) => v && typeof v['id'] === 'string',
@@ -814,11 +836,13 @@ function parseChanges(raw: unknown): ProductChanges {
         price: typeof v['price'] === 'number' ? v['price'] : null,
         quantity: typeof v['quantity'] === 'number' ? v['quantity'] : null,
         enabled: v['enabled'] !== false,
+        sku: typeof v['sku'] === 'string' ? v['sku'] : null,
       })),
     ).map((v) => ({
       id: v.id,
       ...(v.price !== null ? { price: v.price } : {}),
       ...(v.quantity !== null ? { quantity: v.quantity } : {}),
+      ...(v.sku !== null ? { sku: v.sku } : {}),
       enabled: v.enabled,
     }));
   }

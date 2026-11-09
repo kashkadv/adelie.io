@@ -24,6 +24,7 @@ type Product = {
   quantity: number | null;
   views: number | null;
   favorers: number | null;
+  skus: string[];
   listedAt: string | null;
   sold: number;
   revenue: number;
@@ -87,7 +88,9 @@ export function Products() {
       (p) =>
         (!state || p.state === state) &&
         (!pins || (pins === 'with' ? p.posts > 0 : p.posts === 0)) &&
-        (!q || p.title.toLowerCase().includes(q)),
+        (!q ||
+          p.title.toLowerCase().includes(q) ||
+          p.skus.some((x) => x.toLowerCase().includes(q))),
     );
     // Highest first; no data last; then newest listing.
     return list.sort((a, b) => {
@@ -298,6 +301,13 @@ export function Products() {
                         >
                           <Pin size={11} aria-hidden="true" />
                           {t('products.posts', { count: p.posts })}
+                        </span>
+                      )}
+                      {p.skus.length > 0 && (
+                        <span className="tabular truncate" title={p.skus.join(', ')}>
+                          {p.skus.length > 2
+                            ? `${p.skus.slice(0, 2).join(', ')} +${p.skus.length - 2}`
+                            : p.skus.join(', ')}
                         </span>
                       )}
                       {p.listedAt &&

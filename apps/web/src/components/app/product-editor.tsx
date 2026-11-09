@@ -18,20 +18,29 @@ type Editable = {
   price: { amount: number; currency: string } | null;
   quantity: number | null;
   state: string;
+  /** Without variations; with them each variation has its own. */
+  sku: string;
   variations: {
     id: string;
     options: { name: string; value: string }[];
     price: { amount: number; currency: string } | null;
     quantity: number | null;
     enabled: boolean;
+    sku: string;
   }[];
   /** Each variation has its own price / quantity; otherwise one value for all. */
   priceVaries: boolean;
   quantityVaries: boolean;
 };
-type Field = 'title' | 'description' | 'tags' | 'price' | 'quantity' | 'variations';
+type Field = 'title' | 'description' | 'tags' | 'sku' | 'price' | 'quantity' | 'variations';
 /** A variation as edited: price in minor units. */
-type Var = { id: string; price: number | null; quantity: number | null; enabled: boolean };
+type Var = {
+  id: string;
+  price: number | null;
+  quantity: number | null;
+  enabled: boolean;
+  sku: string;
+};
 type Change = {
   id: string;
   changes: Partial<Record<Field, { from: unknown; to: unknown }>>;
@@ -50,20 +59,22 @@ type Values = {
   title: string;
   description: string;
   tags: string[];
+  sku: string;
   price: number | null;
   quantity: number | null;
   variations: Var[];
 };
 
 /** Etsy's limits (the API checks the same, packages/platforms etsy/mapping.ts). */
-const LIMITS = { title: 140, tags: 13, tag: 20, quantity: 999 };
+const LIMITS = { title: 140, tags: 13, tag: 20, quantity: 999, sku: 32 };
 const TAG = /^[\p{L}\p{N}\s\-'™©®]+$/u;
-const FIELDS: Field[] = ['title', 'description', 'tags', 'price', 'quantity', 'variations'];
+const FIELDS: Field[] = ['title', 'description', 'tags', 'sku', 'price', 'quantity', 'variations'];
 
 const valuesOf = (p: Editable): Values => ({
   title: p.title,
   description: p.description,
   tags: p.tags,
+  sku: p.sku,
   price: p.price?.amount ?? null,
   quantity: p.quantity,
   // Sorted by id, like the API compares them.
@@ -73,6 +84,7 @@ const valuesOf = (p: Editable): Values => ({
       price: v.price?.amount ?? null,
       quantity: v.quantity,
       enabled: v.enabled,
+      sku: v.sku,
     }))
     .sort((a, b) => a.id.localeCompare(b.id)),
 });
@@ -231,9 +243,11 @@ export function ProductEditor({
   const edited: Values | null = values
     ? {
         ...values,
+        sku: values.sku.trim(),
         price: priceMinor,
         variations: values.variations.map((v) => ({
           ...v,
+          sku: v.sku.trim(),
           price: toMinor(varPrices[v.id] ?? '', digits),
         })),
       }
@@ -271,6 +285,7 @@ export function ProductEditor({
     if (edited.tags.length > LIMITS.tags) errors.tags = t('errors.tooManyTags');
     else if (edited.tags.some((x) => x.length > LIMITS.tag)) errors.tags = t('errors.tagTooLong');
     else if (edited.tags.some((x) => !TAG.test(x))) errors.tags = t('errors.tagInvalid');
+    if (edited.sku.length > LIMITS.sku) errors.sku = t('errors.skuTooLong');
     if (changed.includes('price') && (priceMinor === null || !(priceMinor >= 20))) {
       errors.price = t('errors.priceInvalid');
     }
@@ -298,6 +313,8 @@ export function ProductEditor({
       )
     ) {
       errors.variations = t('errors.quantityInvalid');
+    } else if (vs.some((v) => v.sku.length > LIMITS.sku)) {
+      errors.variations = t('errors.skuTooLong');
     } else if (vs.every((v) => !v.enabled)) {
       errors.variations = t('errors.noVariationOnSale');
     }
@@ -374,6 +391,7 @@ export function ProductEditor({
         {t(`fields.${f}`)}
         {f === 'variations' && <InfoTip text={t('variationsHint')} />}
         {f === 'tags' && <InfoTip text={t('tagsHint')} />}
+        {f === 'sku' && <InfoTip text={t('skuHint')} />}
       </span>
       {extra && <span className="tabular text-xs">{extra}</span>}
     </span>
@@ -527,6 +545,13 @@ export function ProductEditor({
                         <span className="min-w-0 flex-1 basis-40 truncate" title={optionsOf(v.id)}>
                           {optionsOf(v.id)}
                         </span>
+                        <input
+                          className="field tabular h-9 w-40 py-1"
+                          aria-label={t('variationSku', { variation: optionsOf(v.id) })}
+                          placeholder={t('fields.sku')}
+                          value={v.sku}
+                          onChange={(e) => setVar(v.id, { sku: e.target.value })}
+                        />
                         {data.current!.priceVaries ? (
                           <input
                             className="field tabular h-9 w-28 py-1 text-right"
@@ -568,32 +593,43 @@ export function ProductEditor({
                   {fieldError('variations')}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-4">
                   <label className="block">
-                    {label('price', currency)}
+                    {label('sku', `${values.sku.length}/${LIMITS.sku}`)}
                     <input
                       className="field tabular"
-                      inputMode="decimal"
-                      value={priceText}
-                      onChange={(e) => setPriceText(e.target.value)}
+                      value={values.sku}
+                      onChange={(e) => setValues({ ...values, sku: e.target.value })}
                     />
-                    {fieldError('price')}
+                    {fieldError('sku')}
                   </label>
-                  <label className="block">
-                    {label('quantity')}
-                    <input
-                      className="field tabular"
-                      inputMode="numeric"
-                      value={values.quantity ?? ''}
-                      onChange={(e) =>
-                        setValues({
-                          ...values,
-                          quantity: e.target.value === '' ? null : Number(e.target.value),
-                        })
-                      }
-                    />
-                    {fieldError('quantity')}
-                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="block">
+                      {label('price', currency)}
+                      <input
+                        className="field tabular"
+                        inputMode="decimal"
+                        value={priceText}
+                        onChange={(e) => setPriceText(e.target.value)}
+                      />
+                      {fieldError('price')}
+                    </label>
+                    <label className="block">
+                      {label('quantity')}
+                      <input
+                        className="field tabular"
+                        inputMode="numeric"
+                        value={values.quantity ?? ''}
+                        onChange={(e) =>
+                          setValues({
+                            ...values,
+                            quantity: e.target.value === '' ? null : Number(e.target.value),
+                          })
+                        }
+                      />
+                      {fieldError('quantity')}
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
@@ -625,6 +661,13 @@ export function ProductEditor({
                                       {money(o?.price ?? null, currency)}
                                     </span>{' '}
                                     → {money(v.price, currency)}
+                                  </span>
+                                )}
+                                {o?.sku !== v.sku && (
+                                  <span>
+                                    {t('fields.sku')}:{' '}
+                                    <span className="text-muted line-through">{o?.sku || '—'}</span>{' '}
+                                    → {v.sku || '—'}
                                   </span>
                                 )}
                                 {o?.quantity !== v.quantity && (

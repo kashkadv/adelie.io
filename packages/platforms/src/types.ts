@@ -110,6 +110,8 @@ export interface ProductData {
   views: number | null;
   favorers: number | null;
   tags: string[];
+  /** Distinct non-empty SKUs of the product's variations; absent = not read this time. */
+  skus?: string[];
   listedAt?: Date;
 }
 
@@ -147,6 +149,8 @@ export interface ProductVariation {
   price: Money | null;
   quantity: number | null;
   enabled: boolean;
+  /** Empty when it has none. */
+  sku: string;
 }
 
 /** A product as it is on the platform right now, for editing (ADR-0019). */
@@ -159,6 +163,8 @@ export interface ProductEditable {
   price: Money | null;
   quantity: number | null;
   state: string;
+  /** Without variations — its SKU (empty when none). With them, each variation has its own. */
+  sku: string;
   /** Empty without variations. */
   variations: ProductVariation[];
   /** Whether each variation has its own price / quantity (otherwise one value for all). */
@@ -172,6 +178,7 @@ export interface VariationChange {
   price?: number;
   quantity?: number;
   enabled?: boolean;
+  sku?: string;
 }
 
 /** Changes to a product; absent fields stay as they are. Price in minor units of its currency. */
@@ -181,6 +188,8 @@ export interface ProductChanges {
   tags?: string[];
   price?: number;
   quantity?: number;
+  /** The SKU of a product without variations; with variations — per variation. */
+  sku?: string;
   variations?: VariationChange[];
 }
 

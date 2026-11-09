@@ -41,3 +41,4 @@
 - [ADR-0018](decisions/0018-promotion-and-sales.md) — Джерела даних: просування й продажі (прийнято)
 - [ADR-0019](decisions/0019-connection-access-levels.md) — Рівні доступу підключень (прийнято)
 - [ADR-0020](decisions/0020-connection-features-update-access.md) — Функції підключення й «Оновити доступ» (прийнято)
+- [ADR-0021](decisions/0021-website-catalog-feeds.md) — Каталог сайтів через фід Google Merchant, кілька сайтів-ринків (запропоновано)

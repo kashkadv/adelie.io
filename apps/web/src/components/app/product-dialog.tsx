@@ -29,6 +29,7 @@ type Detail = {
   views: number | null;
   favorers: number | null;
   tags: string[];
+  skus: string[];
   listedAt: string | null;
   account: { username: string | null; displayName: string | null; platform: 'ETSY' };
   sales: {
@@ -251,6 +252,31 @@ export function ProductDialog({
                         <PenLine size={15} aria-hidden="true" />
                         {ts('products.edit')}
                       </button>
+                    )}
+                  </div>
+
+                  {/* SKUs: what links the product to the same one on the website (ADR-0021). */}
+                  <div className="mt-5">
+                    <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
+                      {t('sku', { count: detail.skus.length })}
+                      <InfoTip text={t('skuHint')} />
+                    </p>
+                    {detail.skus.length ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {detail.skus.map((sku) => (
+                          <span
+                            key={sku}
+                            className="tabular rounded-full bg-hover px-2 py-0.5 text-xs"
+                          >
+                            {sku}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400">
+                        <AlertTriangle size={14} aria-hidden="true" />
+                        {t('noSku')}
+                      </p>
                     )}
                   </div>
 
