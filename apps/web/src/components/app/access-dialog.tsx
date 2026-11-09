@@ -95,7 +95,7 @@ export function AccessDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="glass glass-strong animate-rise relative w-full max-w-md rounded-[28px] p-6"
+        className="glass glass-strong animate-rise relative w-full max-w-lg rounded-[28px] p-6"
       >
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
@@ -123,12 +123,12 @@ export function AccessDialog({
         </div>
         <p className="mt-3 px-1 text-xs text-muted">{t('changeLater')}</p>
 
-        <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+        <div className="mt-6 flex items-center justify-between gap-3">
           {onInvite && (
             <button
               type="button"
               onClick={() => onInvite(access)}
-              className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm text-muted hover:bg-hover hover:text-foreground"
+              className="-ml-3.5 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm whitespace-nowrap text-muted hover:bg-hover hover:text-foreground"
             >
               <Link2 size={15} aria-hidden="true" />
               {tAccounts('copyInvite')}
@@ -137,7 +137,7 @@ export function AccessDialog({
           <button
             type="button"
             onClick={() => onConnect(access)}
-            className="btn-primary w-auto px-5"
+            className="btn-primary ml-auto w-auto shrink-0 px-5"
           >
             {t('continue', { platform: name })}
           </button>
