@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, Globe } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Footprints, Globe } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -9,7 +9,6 @@ import { apiUrl } from '@/lib/auth-client';
 import { InfoTip } from '../ui/info-tip';
 import { FlipperCheckout } from './flipper-checkout';
 import { FlipperSources } from './flipper-sources';
-import { FlipperIcon } from '../ui/flipper-icon';
 import { Segmented } from '../ui/segmented';
 import { CONNECT_ROLES } from './accounts-data';
 import { CodeBlock, FlipperGuide, installSnippet } from './flipper-guide';
@@ -225,7 +224,7 @@ export function Flipper() {
       <>
         <PageHeader title={t('title')} subtitle={t('subtitle')} />
         <EmptyState
-          icon={<FlipperIcon size={44} />}
+          icon={<Footprints size={24} strokeWidth={1.75} aria-hidden="true" />}
           title={t('noSitesTitle')}
           text={t('noSitesText')}
           action={
@@ -274,7 +273,7 @@ export function Flipper() {
 
       {current && !site && (
         <EmptyState
-          icon={<FlipperIcon size={44} />}
+          icon={<Footprints size={24} strokeWidth={1.75} aria-hidden="true" />}
           title={t('enableTitle', { site: name(current) })}
           text={t('enableText')}
           action={
