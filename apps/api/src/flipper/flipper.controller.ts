@@ -14,6 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Prisma } from '@adelie/db';
+import { hashServerKey, newServerKey } from './server-purchase.js';
 import { CONNECT_ROLES } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
 import { visibleProjectsWhere } from '../workspaces/project-visibility.js';
@@ -99,6 +100,7 @@ export class FlipperController {
             publicId: true,
             allowedHosts: true,
             consentMode: true,
+            serverKeyHint: true,
             createdAt: true,
           },
         },
@@ -125,6 +127,7 @@ export class FlipperController {
             publicId: trackedSite.publicId,
             allowedHosts: trackedSite.allowedHosts,
             consentMode: trackedSite.consentMode,
+            serverKeyHint: trackedSite.serverKeyHint,
             createdAt: trackedSite.createdAt,
             lastEventAt: last?.receivedAt ?? null,
             events7d,
@@ -188,6 +191,26 @@ export class FlipperController {
       data: { consentMode: mode },
     });
     return { consentMode: mode };
+  }
+
+  /**
+   * Makes a new server key for the site (the old one stops working). The key is in the answer
+   * once: only its hash is stored.
+   */
+  @Post(':accountId/server-key')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async serverKey(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const site = await this.siteOf(request.workspace, projectId, accountId);
+    const key = newServerKey();
+    await this.prisma.client.trackedSite.update({
+      where: { id: site.id },
+      data: { serverKeyHash: hashServerKey(key), serverKeyHint: key.slice(-4) },
+    });
+    return { key, hint: key.slice(-4) };
   }
 
   /** The latest events, newest first. Bots are left out. */

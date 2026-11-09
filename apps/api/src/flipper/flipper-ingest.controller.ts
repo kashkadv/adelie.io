@@ -13,9 +13,11 @@ import {
   isBot,
   MAX_BODY_BYTES,
   parseBatch,
+  cleanAddress,
   RateLimiter,
   visitOf,
 } from './ingest.js';
+import { hashServerKey, isServerKey, parseServerPurchase } from './server-purchase.js';
 
 const bare = (host: string) => host.replace(/^www\./, '').toLowerCase();
 
@@ -72,6 +74,7 @@ export class FlipperIngestController {
   >();
   private readonly perVisitor = new RateLimiter(120, 60_000);
   private readonly perSite = new RateLimiter(6_000, 60_000);
+  private readonly perServerKey = new RateLimiter(120, 60_000);
   private readonly secret = createHash('sha256')
     .update(`flipper:${config.auth.secret}`)
     .digest('hex');
@@ -200,5 +203,101 @@ export class FlipperIngestController {
       skipDuplicates: true,
     });
     return res.status(204).end();
+  }
+
+  /**
+   * A purchase reported by the shop's server once the payment is confirmed. Authenticated by the
+   * site's server key (`Authorization: Bearer fls_…`). One order is one purchase: a repeated call
+   * (webhook, poll and cron all confirm the same payment) is answered "duplicate". The purchase
+   * inherits the visitor's last known source, so the funnel and the channels include it.
+   */
+  @Post('collect/server')
+  async collectServer(@Req() req: Request, @Res() res: Response) {
+    res.setHeader('Cache-Control', 'no-store');
+    const header = String(req.headers.authorization ?? '');
+    const key = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+    if (!isServerKey(key)) return res.status(401).json({ error: 'unauthorized' });
+    const site = await this.prisma.client.trackedSite.findFirst({
+      where: { serverKeyHash: hashServerKey(key) },
+      select: { id: true, allowedHosts: true },
+    });
+    if (!site) return res.status(401).json({ error: 'unauthorized' });
+    if (!this.perServerKey.allow(site.id)) return res.status(429).json({ error: 'rate_limited' });
+
+    const raw = await readBody(req, MAX_BODY_BYTES);
+    if (raw === null) return res.status(413).json({ error: 'too_large' });
+    let json: unknown;
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      return res.status(400).json({ error: 'body' });
+    }
+    const parsed = parseServerPurchase(json);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+    const { orderId, occurredAt, visitorId, url, properties } = parsed.purchase;
+
+    // The visitor's last known visit: the most recent one that did not come direct, else any.
+    const db = this.prisma.client;
+    const since = new Date(occurredAt.getTime() - 30 * 86_400_000);
+    const known = {
+      siteId: site.id,
+      visitorId: visitorId ?? '-',
+      occurredAt: { gte: since, lte: occurredAt },
+    };
+    const select = {
+      sessionId: true,
+      referrerHost: true,
+      source: true,
+      medium: true,
+      campaign: true,
+      content: true,
+      term: true,
+      clickIdType: true,
+      channel: true,
+      device: true,
+    } as const;
+    const visit = visitorId
+      ? ((await db.websiteEvent.findFirst({
+          where: { ...known, channel: { notIn: ['Direct'] }, NOT: { channel: null } },
+          orderBy: { occurredAt: 'desc' },
+          select,
+        })) ??
+        (await db.websiteEvent.findFirst({
+          where: known,
+          orderBy: { occurredAt: 'desc' },
+          select,
+        })))
+      : null;
+
+    const address = cleanAddress(url ?? `https://${site.allowedHosts[0] ?? 'unknown.invalid'}/`);
+    const created = await db.websiteEvent.createMany({
+      data: [
+        {
+          siteId: site.id,
+          eventId: `purchase:${orderId}`,
+          name: 'Purchase',
+          occurredAt,
+          consent: visitorId !== null,
+          visitorId,
+          sessionId: visit?.sessionId ?? null,
+          url: address?.url ?? `https://${site.allowedHosts[0] ?? 'unknown.invalid'}/`,
+          referrerHost: visit?.referrerHost ?? null,
+          source: visit?.source ?? null,
+          medium: visit?.medium ?? null,
+          campaign: visit?.campaign ?? null,
+          content: visit?.content ?? null,
+          term: visit?.term ?? null,
+          clickIdType: visit?.clickIdType ?? null,
+          channel: visit?.channel ?? null,
+          device: visit?.device ?? null,
+          isBot: false,
+          properties: { ...properties, server: true } as unknown as Prisma.InputJsonValue,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return res
+      .status(200)
+      .json({ status: created.count ? 'created' : 'duplicate', attributed: !!visit });
   }
 }

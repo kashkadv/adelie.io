@@ -1318,16 +1318,28 @@
         "rules": "Write values in lower case, without spaces, the same for one source (always pinterest). Do not add labels to links inside your site. Source, medium and channel (Organic Social, Paid Search, Email, Referral, Direct…) are stored separately."
       },
       "check": {
-        "title": "7. Checking",
+        "title": "8. Checking",
         "lead": "Open a page of the site with the parameter flipper_debug=1: every event appears in the browser console. Then look at “Live events” on this page.",
-        "problems": "No events? Check: the script loaded (Network tab, the request to flipper.js), the collect request returned 204, the site is opened from an allowed domain, an ad blocker has not blocked the script.",
-        "purchase": "Purchase is deliberately not sent from the browser: a click or a “thank you” page is not proof of payment. We will add it separately, as a server event from your backend after the payment is confirmed."
+        "problems": "No events? Check: the script loaded (Network tab, the request to flipper.js), the collect request returned 204, the site is opened from an allowed domain, an ad blocker has not blocked the script."
+      },
+      "server": {
+        "title": "7. Purchases from the server",
+        "lead": "Send the purchase from your backend when the payment is confirmed. Create a key in the card Purchases from your server above, put it in the environment of your server (never in the browser code) and call the address below. Save the _fl_v cookie when the order is created, so the purchase can be joined to the visitor and the channel; without it the purchase still counts, just with no channel.",
+        "after": "The answer says created, or duplicate if this order was already reported (so a webhook, a poll and a cron job may all call it). The time of payment may be up to 7 days old. Errors: 401 wrong key, 400 the field named in error, 429 too many calls."
       }
     },
     "productViews": "{views, plural, one {# view} other {# views}} · {visitors, plural, one {# visitor} other {# visitors}}",
     "mode": "Mode",
     "modeHint": "Anonymous: until the visitor agrees, nothing is stored in their browser and people are counted by a daily hash. Full: visitors are recognised at once, without a consent banner (your decision for this site). The change reaches the site within minutes — the code on the site stays the same.",
     "modeAnonymous": "Anonymous until consent",
-    "modeGranted": "Full, no banner"
+    "modeGranted": "Full, no banner",
+    "serverTitle": "Purchases from your server",
+    "serverHint": "When the browser may never return after paying (the bank closes its window), your server reports the purchase itself once the payment is confirmed. It is counted once per order and joined to the visitor’s channel. Authenticated by a secret key: keep it on the server only.",
+    "serverKeySet": "Key ends in {hint}",
+    "serverKeyNone": "No key yet",
+    "serverMakeKey": "Create key",
+    "serverNewKey": "New key",
+    "serverRegenerate": "The old key will stop working at once. Continue?",
+    "serverShownOnce": "Copy the key now: it is shown only once."
   }
 }

@@ -84,6 +84,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   );
 }`;
 
+const SERVER = `// On your server, when the payment is confirmed (webhook, poll or cron — repeats are safe).
+await fetch('https://dev-api.adelie.space/collect/server', {
+  method: 'POST',
+  headers: {
+    'content-type': 'application/json',
+    authorization: \`Bearer \${process.env.FLIPPER_SERVER_KEY}\`, // keep the key on the server only
+  },
+  body: JSON.stringify({
+    transaction_id: order.number,          // required — one order is one purchase
+    occurred_at: order.paidAt.toISOString(), // when it was paid, not when you send it (up to 7 days back)
+    visitor_id: order.flVisitorId,         // the _fl_v cookie saved when the order was created
+    value: order.total,
+    currency: 'UAH',
+    shipping: order.shipping,
+    items: order.lines.map((l) => ({ item_id: l.sku, item_name: l.title, price: l.price, quantity: l.qty })),
+  }),
+});
+// → { "status": "created" | "duplicate", "attributed": true | false }`;
+
 const NEXT_EVENTS = `// A product page (client component): once when the product is shown
 'use client';
 import { useEffect } from 'react';
@@ -226,13 +245,21 @@ export function FlipperGuide({ scriptUrl, siteId }: { scriptUrl: string; siteId:
         </>,
       )}
       {section(
+        'server',
+        t('server.title'),
+        <>
+          {p('server.lead')}
+          <CodeBlock code={SERVER} />
+          {p('server.after')}
+        </>,
+      )}
+      {section(
         'check',
         t('check.title'),
         <>
           {p('check.lead')}
           <CodeBlock code={`https://gushka.ua/product/00022502?flipper_debug=1`} />
           {p('check.problems')}
-          {p('check.purchase')}
         </>,
       )}
     </div>

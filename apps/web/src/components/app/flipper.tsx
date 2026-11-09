@@ -23,6 +23,7 @@ type Site = {
     publicId: string;
     allowedHosts: string[];
     consentMode: 'anonymous' | 'granted';
+    serverKeyHint: string | null;
     createdAt: string;
     lastEventAt: string | null;
     events7d: number;
@@ -140,6 +141,19 @@ export function Flipper() {
     setBusy(true);
     try {
       await api(`${base}/${current.id}`, { method: 'POST' });
+      setVersion((v) => v + 1);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const [newKey, setNewKey] = useState<string | null>(null);
+  async function makeKey() {
+    if (!base || !current) return;
+    setBusy(true);
+    try {
+      const r = await api<{ key: string }>(`${base}/${current.id}/server-key`, { method: 'POST' });
+      setNewKey(r.key);
       setVersion((v) => v + 1);
     } finally {
       setBusy(false);
@@ -271,6 +285,38 @@ export function Flipper() {
               code={installSnippet(`${apiUrl}/flipper.js?site=${site.publicId}`, site.publicId)}
               label={t('install')}
             />
+          </section>
+
+          <section className="card animate-rise mb-6 rounded-[24px] p-5">
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                {t('serverTitle')}
+                <InfoTip text={t('serverHint')} />
+              </h2>
+              <span className="text-xs text-muted">
+                {site.serverKeyHint
+                  ? t('serverKeySet', { hint: site.serverKeyHint })
+                  : t('serverKeyNone')}
+              </span>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  if (!site.serverKeyHint || window.confirm(t('serverRegenerate'))) void makeKey();
+                }}
+                className="rounded-full border border-line px-3 py-1 text-xs hover:text-foreground"
+              >
+                {site.serverKeyHint ? t('serverNewKey') : t('serverMakeKey')}
+              </button>
+            </div>
+            {newKey && (
+              <>
+                <p className="mb-2 text-xs text-amber-700 dark:text-amber-300">
+                  {t('serverShownOnce')}
+                </p>
+                <CodeBlock code={newKey} label={t('serverTitle')} />
+              </>
+            )}
           </section>
 
           <div className="animate-rise mb-4 flex flex-wrap items-center gap-3">

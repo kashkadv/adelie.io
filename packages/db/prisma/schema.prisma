@@ -897,6 +897,10 @@ model TrackedSite {
   /// "anonymous" (wait for consent) or "granted" (the site's own decision: no banner). Baked
   /// into the script the site loads, so changing it needs no change on the site.
   consentMode  String        @default("anonymous")
+  /// SHA-256 of the site's server key (the shop's backend reports purchases with it); the key
+  /// itself is shown once. serverKeyHint is its last four characters, to tell keys apart.
+  serverKeyHash String?      @unique
+  serverKeyHint String?
   createdAt    DateTime      @default(now())
 
   events WebsiteEvent[]
