@@ -1011,6 +1011,10 @@
       "ignoreHint": "This is on purpose — do not show this problem for the product",
       "ignoredTitle": "Ignored",
       "restore": "Bring back"
+    },
+    "shopKind": {
+      "ETSY": "Etsy",
+      "WEBSITE": "Site"
     }
   }
 }

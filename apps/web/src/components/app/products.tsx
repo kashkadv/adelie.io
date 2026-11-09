@@ -257,7 +257,12 @@ export function Products() {
             label={t('shop')}
             value={shopId}
             onChange={setShopId}
-            options={shops.map((s) => ({ value: s.id, label: s.displayName || s.username || '' }))}
+            options={shops.map((s) => ({
+              value: s.id,
+              label: s.displayName || s.username || '',
+              // What it is: a shop (Etsy) or a site with a feed.
+              hint: t(`shopKind.${s.platform}`),
+            }))}
             clearLabel={tc('clearFilter')}
           />
         )}
