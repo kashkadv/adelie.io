@@ -3,8 +3,9 @@
 import { ArrowLeft, ArrowRight, Check, List, Lock, X } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { api, ApiError } from '@/lib/api';
+import { compareVariations } from '@/lib/variation-order';
 import { InfoTip } from '../ui/info-tip';
 import { PanelSheet } from '../ui/panel-sheet';
 import { Segmented } from '../ui/segmented';
@@ -275,6 +276,11 @@ export function ProductEditor({
       .find((v) => v.id === id)
       ?.options.map((o) => o.value)
       .join(' · ') ?? id;
+  /** A variation's option values, optionally without some options, in the options' order. */
+  const valuesOfVariation = (id: string, without: string[] = []) =>
+    (variationsOf.find((v) => v.id === id)?.options ?? [])
+      .filter((o) => !without.includes(o.propertyId))
+      .map((o) => o.value);
   /** The variation's value of an option (e.g. its colour) — what groups variations by SKU. */
   const optionValue = (variationId: string, propertyId: string) =>
     variationsOf.find((v) => v.id === variationId)?.options.find((o) => o.propertyId === propertyId)
@@ -333,6 +339,26 @@ export function ProductEditor({
     });
   }
   const skuMode = skuModes.find((m) => sameSet(m.ids, currentOn))?.key ?? 'none';
+  /**
+   * Display order only (nothing sent changes): the SKU's groups together, sizes in their natural
+   * order inside them (XS, S, M, L, XL…). With one SKU for all, by sizes. A group header carries
+   * the group's SKU when a group has several variations.
+   */
+  const shownOn = values?.skuOnProperty ?? [];
+  const orderKey = (id: string) => [
+    ...shownOn.map((p) => optionValue(id, p)),
+    ...valuesOfVariation(id, shownOn),
+  ];
+  const orderedVariations = [...(values?.variations ?? [])].sort((a, b) =>
+    compareVariations(orderKey(a.id), orderKey(b.id)),
+  );
+  const skuGroups = new Map<string, Var[]>();
+  for (const v of orderedVariations) {
+    const key = groupKey(v.id, shownOn);
+    skuGroups.set(key, [...(skuGroups.get(key) ?? []), v]);
+  }
+  /** Several variations share each SKU: show the SKU once per group, in its header. */
+  const groupedSku = shownOn.length > 0 && skuGroups.size < orderedVariations.length;
   /** One variation changed — or all of them, when the value is shared. */
   const setVar = (id: string, patch: Partial<Var>) =>
     values &&
@@ -481,6 +507,63 @@ export function ProductEditor({
     errors[f] && (
       <p className="mt-1 px-3.5 text-xs text-rose-600 dark:text-rose-400">{errors[f]}</p>
     );
+
+  /** One row of the variations list; in a SKU group it is indented under the group's header. */
+  const variationRow = (v: Var, grouped: boolean) => (
+    <li
+      key={v.id}
+      className={`flex flex-wrap items-center gap-3 py-2 pr-3 text-sm ${
+        grouped ? 'pl-7' : 'pl-3'
+      } ${v.enabled ? '' : 'text-muted'}`}
+    >
+      <span className="min-w-0 flex-1 basis-40 truncate" title={optionsOf(v.id)}>
+        {grouped ? valuesOfVariation(v.id, shownOn).join(' · ') : optionsOf(v.id)}
+      </span>
+      {values!.skuOnProperty.length > 0 && !grouped && (
+        <input
+          className="field tabular h-9 w-40 py-1"
+          aria-label={t('variationSku', { variation: optionsOf(v.id) })}
+          placeholder={t('fields.sku')}
+          value={v.sku}
+          onChange={(e) => setSku(v.id, e.target.value)}
+        />
+      )}
+
+      {data!.current!.priceVaries ? (
+        <input
+          className="field tabular h-9 w-28 py-1 text-right"
+          inputMode="decimal"
+          aria-label={t('variationPrice', { variation: optionsOf(v.id) })}
+          value={varPrices[v.id] ?? ''}
+          onChange={(e) => setVarPrice(v.id, e.target.value)}
+        />
+      ) : (
+        <span className="tabular w-28 text-right text-muted">
+          {money(toMinor(varPrices[v.id] ?? '', digits), currency)}
+        </span>
+      )}
+      {data!.current!.quantityVaries ? (
+        <input
+          className="field tabular h-9 w-20 py-1 text-right"
+          inputMode="numeric"
+          aria-label={t('variationQuantity', { variation: optionsOf(v.id) })}
+          value={v.quantity ?? ''}
+          onChange={(e) =>
+            setVar(v.id, {
+              quantity: e.target.value === '' ? null : Number(e.target.value),
+            })
+          }
+        />
+      ) : (
+        <span className="tabular w-20 text-right text-muted">{v.quantity ?? '—'}</span>
+      )}
+      <Switch
+        checked={v.enabled}
+        onChange={(on) => setVar(v.id, { enabled: on })}
+        label={t('onSale')}
+      />
+    </li>
+  );
 
   return (
     <PanelSheet labelledBy={titleId} onClose={() => !saving && onClose()} closeLabel={t('close')}>
@@ -644,63 +727,29 @@ export function ProductEditor({
                     </div>
                   )}
                   <ul className="divide-y divide-line rounded-2xl border border-line">
-                    {values.variations.map((v) => (
-                      <li
-                        key={v.id}
-                        className={`flex flex-wrap items-center gap-3 px-3 py-2 text-sm ${
-                          v.enabled ? '' : 'text-muted'
-                        }`}
-                      >
-                        <span className="min-w-0 flex-1 basis-40 truncate" title={optionsOf(v.id)}>
-                          {optionsOf(v.id)}
-                        </span>
-                        {values.skuOnProperty.length > 0 && (
-                          <input
-                            className="field tabular h-9 w-40 py-1"
-                            aria-label={t('variationSku', { variation: optionsOf(v.id) })}
-                            placeholder={t('fields.sku')}
-                            value={v.sku}
-                            onChange={(e) => setSku(v.id, e.target.value)}
-                          />
-                        )}
-
-                        {data.current!.priceVaries ? (
-                          <input
-                            className="field tabular h-9 w-28 py-1 text-right"
-                            inputMode="decimal"
-                            aria-label={t('variationPrice', { variation: optionsOf(v.id) })}
-                            value={varPrices[v.id] ?? ''}
-                            onChange={(e) => setVarPrice(v.id, e.target.value)}
-                          />
-                        ) : (
-                          <span className="tabular w-28 text-right text-muted">
-                            {money(toMinor(varPrices[v.id] ?? '', digits), currency)}
-                          </span>
-                        )}
-                        {data.current!.quantityVaries ? (
-                          <input
-                            className="field tabular h-9 w-20 py-1 text-right"
-                            inputMode="numeric"
-                            aria-label={t('variationQuantity', { variation: optionsOf(v.id) })}
-                            value={v.quantity ?? ''}
-                            onChange={(e) =>
-                              setVar(v.id, {
-                                quantity: e.target.value === '' ? null : Number(e.target.value),
-                              })
-                            }
-                          />
-                        ) : (
-                          <span className="tabular w-20 text-right text-muted">
-                            {v.quantity ?? '—'}
-                          </span>
-                        )}
-                        <Switch
-                          checked={v.enabled}
-                          onChange={(on) => setVar(v.id, { enabled: on })}
-                          label={t('onSale')}
-                        />
-                      </li>
-                    ))}
+                    {groupedSku
+                      ? [...skuGroups].map(([key, members]) => (
+                          <Fragment key={key}>
+                            <li className="flex flex-wrap items-center gap-3 bg-hover px-3 py-2 text-sm font-medium">
+                              <span className="min-w-0 flex-1 basis-40 truncate">
+                                {shownOn.map((p) => optionValue(members[0]!.id, p)).join(' · ')}
+                              </span>
+                              <input
+                                className="field tabular h-9 w-40 py-1 font-normal"
+                                aria-label={t('groupSku', {
+                                  group: shownOn
+                                    .map((p) => optionValue(members[0]!.id, p))
+                                    .join(' · '),
+                                })}
+                                placeholder={t('fields.sku')}
+                                value={members[0]!.sku}
+                                onChange={(e) => setSku(members[0]!.id, e.target.value)}
+                              />
+                            </li>
+                            {members.map((v) => variationRow(v, true))}
+                          </Fragment>
+                        ))
+                      : orderedVariations.map((v) => variationRow(v, false))}
                   </ul>
                   {fieldError('variations')}
                 </div>

@@ -851,7 +851,8 @@
       "skuMode": "SKU",
       "skuOneForAll": "Один для всіх",
       "skuByOption": "За {name}",
-      "skuEach": "Кожна варіація"
+      "skuEach": "Кожна варіація",
+      "groupSku": "SKU: {group}"
     },
     "card": {
       "close": "Закрити",

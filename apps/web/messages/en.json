@@ -851,7 +851,8 @@
       "skuMode": "SKU",
       "skuOneForAll": "One for all",
       "skuByOption": "By {name}",
-      "skuEach": "Each variation"
+      "skuEach": "Each variation",
+      "groupSku": "SKU: {group}"
     },
     "card": {
       "close": "Close",
