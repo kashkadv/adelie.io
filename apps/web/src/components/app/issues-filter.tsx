@@ -91,11 +91,11 @@ export function IssuesFilter({
         clearLabel={clearLabel}
       />
       {open && (
-        <ChipPanel className="w-80">
+        <ChipPanel className="w-max max-w-[calc(100vw-2rem)] min-w-72">
           <div
             role="group"
             aria-label={t('filter')}
-            className="scroll-thin max-h-96 overflow-y-auto p-1.5"
+            className="scroll-thin max-h-[min(34rem,70vh)] overflow-y-auto p-1.5"
           >
             {present.length === 0 && <p className="px-3 py-3 text-sm text-muted">{t('none')}</p>}
             {ISSUE_LEVELS.map((level) => {
@@ -130,7 +130,9 @@ export function IssuesFilter({
                       className="flex w-full items-center gap-3 rounded-xl py-2 pr-3 pl-10 text-left text-sm hover:bg-hover"
                     >
                       <Box checked={selected.includes(code)} />
-                      <span className="min-w-0 flex-1">{t(`short.${code}`)}</span>
+                      <span className="min-w-0 flex-1 truncate whitespace-nowrap">
+                        {t(`short.${code}`)}
+                      </span>
                       <span className="tabular shrink-0 text-xs text-muted">
                         {counts[code] ?? 0}
                       </span>
