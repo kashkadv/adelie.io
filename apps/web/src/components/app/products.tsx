@@ -737,8 +737,8 @@ export function Products() {
           onEdit={
             openProduct?.state !== 'removed' && openProduct?.account.platform === 'ETSY'
               ? () => {
+                  // The row it was opened from stays lit through the editing, too.
                   setEditing(openId);
-                  setOpenedFrom(null);
                   setOpenId(null);
                 }
               : undefined
@@ -750,8 +750,15 @@ export function Products() {
         <ProductEditor
           base={base}
           productId={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => setVersion((v) => v + 1)}
+          onClose={() => {
+            setEditing(null);
+            setOpenedFrom(null);
+          }}
+          onSaved={() => {
+            setVersion((v) => v + 1);
+            // What was read from other channels may be out of date now: read again when needed.
+            setOtherLists({});
+          }}
         />
       )}
     </>
