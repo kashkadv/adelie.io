@@ -149,7 +149,6 @@ export function ProductDialog({
 }) {
   const t = useTranslations('Sales.card');
   const ts = useTranslations('Sales');
-  const ti = useTranslations('Sales.issues');
   const format = useFormatter();
   const locale = useLocale();
   const money = useMoney();

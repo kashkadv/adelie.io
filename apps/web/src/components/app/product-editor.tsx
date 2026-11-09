@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, ArrowRight, Check, List, Lock, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ExternalLink, List, Lock, X } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
@@ -30,15 +30,23 @@ type Editable = {
     enabled: boolean;
     sku: string;
   }[];
-  /** Each variation has its own price / quantity; otherwise one value for all. */
-  priceVaries: boolean;
-  quantityVaries: boolean;
-  /** The options variations are made of, and the ones the SKU goes by. */
+  /** The options variations are made of, and the ones price, quantity and SKU go by. */
   skuProperties: { id: string; name: string }[];
+  priceOnProperty: string[];
+  quantityOnProperty: string[];
   skuOnProperty: string[];
 };
 type Field =
-  'title' | 'description' | 'tags' | 'sku' | 'price' | 'quantity' | 'skuOnProperty' | 'variations';
+  | 'title'
+  | 'description'
+  | 'tags'
+  | 'sku'
+  | 'price'
+  | 'quantity'
+  | 'priceOnProperty'
+  | 'quantityOnProperty'
+  | 'skuOnProperty'
+  | 'variations';
 /** A variation as edited: price in minor units. */
 type Var = {
   id: string;
@@ -56,6 +64,13 @@ type Change = {
   user: { name: string } | null;
 };
 type EditData = {
+  /** For the header: what the product looks like and where it is in Etsy. */
+  product: {
+    title: string;
+    imageUrl: string | null;
+    url: string | null;
+    externalId: string;
+  } | null;
   canEdit: boolean;
   reason: 'role' | 'connection' | 'readOnly' | 'removed' | null;
   current: Editable | null;
@@ -68,7 +83,9 @@ type Values = {
   sku: string;
   price: number | null;
   quantity: number | null;
-  /** Ids of the options the SKU goes by, sorted. */
+  /** Ids of the options price / quantity / SKU go by, sorted. */
+  priceOnProperty: string[];
+  quantityOnProperty: string[];
   skuOnProperty: string[];
   variations: Var[];
 };
@@ -83,6 +100,8 @@ const FIELDS: Field[] = [
   'sku',
   'price',
   'quantity',
+  'priceOnProperty',
+  'quantityOnProperty',
   'skuOnProperty',
   'variations',
 ];
@@ -94,6 +113,8 @@ const valuesOf = (p: Editable): Values => ({
   sku: p.sku,
   price: p.price?.amount ?? null,
   quantity: p.quantity,
+  priceOnProperty: [...p.priceOnProperty].sort(),
+  quantityOnProperty: [...p.quantityOnProperty].sort(),
   skuOnProperty: [...p.skuOnProperty].sort(),
   // Sorted by id, like the API compares them.
   variations: p.variations
@@ -315,30 +336,62 @@ export function ProductEditor({
       })),
     });
   };
-  /** The ways the SKU can vary: for all at once, by one option, by every option together. */
+  /** The ways a setting can vary: for all at once, by one option, by every option together. */
   const skuProps = data?.current?.skuProperties ?? [];
   const sameSet = (a: string[], b: string[]) => same([...a].sort(), [...b].sort());
-  const skuModes: { key: string; ids: string[]; label: string }[] = [
-    { key: 'none', ids: [], label: t('skuOneForAll') },
-    ...skuProps.map((p) => ({
-      key: `p${p.id}`,
-      ids: [p.id],
-      label: t('skuByOption', { name: p.name }),
-    })),
-    ...(skuProps.length > 1
-      ? [{ key: 'all', ids: skuProps.map((p) => p.id), label: t('skuEach') }]
-      : []),
-  ];
-  const currentOn = values?.skuOnProperty ?? [];
-  if (values && !skuModes.some((m) => sameSet(m.ids, currentOn))) {
-    // A combination Etsy already has that is not one of the above: show it as it is.
-    skuModes.push({
-      key: 'custom',
-      ids: currentOn,
-      label: currentOn.map((id) => skuProps.find((p) => p.id === id)?.name ?? id).join(' + '),
+  const modesOf = (on: string[]) => {
+    const list: { key: string; ids: string[]; label: string }[] = [
+      { key: 'none', ids: [], label: t('varyNone') },
+      ...skuProps.map((p) => ({
+        key: `p${p.id}`,
+        ids: [p.id],
+        label: t('varyBy', { name: p.name }),
+      })),
+      ...(skuProps.length > 1
+        ? [{ key: 'all', ids: skuProps.map((p) => p.id), label: t('varyEach') }]
+        : []),
+    ];
+    if (!list.some((m) => sameSet(m.ids, on))) {
+      // A combination Etsy already has that is not one of the above: show it as it is.
+      list.push({
+        key: 'custom',
+        ids: on,
+        label: on.map((id) => skuProps.find((p) => p.id === id)?.name ?? id).join(' + '),
+      });
+    }
+    return list;
+  };
+  /** Choosing what the price goes by regroups the variations; each group keeps one price. */
+  const setPriceOn = (on: string[]) => {
+    if (!values) return;
+    const first = new Map<string, string>();
+    for (const v of values.variations) {
+      const key = groupKey(v.id, on);
+      const text = varPrices[v.id] ?? '';
+      if (!first.get(key) && text.trim()) first.set(key, text);
+    }
+    setValues({ ...values, priceOnProperty: on });
+    setVarPrices(
+      Object.fromEntries(values.variations.map((v) => [v.id, first.get(groupKey(v.id, on)) ?? ''])),
+    );
+  };
+  /** Same for the quantity. */
+  const setQuantityOn = (on: string[]) => {
+    if (!values) return;
+    const first = new Map<string, number>();
+    for (const v of values.variations) {
+      const key = groupKey(v.id, on);
+      if (!first.has(key) && v.quantity !== null) first.set(key, v.quantity);
+    }
+    setValues({
+      ...values,
+      quantityOnProperty: on,
+      variations: values.variations.map((v) => ({
+        ...v,
+        quantity: first.get(groupKey(v.id, on)) ?? null,
+      })),
     });
-  }
-  const skuMode = skuModes.find((m) => sameSet(m.ids, currentOn))?.key ?? 'none';
+  };
   /**
    * Display order only (nothing sent changes): the SKU's groups together, sizes in their natural
    * order inside them (XS, S, M, L, XL…). With one SKU for all, by sizes. A group header carries
@@ -365,16 +418,25 @@ export function ProductEditor({
     setValues({
       ...values,
       variations: values.variations.map((v) =>
-        v.id === id || ('quantity' in patch && !data?.current?.quantityVaries)
+        v.id === id ||
+        ('quantity' in patch &&
+          groupKey(v.id, values.quantityOnProperty) === groupKey(id, values.quantityOnProperty))
           ? { ...v, ...patch }
           : v,
       ),
     });
+  /** A price belongs to the whole group of variations that agree on the options it goes by. */
   const setVarPrice = (id: string, text: string) =>
+    values &&
     setVarPrices((all) =>
-      data?.current?.priceVaries
-        ? { ...all, [id]: text }
-        : Object.fromEntries(Object.keys(all).map((k) => [k, text])),
+      Object.fromEntries(
+        Object.keys(all).map((k) => [
+          k,
+          groupKey(k, values.priceOnProperty) === groupKey(id, values.priceOnProperty)
+            ? text
+            : all[k],
+        ]),
+      ),
     );
   const changed = FIELDS.filter((f) => original && edited && !same(original[f], edited[f]));
 
@@ -483,7 +545,7 @@ export function ProductEditor({
     if (v === null || v === undefined || v === '') return '—';
     if (f === 'price') return money(v as number, currency);
     if (f === 'tags') return (v as string[]).join(', ');
-    if (f === 'skuOnProperty') {
+    if (f === 'skuOnProperty' || f === 'priceOnProperty' || f === 'quantityOnProperty') {
       const names = (v as string[]).map(
         (id) => data?.current?.skuProperties.find((p) => p.id === id)?.name ?? id,
       );
@@ -529,7 +591,7 @@ export function ProductEditor({
         />
       )}
 
-      {data!.current!.priceVaries ? (
+      {values!.priceOnProperty.length > 0 ? (
         <input
           className="field tabular h-9 w-28 py-1 text-right"
           inputMode="decimal"
@@ -542,7 +604,7 @@ export function ProductEditor({
           {money(toMinor(varPrices[v.id] ?? '', digits), currency)}
         </span>
       )}
-      {data!.current!.quantityVaries ? (
+      {values!.quantityOnProperty.length > 0 ? (
         <input
           className="field tabular h-9 w-20 py-1 text-right"
           inputMode="numeric"
@@ -567,13 +629,33 @@ export function ProductEditor({
 
   return (
     <PanelSheet labelledBy={titleId} onClose={() => !saving && onClose()} closeLabel={t('close')}>
-      <div className="flex items-start gap-3 border-b border-line p-5">
+      <div className="flex items-center gap-3 border-b border-line p-5">
+        <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-hover">
+          {data?.product?.imageUrl && (
+            // External platform image: plain <img>, lazy.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={data.product.imageUrl} alt="" className="h-full w-full object-cover" />
+          )}
+        </span>
         <div className="min-w-0 flex-1">
           <h2 id={titleId} className="text-lg font-semibold">
             {step === 'review' ? t('reviewTitle') : t('title')}
           </h2>
-          <p className="truncate text-sm text-muted">{data?.current?.title ?? '…'}</p>
+          <p className="truncate text-sm text-muted">
+            {data?.current?.title ?? data?.product?.title ?? '…'}
+          </p>
         </div>
+        {data?.product && (
+          <a
+            href={`https://www.etsy.com/your/shops/me/tools/listings/${data.product.externalId}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-1.5 text-sm hover:bg-hover"
+          >
+            <ExternalLink size={15} aria-hidden="true" />
+            {t('openInEtsyEditor')}
+          </a>
+        )}
         <button
           type="button"
           onClick={onClose}
@@ -661,19 +743,37 @@ export function ProductEditor({
               {data.current?.hasVariations ? (
                 <div>
                   {label('variations', currency)}
-                  {/* Etsy's "SKUs vary": one SKU for all, or by an option (colour, size…). */}
+                  {/* Etsy's "Prices / Quantities / SKUs vary": for all, or by an option (colour, size…). */}
                   {data.current.skuProperties.length > 0 && (
-                    <div className="mb-3">
-                      <span className="mb-1.5 flex items-center gap-1.5 px-3.5 text-xs text-muted">
-                        {t('skuMode')}
-                        <InfoTip text={t('skuByHint')} />
-                      </span>
-                      <Segmented
-                        ariaLabel={t('skuMode')}
-                        value={skuMode}
-                        onChange={(key) => setSkuOn(skuModes.find((m) => m.key === key)?.ids ?? [])}
-                        options={skuModes.map((m) => ({ value: m.key, label: m.label }))}
-                      />
+                    <div className="mb-3 grid gap-3">
+                      {(
+                        [
+                          ['priceMode', 'priceModeHint', values.priceOnProperty, setPriceOn],
+                          [
+                            'quantityMode',
+                            'quantityModeHint',
+                            values.quantityOnProperty,
+                            setQuantityOn,
+                          ],
+                          ['skuMode', 'skuByHint', values.skuOnProperty, setSkuOn],
+                        ] as const
+                      ).map(([label, hint, on, set]) => {
+                        const modes = modesOf(on);
+                        return (
+                          <div key={label}>
+                            <span className="mb-1.5 flex items-center gap-1.5 px-3.5 text-xs text-muted">
+                              {t(label)}
+                              <InfoTip text={t(hint)} />
+                            </span>
+                            <Segmented
+                              ariaLabel={t(label)}
+                              value={modes.find((m) => sameSet(m.ids, on))?.key ?? 'none'}
+                              onChange={(key) => set(modes.find((m) => m.key === key)?.ids ?? [])}
+                              options={modes.map((m) => ({ value: m.key, label: m.label }))}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   {/* SKU does not vary: one SKU for the whole product, edited once. */}
@@ -690,9 +790,10 @@ export function ProductEditor({
                     </label>
                   )}
                   {/* A shared price or quantity is edited once for every variation. */}
-                  {(!data.current.priceVaries || !data.current.quantityVaries) && (
+                  {(values.priceOnProperty.length === 0 ||
+                    values.quantityOnProperty.length === 0) && (
                     <div className="mb-3 grid grid-cols-2 gap-4">
-                      {!data.current.priceVaries && (
+                      {values.priceOnProperty.length === 0 && (
                         <label className="block">
                           <span className="mb-1.5 block px-3.5 text-xs text-muted">
                             {t('sharedPrice')}
@@ -707,7 +808,7 @@ export function ProductEditor({
                           />
                         </label>
                       )}
-                      {!data.current.quantityVaries && (
+                      {values.quantityOnProperty.length === 0 && (
                         <label className="block">
                           <span className="mb-1.5 block px-3.5 text-xs text-muted">
                             {t('sharedQuantity')}

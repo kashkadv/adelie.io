@@ -71,6 +71,9 @@ export class SalesController {
       select: {
         id: true,
         externalId: true,
+        title: true,
+        imageUrl: true,
+        url: true,
         state: true,
         accountId: true,
         account: {
@@ -330,6 +333,13 @@ export class SalesController {
     return {
       canEdit: reason === null && !!current,
       reason,
+      // For the editor's header: what the product looks like and where it is in Etsy.
+      product: {
+        title: product.title,
+        imageUrl: product.imageUrl,
+        url: product.url,
+        externalId: product.externalId,
+      },
       current,
       history: await this.history(product.id),
     };
@@ -369,8 +379,8 @@ export class SalesController {
             }))
           : k === 'sku'
             ? c.sku?.trim()
-            : k === 'skuOnProperty'
-              ? [...(c.skuOnProperty ?? [])].sort()
+            : k === 'skuOnProperty' || k === 'priceOnProperty' || k === 'quantityOnProperty'
+              ? [...(c[k] ?? [])].sort()
               : c[k];
       const conflict = (Object.keys(changes) as (keyof ProductChanges)[]).some(
         (k) => k in expected && !same(valueOf(live, k), asked(expected, k)),
@@ -587,13 +597,15 @@ export class SalesController {
     }
     return {
       period: period ? { from: period.from, to: period.to } : null,
-      items: products.map(({ externalId, tags, variationCount, skuGroups, ...p }) => ({
-        ...p,
-        sold: sold.get(p.id)?.units ?? 0,
-        revenue: sold.get(p.id)?.revenue ?? 0,
-        posts: postsOf({ ...p, externalId }),
-        issues: issues.get(p.id) ?? [],
-      })),
+      items: products.map(
+        ({ externalId, tags: _tags, variationCount: _variations, skuGroups: _groups, ...p }) => ({
+          ...p,
+          sold: sold.get(p.id)?.units ?? 0,
+          revenue: sold.get(p.id)?.revenue ?? 0,
+          posts: postsOf({ ...p, externalId }),
+          issues: issues.get(p.id) ?? [],
+        }),
+      ),
     };
   }
 
@@ -814,7 +826,9 @@ function normalizeVariations(
 function valueOf(p: ProductEditable, key: keyof ProductChanges): unknown {
   if (key === 'price') return p.price?.amount ?? null;
   if (key === 'variations') return normalizeVariations(p.variations);
-  if (key === 'skuOnProperty') return [...p.skuOnProperty].sort();
+  if (key === 'skuOnProperty' || key === 'priceOnProperty' || key === 'quantityOnProperty') {
+    return [...p[key]].sort();
+  }
   return p[key];
 }
 
@@ -850,8 +864,9 @@ function parseChanges(raw: unknown): ProductChanges {
   if (typeof r['price'] === 'number') out.price = r['price'];
   if (typeof r['quantity'] === 'number') out.quantity = r['quantity'];
   if (typeof r['sku'] === 'string') out.sku = r['sku'].trim();
-  if (Array.isArray(r['skuOnProperty']) && r['skuOnProperty'].every((x) => typeof x === 'string')) {
-    out.skuOnProperty = r['skuOnProperty'] as string[];
+  for (const key of ['skuOnProperty', 'priceOnProperty', 'quantityOnProperty'] as const) {
+    const value = r[key];
+    if (Array.isArray(value) && value.every((x) => typeof x === 'string')) out[key] = value;
   }
   if (Array.isArray(r['variations'])) {
     const list = (r['variations'] as Record<string, unknown>[]).filter(

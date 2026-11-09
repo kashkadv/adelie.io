@@ -491,7 +491,11 @@ describe('Etsy variations', () => {
       '/v3/application/listings/7/inventory': [inventory],
     });
     const p = await adapter.getProductForEdit(ctx(client), '7');
-    expect(p).toMatchObject({ hasVariations: true, priceVaries: true, quantityVaries: false });
+    expect(p).toMatchObject({
+      hasVariations: true,
+      priceOnProperty: ['200'],
+      quantityOnProperty: [],
+    });
     expect(p.variations[1]).toEqual({
       id: '2',
       options: [{ propertyId: '200', name: 'Primary color', value: 'Brown' }],
@@ -594,6 +598,86 @@ describe('Etsy variations', () => {
       ).rejects.toSatisfy((e) => isAdapterError(e, 'INVALID'));
     });
 
+    it('price and quantity can vary by an option too: one value per group', async () => {
+      const { client, seen } = http({
+        '/v3/application/listings/7': [{ ...listing, has_variations: true }],
+        '/v3/application/listings/7/inventory': [
+          jacket([], ['', '', '', '']),
+          {},
+          jacket([], ['', '', '', '']),
+        ],
+      });
+      await adapter.updateProduct(ctx(client), '7', {
+        priceOnProperty: ['200'],
+        quantityOnProperty: ['200'],
+        variations: [
+          { id: '1', price: 70000, quantity: 3 },
+          { id: '2', price: 70000, quantity: 3 },
+          { id: '3', price: 80000, quantity: 5 },
+          { id: '4', price: 80000, quantity: 5 },
+        ],
+      });
+      const body = JSON.parse(String(seen.find((x) => x.init.method === 'PUT')!.init.body));
+      expect(body.price_on_property).toEqual([200]);
+      expect(body.quantity_on_property).toEqual([200]);
+      expect(body.sku_on_property).toEqual([]);
+      expect(
+        body.products.map((p: { offerings: { price: number; quantity: number }[] }) => [
+          p.offerings[0]!.price,
+          p.offerings[0]!.quantity,
+        ]),
+      ).toEqual([
+        [700, 3],
+        [700, 3],
+        [800, 5],
+        [800, 5],
+      ]);
+    });
+
+    it('refuses different prices inside one price group', async () => {
+      const { client } = http({
+        '/v3/application/listings/7/inventory': [
+          { ...jacket([], ['', '', '', '']), price_on_property: [200] },
+        ],
+      });
+      await expect(
+        adapter.updateProduct(ctx(client), '7', { variations: [{ id: '2', price: 71000 }] }),
+      ).rejects.toSatisfy((e) => isAdapterError(e, 'INVALID'));
+    });
+
+    it('applies Etsy’s rule: one setting by every option means the others by every option or none', async () => {
+      const { client } = http({
+        '/v3/application/listings/7/inventory': [
+          { ...jacket([], ['', '', '', '']), price_on_property: [200] },
+        ],
+      });
+      await expect(
+        adapter.updateProduct(ctx(client), '7', { skuOnProperty: ['200', '300'] }),
+      ).rejects.toSatisfy((e) => isAdapterError(e, 'INVALID'));
+    });
+
+    it('sends the processing-profile setting back as it was', async () => {
+      const { client, seen } = http({
+        '/v3/application/listings/7/inventory': [
+          { ...jacket([], ['', '', '', '']), readiness_state_on_property: [300] },
+          {},
+          jacket([], ['', '', '', '']),
+        ],
+        '/v3/application/listings/7': [{ ...listing, has_variations: true }],
+      });
+      await adapter.updateProduct(ctx(client), '7', {
+        skuOnProperty: ['200'],
+        variations: [
+          { id: '1', sku: 'A' },
+          { id: '2', sku: 'A' },
+          { id: '3', sku: 'B' },
+          { id: '4', sku: 'B' },
+        ],
+      });
+      const body = JSON.parse(String(seen.find((x) => x.init.method === 'PUT')!.init.body));
+      expect(body.readiness_state_on_property).toEqual([300]);
+    });
+
     it('refuses an option the variations are not made of', async () => {
       const { client } = http({
         '/v3/application/listings/7/inventory': [jacket([], ['X', 'X', 'X', 'X'])],
@@ -609,7 +693,7 @@ describe('Etsy variations', () => {
       '/v3/application/listings/7/inventory': [inventory, {}, inventory],
       '/v3/application/listings/7': [listing],
     });
-    await adapter.updateProduct(ctx(client), '7', { variations: [{ id: '2', quantity: 4 }] });
+    await adapter.updateProduct(ctx(client), '7', { variations: [{ id: '2', price: 25000 }] });
     const body = JSON.parse(String(seen.find((x) => x.init.method === 'PUT')!.init.body));
     expect(body.sku_on_property).toEqual([]);
     expect(body.products.map((p: { sku: string }) => p.sku)).toEqual(['S', 'S']);

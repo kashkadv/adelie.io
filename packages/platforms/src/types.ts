@@ -178,8 +178,9 @@ export interface ProductEditable {
   /** Ids of the options the SKU goes by; empty = one SKU for all variations. */
   skuOnProperty: string[];
   /** Whether each variation has its own price / quantity (otherwise one value for all). */
-  priceVaries: boolean;
-  quantityVaries: boolean;
+  /** Ids of the options the price / quantity go by; empty = one value for all variations. */
+  priceOnProperty: string[];
+  quantityOnProperty: string[];
 }
 
 /** A change to one variation; absent fields stay. Price in minor units. */
@@ -200,8 +201,10 @@ export interface ProductChanges {
   quantity?: number;
   /** The SKU of a product without variations; with variations — per variation. */
   sku?: string;
-  /** Which options the SKU goes by (ids from `skuProperties`). */
+  /** Which options the SKU / price / quantity go by (ids from `skuProperties`). */
   skuOnProperty?: string[];
+  priceOnProperty?: string[];
+  quantityOnProperty?: string[];
   variations?: VariationChange[];
 }
 

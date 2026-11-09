@@ -797,7 +797,9 @@
         "quantity": "Quantity",
         "variations": "Variations",
         "sku": "SKU",
-        "skuOnProperty": "SKU varies by"
+        "skuOnProperty": "SKU varies by",
+        "priceOnProperty": "Price varies by",
+        "quantityOnProperty": "Quantity varies by"
       },
       "tagsHint": "Up to 13 tags, each up to 20 characters: letters, digits, spaces, hyphen and apostrophe. Enter or comma adds a tag.",
       "addTag": "Add a tag",
@@ -849,10 +851,15 @@
       "skuByHint": "Etsy’s “SKUs vary”. One for all: a single SKU for the whole product (e.g. a vest that differs only by size). By an option (colour, size): one SKU per value of it — all sizes of one colour share its SKU. Each variation: its own SKU.",
       "productSku": "SKU of the product",
       "skuMode": "SKU",
-      "skuOneForAll": "One for all",
-      "skuByOption": "By {name}",
-      "skuEach": "Each variation",
-      "groupSku": "SKU: {group}"
+      "groupSku": "SKU: {group}",
+      "varyNone": "One for all",
+      "varyBy": "By {name}",
+      "varyEach": "Each variation",
+      "priceMode": "Price",
+      "quantityMode": "Quantity",
+      "priceModeHint": "Etsy’s “Prices vary”. One for all: one price for every variation. By an option (colour, size): one price per value of it. Each variation: its own price.",
+      "quantityModeHint": "Etsy’s “Quantities vary”. One for all: one stock for every variation. By an option: one stock per value of it. Each variation: its own stock.",
+      "openInEtsyEditor": "Edit in Etsy"
     },
     "card": {
       "close": "Close",

@@ -54,6 +54,8 @@ type Response = { period: { from: string; to: string } | null; items: Product[] 
 
 const COLUMNS = ['price', 'quantity', 'views', 'favorers', 'sold', 'revenue'] as const;
 type Column = (typeof COLUMNS)[number];
+/** How long a row stays lit after its dialog closes, before it fades out. */
+const LIT_AFTER_CLOSE_MS = 1500;
 const STATES = ['active', 'inactive', 'sold_out', 'draft', 'expired', 'removed'] as const;
 
 /**
@@ -106,6 +108,23 @@ export function Products() {
   const [data, setData] = useState<{ key: string; value: Response } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  /**
+   * The row of the product a dialog is open for stays lit; after the dialog closes the light holds
+   * a moment and fades out, so it is easy to see which product was just worked on.
+   */
+  const active = openId ?? editing;
+  const [lastActive, setLastActive] = useState<string | null>(null);
+  const [holding, setHolding] = useState(false);
+  if (active && (active !== lastActive || !holding)) {
+    setLastActive(active);
+    setHolding(true);
+  }
+  useEffect(() => {
+    if (active) return;
+    const timer = setTimeout(() => setHolding(false), LIT_AFTER_CLOSE_MS);
+    return () => clearTimeout(timer);
+  }, [active]);
+  const lit = active ?? (holding ? lastActive : null);
   /** Bumped after a save: the list reloads with the new values. */
   const [version, setVersion] = useState(0);
 
@@ -330,7 +349,9 @@ export function Products() {
             {items.map((p) => (
               <li
                 key={p.id}
-                className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 xl:flex-nowrap"
+                className={`flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 transition-colors duration-700 xl:flex-nowrap ${
+                  p.id === lit ? 'bg-hover' : ''
+                }`}
               >
                 {/* The product itself opens its card (sales, orders, pins). */}
                 <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">

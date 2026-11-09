@@ -16,6 +16,7 @@ import type {
   ProductChanges,
   ProductEditable,
   ProductVariation,
+  VariationChange,
   ProductData,
   TokenSet,
 } from '../types.js';
@@ -81,6 +82,7 @@ interface EtsyInventory {
   price_on_property?: number[];
   quantity_on_property?: number[];
   sku_on_property?: number[];
+  readiness_state_on_property?: number[];
 }
 
 function utcToday(): string {
@@ -296,8 +298,8 @@ export class EtsyAdapter implements PlatformAdapter {
         variations: [],
         skuProperties: [],
         skuOnProperty: [],
-        priceVaries: false,
-        quantityVaries: false,
+        priceOnProperty: [],
+        quantityOnProperty: [],
       };
     }
     return {
@@ -306,8 +308,8 @@ export class EtsyAdapter implements PlatformAdapter {
       variations: live.map(toVariation),
       skuProperties: skuProperties(live),
       skuOnProperty: (inventory?.sku_on_property ?? []).map(String),
-      priceVaries: (inventory?.price_on_property ?? []).length > 0,
-      quantityVaries: (inventory?.quantity_on_property ?? []).length > 0,
+      priceOnProperty: (inventory?.price_on_property ?? []).map(String),
+      quantityOnProperty: (inventory?.quantity_on_property ?? []).map(String),
     };
   }
 
@@ -341,6 +343,8 @@ export class EtsyAdapter implements PlatformAdapter {
       changes.quantity !== undefined ||
       changes.sku !== undefined ||
       changes.skuOnProperty !== undefined ||
+      changes.priceOnProperty !== undefined ||
+      changes.quantityOnProperty !== undefined ||
       changes.variations !== undefined
     ) {
       const inventory = await this.get<EtsyInventory>(ctx, `/listings/${listingId}/inventory`);
@@ -354,39 +358,106 @@ export class EtsyAdapter implements PlatformAdapter {
       ) {
         throw new AdapterError('NOT_AVAILABLE', 'Listings with variations change per variation');
       }
-      // The options the SKU goes by: as they are, or as asked. Variations that agree on those
-      // options are one group and must carry one SKU (Etsy keeps the same rule).
+      // What the SKU, price and quantity go by (Etsy's "SKUs / Prices / Quantities vary"): as they
+      // are, or as asked. Variations that agree on those options are one group and must carry
+      // one value (Etsy keeps the same rule).
       const propertyIds = skuProperties(products).map((p) => Number(p.id));
-      let skuOnProperty = inventory.sku_on_property ?? [];
-      if (changes.skuOnProperty !== undefined) {
-        const wanted = changes.skuOnProperty.map(Number);
-        if (wanted.some((id) => !propertyIds.includes(id))) {
-          throw new AdapterError('INVALID', 'SKU can go only by the options of the variations');
+      const pick = (wanted: string[] | undefined, current: number[], what: string) => {
+        if (wanted === undefined) return current;
+        const ids = wanted.map(Number);
+        if (ids.some((id) => !propertyIds.includes(id))) {
+          throw new AdapterError(
+            'INVALID',
+            `${what} can vary only by the options of the variations`,
+          );
         }
-        skuOnProperty = wanted;
-      }
-      const nextSku = (p: (typeof products)[number]) =>
-        ((single ? changes.sku : byId.get(String(p.product_id))?.sku) ?? p.sku ?? '').trim();
-      const skuTouched =
-        changes.skuOnProperty !== undefined ||
-        changes.sku !== undefined ||
-        (changes.variations ?? []).some((v) => v.sku !== undefined);
-      if (skuTouched) {
-        const groups = new Map<string, Set<string>>();
+        return ids;
+      };
+      const skuOn = pick(changes.skuOnProperty, inventory.sku_on_property ?? [], 'SKU');
+      const priceOn = pick(changes.priceOnProperty, inventory.price_on_property ?? [], 'Price');
+      const quantityOn = pick(
+        changes.quantityOnProperty,
+        inventory.quantity_on_property ?? [],
+        'Quantity',
+      );
+      type Live = (typeof products)[number];
+      const changeOf = (p: Live) => byId.get(String(p.product_id));
+      const nextSku = (p: Live) =>
+        ((single ? changes.sku : changeOf(p)?.sku) ?? p.sku ?? '').trim();
+      const nextMinor = (p: Live) => {
+        const offering = liveOffering(p)!;
+        const currency = offering.price?.currency_code ?? 'USD';
+        return (
+          (single ? changes.price : changeOf(p)?.price) ??
+          Math.round(
+            ((offering.price?.amount ?? 0) / (offering.price?.divisor ?? 100)) *
+              10 ** minorDigits(currency),
+          )
+        );
+      };
+      const nextQuantity = (p: Live) =>
+        (single ? changes.quantity : changeOf(p)?.quantity) ?? liveOffering(p)!.quantity ?? 0;
+      const sameInGroups = (on: number[], value: (p: Live) => string | number) => {
+        const groups = new Map<string, Set<string | number>>();
         for (const p of products) {
-          const key = skuOnProperty
+          const key = on
             .map((id) =>
               (p.property_values ?? []).find((v) => v.property_id === id)?.values?.join(),
             )
             .join('\u0000');
-          groups.set(key, (groups.get(key) ?? new Set<string>()).add(nextSku(p)));
+          groups.set(key, (groups.get(key) ?? new Set<string | number>()).add(value(p)));
         }
-        if ([...groups.values()].some((skus) => skus.size > 1)) {
-          throw new AdapterError(
-            'INVALID',
-            'Variations that agree on the options the SKU goes by must share one SKU',
-          );
-        }
+        return [...groups.values()].every((values) => values.size <= 1);
+      };
+      const varied = (v: VariationChange[] | undefined, key: 'sku' | 'price' | 'quantity') =>
+        (v ?? []).some((x) => x[key] !== undefined);
+      if (
+        (changes.skuOnProperty !== undefined ||
+          changes.sku !== undefined ||
+          varied(changes.variations, 'sku')) &&
+        !sameInGroups(skuOn, nextSku)
+      ) {
+        throw new AdapterError(
+          'INVALID',
+          'Variations that agree on the options the SKU goes by must share one SKU',
+        );
+      }
+      if (
+        (changes.priceOnProperty !== undefined ||
+          changes.price !== undefined ||
+          varied(changes.variations, 'price')) &&
+        !sameInGroups(priceOn, nextMinor)
+      ) {
+        throw new AdapterError(
+          'INVALID',
+          'Variations that agree on the options the price goes by must share one price',
+        );
+      }
+      if (
+        (changes.quantityOnProperty !== undefined ||
+          changes.quantity !== undefined ||
+          varied(changes.variations, 'quantity')) &&
+        !sameInGroups(quantityOn, nextQuantity)
+      ) {
+        throw new AdapterError(
+          'INVALID',
+          'Variations that agree on the options the quantity goes by must share one quantity',
+        );
+      }
+      // Etsy: when one of the three varies by every option, the others must vary by every
+      // option or by none.
+      const sets = [skuOn, priceOn, quantityOn];
+      if (
+        (changes.skuOnProperty ?? changes.priceOnProperty ?? changes.quantityOnProperty) !==
+          undefined &&
+        propertyIds.length > 0 &&
+        sets.some((x) => x.length === propertyIds.length) &&
+        sets.some((x) => x.length > 0 && x.length < propertyIds.length)
+      ) {
+        throw new AdapterError(
+          'INVALID',
+          'Etsy: when one of SKU, price and quantity varies by every option, the others must vary by every option or by none',
+        );
       }
       if (
         products.every(
@@ -400,14 +471,7 @@ export class EtsyAdapter implements PlatformAdapter {
         json: {
           products: products.map((p) => {
             const offering = liveOffering(p)!;
-            const change = byId.get(String(p.product_id));
             const currency = offering.price?.currency_code ?? 'USD';
-            const minor =
-              (single ? changes.price : change?.price) ??
-              Math.round(
-                ((offering.price?.amount ?? 0) / (offering.price?.divisor ?? 100)) *
-                  10 ** minorDigits(currency),
-              );
             return {
               sku: nextSku(p),
               property_values: (p.property_values ?? []).map((v) => ({
@@ -419,10 +483,9 @@ export class EtsyAdapter implements PlatformAdapter {
               })),
               offerings: [
                 {
-                  price: minor / 10 ** minorDigits(currency),
-                  quantity:
-                    (single ? changes.quantity : change?.quantity) ?? offering.quantity ?? 0,
-                  is_enabled: change?.enabled ?? offering.is_enabled ?? true,
+                  price: nextMinor(p) / 10 ** minorDigits(currency),
+                  quantity: nextQuantity(p),
+                  is_enabled: changeOf(p)?.enabled ?? offering.is_enabled ?? true,
                   ...(offering.readiness_state_id
                     ? { readiness_state_id: offering.readiness_state_id }
                     : {}),
@@ -430,9 +493,11 @@ export class EtsyAdapter implements PlatformAdapter {
               ],
             };
           }),
-          price_on_property: inventory.price_on_property ?? [],
-          quantity_on_property: inventory.quantity_on_property ?? [],
-          sku_on_property: skuOnProperty,
+          price_on_property: priceOn,
+          quantity_on_property: quantityOn,
+          sku_on_property: skuOn,
+          // Passed through as it is: the processing profiles are not ours to change.
+          readiness_state_on_property: inventory.readiness_state_on_property ?? [],
         },
       });
     }
