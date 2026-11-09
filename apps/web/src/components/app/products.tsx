@@ -148,7 +148,9 @@ export function Products() {
    * The row of the product a dialog is open for stays lit; after the dialog closes the light holds
    * a moment and fades out, so it is easy to see which product was just worked on.
    */
-  const active = openId ?? editing;
+  /** The row a linked product was opened from: it stays lit while that card is open. */
+  const [openedFrom, setOpenedFrom] = useState<string | null>(null);
+  const active = openedFrom ?? openId ?? editing;
   const [lastActive, setLastActive] = useState<string | null>(null);
   const [holding, setHolding] = useState(false);
   if (active && (active !== lastActive || !holding)) {
@@ -249,6 +251,28 @@ export function Products() {
   }, [shown, state, pins, issueCodes, presence, category, search, sort]);
 
   const openIndex = openId ? items.findIndex((p) => p.id === openId) : -1;
+  /**
+   * A product opened from a row's linked products lives on another channel: its problems come from
+   * that channel's list, read once and kept — the list on screen and its filters stay as they are.
+   */
+  const [otherLists, setOtherLists] = useState<Record<string, Product[]>>({});
+  const loadOther = (accountId: string) => {
+    if (!base) return;
+    api<Response>(`${base}/products?${new URLSearchParams({ accountId })}`).then(
+      (value) => setOtherLists((all) => ({ ...all, [accountId]: value.items })),
+      () => undefined,
+    );
+  };
+  const openLinked = (accountId: string, id: string, fromRow: string) => {
+    setOpenedFrom(fromRow);
+    setOpenId(id);
+    if (!otherLists[accountId]) loadOther(accountId);
+  };
+  const openProduct =
+    (openIndex >= 0 ? items[openIndex] : undefined) ??
+    Object.values(otherLists)
+      .flat()
+      .find((p) => p.id === openId);
 
   /** Switching the channel drops what only made sense on the previous one. */
   const switchChannel = (id: string) => {
@@ -643,13 +667,10 @@ export function Products() {
                           )}
                         </span>
                         <span className="min-w-0 flex-1">
-                          {/* Opens that product's card, on its own channel's list. */}
+                          {/* Opens that product's card over this list: you stay where you are. */}
                           <button
                             type="button"
-                            onClick={() => {
-                              switchChannel(e.account.id);
-                              setOpenId(e.id);
-                            }}
+                            onClick={() => openLinked(e.account.id, e.id, p.id)}
                             className="block max-w-full truncate text-left hover:underline hover:underline-offset-2"
                             title={e.title}
                           >
@@ -696,10 +717,17 @@ export function Products() {
         <ProductDialog
           base={base}
           productId={openId}
-          issues={items[openIndex]?.issues}
-          ignored={items[openIndex]?.ignored}
-          onChanged={() => setVersion((v) => v + 1)}
-          onClose={() => setOpenId(null)}
+          issues={openProduct?.issues}
+          ignored={openProduct?.ignored}
+          onChanged={() => {
+            setVersion((v) => v + 1);
+            // Something changed on a product of another channel: its list is read again.
+            if (openIndex < 0 && openProduct) loadOther(openProduct.account.id);
+          }}
+          onClose={() => {
+            setOpenId(null);
+            setOpenedFrom(null);
+          }}
           onPrevious={openIndex > 0 ? () => setOpenId(items[openIndex - 1]!.id) : undefined}
           onNext={
             openIndex >= 0 && openIndex < items.length - 1
@@ -707,9 +735,10 @@ export function Products() {
               : undefined
           }
           onEdit={
-            items[openIndex]?.state !== 'removed' && items[openIndex]?.account.platform === 'ETSY'
+            openProduct?.state !== 'removed' && openProduct?.account.platform === 'ETSY'
               ? () => {
                   setEditing(openId);
+                  setOpenedFrom(null);
                   setOpenId(null);
                 }
               : undefined
