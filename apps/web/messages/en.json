@@ -1184,13 +1184,13 @@
       "install": {
         "title": "1. Installation",
         "lead": "Add two lines to the head of every page (or once in a shared template). The first is a tiny stub so calls made before the script loads are not lost. The second is the script itself: it loads asynchronously, does not slow the site down and its errors never break the page.",
-        "next": "In Next.js this goes in the root layout. Each domain has its own id and its own mode: in the example gushka.ua runs in full mode at once (data-consent granted) and gushka.world stays anonymous.",
+        "next": "In Next.js this goes in the root layout. Each domain has its own id. The mode of each site (full without a banner, or anonymous until consent) is switched in this cabinet above the code — the code on the site does not change. Copy the code with ?site=… in the address: that is how the mode reaches the site.",
         "options": "Options are attributes of the script tag: data-consent=\"granted\" (do not wait for consent — see below), data-spa=\"false\" (do not count route changes as page views), data-auto-pageview=\"false\" (do not count the page view automatically), data-allow-params=\"page,sort\" (which more address parameters may be sent; by default only utm and click ids), data-link-domains=\"gushka.world\" (carry the visitor to your other domain)."
       },
       "consent": {
         "title": "2. Cookie consent",
         "lead": "By default Flipper is anonymous: it writes nothing to the browser, sets no cookie, and counts views and unique visitors per day. When the visitor agrees to analytics, call consent — then there is a persistent visitor, sessions, the funnel and the source they came from. If the visitor declines, call consent denied and Flipper stops sending.",
-        "dnt": "Flipper respects Do Not Track and Global Privacy Control: nothing is sent for such visitors. If your site runs on a basis that does not need consent, put data-consent=\"granted\" on the script tag."
+        "dnt": "Flipper respects Do Not Track and Global Privacy Control: nothing is sent for such visitors. If your site runs on a basis that does not need consent, choose the mode Full, no banner in the cabinet (or put data-consent=\"granted\" on the script tag — it wins over the cabinet)."
       },
       "events": {
         "title": "3. Shop events",
@@ -1323,6 +1323,10 @@
         "purchase": "Purchase is deliberately not sent from the browser: a click or a “thank you” page is not proof of payment. We will add it separately, as a server event from your backend after the payment is confirmed."
       }
     },
-    "productViews": "{views, plural, one {# view} other {# views}} · {visitors, plural, one {# visitor} other {# visitors}}"
+    "productViews": "{views, plural, one {# view} other {# views}} · {visitors, plural, one {# visitor} other {# visitors}}",
+    "mode": "Mode",
+    "modeHint": "Anonymous: until the visitor agrees, nothing is stored in their browser and people are counted by a daily hash. Full: visitors are recognised at once, without a consent banner (your decision for this site). The change reaches the site within minutes — the code on the site stays the same.",
+    "modeAnonymous": "Anonymous until consent",
+    "modeGranted": "Full, no banner"
   }
 }

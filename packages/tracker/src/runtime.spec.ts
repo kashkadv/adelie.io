@@ -180,6 +180,18 @@ describe('events', () => {
     expect(events[3]!.p).toMatchObject({ value: 25, item_count: 3, currency: 'USD' });
   });
 
+  it('takes the consent mode the cabinet baked into the script, unless the tag says otherwise', () => {
+    (window as unknown as { __flipperConfig?: unknown }).__flipperConfig = { consent: 'granted' };
+    try {
+      const f = load({ 'auto-pageview': 'false' })!;
+      f.productView({ id: '1' });
+      vi.advanceTimersByTime(2000);
+      expect(bodies()[0]!.c).toBe(1);
+    } finally {
+      delete (window as unknown as { __flipperConfig?: unknown }).__flipperConfig;
+    }
+  });
+
   it('purchase carries the order number and sums the lines', () => {
     const f = load({ 'auto-pageview': 'false' })!;
     f.purchase({

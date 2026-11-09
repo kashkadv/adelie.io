@@ -122,7 +122,10 @@ export function init(env: Env): Flipper | null {
   const auto = attr('auto-pageview') !== 'false';
   const outbound = attr('outbound') !== 'false';
   let debug = attr('debug') === 'true' || /[?&]flipper_debug=1\b/.test(win.location.search);
-  let consent: Consent = attr('consent') === 'granted' ? 'granted' : 'unknown';
+  // The page's own attribute wins; else the mode the cabinet set (baked into the script).
+  const configured = (win as unknown as { __flipperConfig?: { consent?: string } }).__flipperConfig;
+  const mode = attr('consent') ?? configured?.consent;
+  let consent: Consent = mode === 'granted' ? 'granted' : 'unknown';
 
   // A person who asked not to be tracked (Do Not Track, Global Privacy Control) is not.
   const nav = win.navigator as Navigator & { globalPrivacyControl?: boolean };

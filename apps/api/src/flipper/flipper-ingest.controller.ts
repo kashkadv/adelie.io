@@ -66,7 +66,10 @@ const clientIp = (req: Request): string =>
 export class FlipperIngestController {
   private script: { body: string; etag: string } | undefined;
   /** What each site id means, kept for a minute: the address is hit by every page view. */
-  private readonly sites = new Map<string, { id: string; hosts: string[]; until: number } | null>();
+  private readonly sites = new Map<
+    string,
+    { id: string; hosts: string[]; mode: string; until: number } | null
+  >();
   private readonly perVisitor = new RateLimiter(120, 60_000);
   private readonly perSite = new RateLimiter(6_000, 60_000);
   private readonly secret = createHash('sha256')
@@ -89,12 +92,21 @@ export class FlipperIngestController {
 
   /** The tracker script. Cached for a few minutes at the edge: a new version reaches sites soon. */
   @Get('flipper.js')
-  serve(@Req() req: Request, @Res() res: Response) {
-    const { body, etag } = this.loadScript();
+  async serve(@Req() req: Request, @Res() res: Response) {
+    const loaded = this.loadScript();
+    // With ?site=… the script carries that site's settings (today: the consent mode). Anything
+    // else, an unknown id included, gets the plain script: the page's own attributes decide.
+    const id = typeof req.query.site === 'string' ? req.query.site : '';
+    const site = /^fl_[A-Za-z0-9]{6,40}$/.test(id) ? await this.siteOf(id) : null;
+    const prefix = site?.mode === 'granted' ? 'window.__flipperConfig={consent:"granted"};' : '';
+    const body = prefix + loaded.body;
+    const etag = prefix
+      ? `"${createHash('sha1').update(body).digest('hex').slice(0, 16)}"`
+      : loaded.etag;
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=86400');
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
     res.setHeader('ETag', etag);
     if (req.headers['if-none-match'] === etag) return res.status(304).end();
     res.type('application/javascript; charset=utf-8');
@@ -116,10 +128,15 @@ export class FlipperIngestController {
     if (known !== undefined && (known === null || known.until > now)) return known;
     const row = await this.prisma.client.trackedSite.findUnique({
       where: { publicId },
-      select: { id: true, allowedHosts: true },
+      select: { id: true, allowedHosts: true, consentMode: true },
     });
     const site = row
-      ? { id: row.id, hosts: row.allowedHosts.map(bare), until: now + 60_000 }
+      ? {
+          id: row.id,
+          hosts: row.allowedHosts.map(bare),
+          mode: row.consentMode,
+          until: now + 60_000,
+        }
       : null;
     // An unknown id is remembered for a minute too, so guessing ids does not reach the database.
     this.sites.set(publicId, site);

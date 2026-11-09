@@ -894,6 +894,9 @@ model TrackedSite {
   /// Hosts the site's events may come from (the feed's host to begin with). A hint against
   /// misuse, not authentication: browsers can be made to send anything.
   allowedHosts String[]      @default([])
+  /// "anonymous" (wait for consent) or "granted" (the site's own decision: no banner). Baked
+  /// into the script the site loads, so changing it needs no change on the site.
+  consentMode  String        @default("anonymous")
   createdAt    DateTime      @default(now())
 
   events WebsiteEvent[]

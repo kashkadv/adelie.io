@@ -54,20 +54,19 @@ const ATTRIBUTES = `<!-- No JavaScript needed: data-flipper-* on the element fir
   data-flipper-quantity="1"
 >Add to cart</button>`;
 
-const NEXT = `// app/layout.tsx (Next.js): one place, every page; each domain has its own id and mode
+const NEXT = `// app/layout.tsx (Next.js): one place, every page; each domain has its own id.
+// The mode (full / anonymous) is set in the cabinet and travels with the script.
 import Script from 'next/script';
 import { headers } from 'next/headers';
 
 const SITES = {
-  // Ukraine: full mode at once (visitor, sessions, funnel) — no cookie banner needed
-  'gushka.ua': { id: 'fl_UA_SITE_ID', consent: 'granted' },
-  // The world: anonymous for now (views and unique visitors per day, nothing stored in the browser)
-  'gushka.world': { id: 'fl_WORLD_SITE_ID', consent: undefined },
+  'gushka.ua': 'fl_UA_SITE_ID',
+  'gushka.world': 'fl_WORLD_SITE_ID',
 } as const;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const host = ((await headers()).get('host') ?? 'gushka.ua').replace(/^www\\./, '') as keyof typeof SITES;
-  const site = SITES[host] ?? SITES['gushka.ua'];
+  const id = SITES[host] ?? SITES['gushka.ua'];
   return (
     <html>
       <body>
@@ -76,9 +75,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           "window.flipper=window.flipper||function(){(window.flipper.q=window.flipper.q||[]).push(arguments)}"
         }</Script>
         <Script
-          src="https://dev-api.adelie.space/flipper.js"
-          data-site-id={site.id}
-          data-consent={site.consent}
+          src={\`https://dev-api.adelie.space/flipper.js?site=\${id}\`}
+          data-site-id={id}
           strategy="afterInteractive"
         />
       </body>

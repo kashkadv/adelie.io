@@ -22,6 +22,7 @@ type Site = {
   site: {
     publicId: string;
     allowedHosts: string[];
+    consentMode: 'anonymous' | 'granted';
     createdAt: string;
     lastEventAt: string | null;
     events7d: number;
@@ -145,6 +146,17 @@ export function Flipper() {
     }
   }
 
+  async function setMode(consentMode: 'anonymous' | 'granted') {
+    if (!base || !current) return;
+    setBusy(true);
+    try {
+      await api(`${base}/${current.id}`, { method: 'PATCH', json: { consentMode } });
+      setVersion((v) => v + 1);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const name = (s: Site) => s.displayName || s.username || s.host || '';
   const date = (iso: string) =>
     format.dateTime(new Date(iso), { dateStyle: 'medium', timeStyle: 'short' });
@@ -240,8 +252,23 @@ export function Flipper() {
                 {t('siteId')}: <span className="tabular text-foreground">{site.publicId}</span>
               </span>
             </div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-1.5 text-xs text-muted">
+                {t('mode')}
+                <InfoTip text={t('modeHint')} />
+              </span>
+              <Segmented
+                ariaLabel={t('mode')}
+                value={site.consentMode}
+                onChange={(m) => !busy && setMode(m)}
+                options={[
+                  { value: 'anonymous', label: t('modeAnonymous') },
+                  { value: 'granted', label: t('modeGranted') },
+                ]}
+              />
+            </div>
             <CodeBlock
-              code={installSnippet(`${apiUrl}/flipper.js`, site.publicId)}
+              code={installSnippet(`${apiUrl}/flipper.js?site=${site.publicId}`, site.publicId)}
               label={t('install')}
             />
           </section>

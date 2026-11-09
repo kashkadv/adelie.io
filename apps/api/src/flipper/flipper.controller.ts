@@ -1,10 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   NotFoundException,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -90,7 +93,15 @@ export class FlipperController {
         username: true,
         displayName: true,
         externalId: true,
-        trackedSite: { select: { id: true, publicId: true, allowedHosts: true, createdAt: true } },
+        trackedSite: {
+          select: {
+            id: true,
+            publicId: true,
+            allowedHosts: true,
+            consentMode: true,
+            createdAt: true,
+          },
+        },
       },
     });
     const since = new Date(Date.now() - 7 * 86_400_000);
@@ -113,6 +124,7 @@ export class FlipperController {
           site: {
             publicId: trackedSite.publicId,
             allowedHosts: trackedSite.allowedHosts,
+            consentMode: trackedSite.consentMode,
             createdAt: trackedSite.createdAt,
             lastEventAt: last?.receivedAt ?? null,
             events7d,
@@ -155,6 +167,27 @@ export class FlipperController {
       select: { publicId: true },
     });
     return site;
+  }
+
+  /** Sets the site's consent mode. It reaches the site with the script, within minutes. */
+  @Patch(':accountId')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async setMode(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Body() body: { consentMode?: unknown },
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const mode = body?.consentMode;
+    if (mode !== 'anonymous' && mode !== 'granted') {
+      throw new BadRequestException({ errors: { consentMode: 'invalid' } });
+    }
+    const site = await this.siteOf(request.workspace, projectId, accountId);
+    await this.prisma.client.trackedSite.update({
+      where: { id: site.id },
+      data: { consentMode: mode },
+    });
+    return { consentMode: mode };
   }
 
   /** The latest events, newest first. Bots are left out. */
