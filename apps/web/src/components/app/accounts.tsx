@@ -261,23 +261,15 @@ function AccountRow({
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 md:flex-nowrap">
         {/* Who */}
         <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
-          {account.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={account.avatarUrl}
-              alt=""
-              className="h-11 w-11 shrink-0 rounded-full object-cover"
+          {/* The platform's icon, not the account's logo: where the data comes from at a glance. */}
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+            <PlatformIcon
+              platform={account.platform}
+              size={18}
+              strokeWidth={1.75}
+              aria-hidden="true"
             />
-          ) : (
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-              <PlatformIcon
-                platform={account.platform}
-                size={18}
-                strokeWidth={1.75}
-                aria-hidden="true"
-              />
-            </span>
-          )}
+          </span>
           <div className={`min-w-0 ${account.hidden ? 'opacity-60' : ''}`}>
             <p className="flex items-center gap-1.5 font-medium">
               <span className="truncate">{name}</span>
