@@ -643,44 +643,49 @@ model SyncPayload {
 
 /// A product the shop sells (Etsy listing). Money: integer minor units of `currency` (cents).
 model ShopProduct {
-  id          String        @id @default(uuid(7)) @db.Uuid
-  workspaceId String        @db.Uuid
-  projectId   String        @db.Uuid
-  accountId   String        @db.Uuid
-  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  externalId  String
-  title       String
-  url         String?
-  imageUrl    String?
+  id               String        @id @default(uuid(7)) @db.Uuid
+  workspaceId      String        @db.Uuid
+  projectId        String        @db.Uuid
+  accountId        String        @db.Uuid
+  account          SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  externalId       String
+  title            String
+  url              String?
+  imageUrl         String?
   /// Platform state: active, inactive, sold_out, draft, expired.
-  state       String
-  price       Int?
-  currency    String?
-  quantity    Int?
+  state            String
+  price            Int?
+  currency         String?
+  quantity         Int?
   /// Lifetime counters as the platform reports them (null = not reported).
-  views       Int?
-  favorers    Int?
-  tags        String[]      @default([])
+  views            Int?
+  favorers         Int?
+  tags             String[]      @default([])
   /// Distinct non-empty SKUs of the product's variations (Etsy inventory); links it to the same
   /// product on other channels (ADR-0021).
-  skus        String[]      @default([])
+  skus             String[]      @default([])
   /// Live variations (Etsy inventory products); null = not read yet.
-  variationCount Int?
+  variationCount   Int?
   /// Options the SKU goes by (e.g. ["Color"]); empty = one SKU for the whole listing.
-  skuBy       String[]      @default([])
+  skuBy            String[]      @default([])
   /// How many SKUs the product should have: one per combination of the `skuBy` options.
-  skuGroups   Int?
+  skuGroups        Int?
   /// Names of the options the variations are made of ("Primary color", "Size").
-  variationOptions String[] @default([])
-  listedAt    DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  variationOptions String[]      @default([])
+  /// Listings that are the same product (same variations; only their order or photos differ) share
+  /// a group; null = alone. Twins are not duplicates of each other's SKU (ADR-0021).
+  twinGroupId      String?       @db.Uuid
+  listedAt         DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  orderItems ShopOrderItem[]
-  changes    ShopProductChange[]
+  orderItems   ShopOrderItem[]
+  changes      ShopProductChange[]
+  issueIgnores ShopProductIssueIgnore[]
 
   @@unique([accountId, externalId])
   @@index([projectId])
+  @@index([projectId, twinGroupId])
   @@map("shop_product")
 }
 
@@ -801,19 +806,36 @@ model SocialPostLink {
 /// Account level only — platforms give no demographics per post. `groups`: { ages: [{key, name,
 /// ratio}], genders: […], countries: […], interests: […] … }.
 model AccountAudience {
-  id          String        @id @default(uuid(7)) @db.Uuid
-  workspaceId String        @db.Uuid
-  accountId   String        @db.Uuid
-  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  id               String        @id @default(uuid(7)) @db.Uuid
+  workspaceId      String        @db.Uuid
+  accountId        String        @db.Uuid
+  account          SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   /// engaged | total
-  type        String
-  date        DateTime      @db.Date
-  size        Int?
+  type             String
+  date             DateTime      @db.Date
+  size             Int?
   /// `size` is a ceiling ("up to 10k"), not an estimate.
-  sizeIsUpperBound Boolean @default(false)
-  groups      Json
-  fetchedAt   DateTime
+  sizeIsUpperBound Boolean       @default(false)
+  groups           Json
+  fetchedAt        DateTime
 
   @@unique([accountId, type, date])
   @@map("account_audience")
+}
+
+/// A problem the user marked as intended for one product ("this is on purpose"): it is not shown
+/// as a problem any more, but can be brought back.
+model ShopProductIssueIgnore {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  workspaceId String      @db.Uuid
+  projectId   String      @db.Uuid
+  productId   String      @db.Uuid
+  product     ShopProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// An issue code of apps/api sales/product-issues.ts.
+  code        String
+  userId      String?
+  createdAt   DateTime    @default(now())
+
+  @@unique([productId, code])
+  @@map("shop_product_issue_ignore")
 }

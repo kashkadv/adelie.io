@@ -888,7 +888,15 @@
       "skuHint": "Article code from Etsy’s inventory. The same code as the id in the website feed links this product to the website.",
       "noSku": "No SKU — set one so the product can be linked to the website.",
       "skuBy": "SKU varies by: {options}",
-      "viewOn": "View on {platform}"
+      "viewOn": "View on {platform}",
+      "twins": "{count, plural, =0 {Twins} other {Twins · #}}",
+      "twinsHint": "Listings that are the same product: the same variations, only their order or photos differ. Twins are not duplicates of each other’s SKU, but their SKUs and price should match.",
+      "twinSuggested": "Possible twins (the same SKUs)",
+      "twinLink": "Link",
+      "twinUnlink": "Unlink",
+      "twinAdd": "Add a twin…",
+      "twinSearch": "Search listings",
+      "twinFailed": "Could not save the change."
     },
     "orderCard": {
       "close": "Close",
@@ -946,7 +954,8 @@
         "noViews": "No views a month after publishing.",
         "skuGaps": "The SKU goes by {by}: only {have} of {groups} groups have their own SKU — some lack one or share it.",
         "skuOneForAll": "The variations differ by {options}, but one SKU is set for all — most likely a mistake. Choose in the editor what the SKU goes by.",
-        "skuPattern": "SKU {skus} does not match the expected format — most likely a wrong one."
+        "skuPattern": "SKU {skus} does not match the expected format — most likely a wrong one.",
+        "twinMismatch": "The twin “{twin}” has other SKUs or price."
       },
       "none": "No issues found",
       "title": "Possible improvements",
@@ -963,9 +972,14 @@
         "skuOneForAll": "Several options, one SKU for all",
         "fewTags": "Fewer than 13 tags",
         "noViews": "No views in a month",
-        "skuPattern": "Invalid SKU"
+        "skuPattern": "Invalid SKU",
+        "twinMismatch": "Twins do not match"
       },
-      "selected": "{count} selected"
+      "selected": "{count} selected",
+      "ignore": "Ignore",
+      "ignoreHint": "This is on purpose — do not show this problem for the product",
+      "ignoredTitle": "Ignored",
+      "restore": "Bring back"
     }
   }
 }

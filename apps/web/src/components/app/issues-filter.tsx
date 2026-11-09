@@ -19,6 +19,7 @@ const LEVEL_OF: Record<IssueCode, IssueLevel> = {
   noPins: 'important',
   skuGaps: 'important',
   skuOneForAll: 'important',
+  twinMismatch: 'important',
   fewTags: 'note',
   noViews: 'note',
 };

@@ -49,6 +49,8 @@ type Product = {
   /** Posts (pins) leading to the product. */
   posts: number;
   issues: ProductIssue[];
+  /** Problems the user marked "on purpose". */
+  ignored: ProductIssue[];
 };
 type Response = { period: { from: string; to: string } | null; items: Product[] };
 
@@ -467,6 +469,8 @@ export function Products() {
           base={base}
           productId={openId}
           issues={items[openIndex]?.issues}
+          ignored={items[openIndex]?.ignored}
+          onChanged={() => setVersion((v) => v + 1)}
           onClose={() => setOpenId(null)}
           onPrevious={openIndex > 0 ? () => setOpenId(items[openIndex - 1]!.id) : undefined}
           onNext={

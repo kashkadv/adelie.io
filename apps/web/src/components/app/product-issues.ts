@@ -13,6 +13,7 @@ export type IssueCode =
   | 'noPins'
   | 'skuGaps'
   | 'skuOneForAll'
+  | 'twinMismatch'
   | 'fewTags'
   | 'noViews';
 

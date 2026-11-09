@@ -4,6 +4,8 @@ import { baseSku, productIssues, type IssueProduct } from './product-issues.js';
 const NOW = new Date('2026-11-09T12:00:00Z');
 const product = (over: Partial<IssueProduct> = {}): IssueProduct => ({
   id: 'p1',
+  title: 'Wool vest',
+  twinGroupId: null,
   state: 'active',
   price: 4500,
   quantity: 3,
@@ -121,6 +123,26 @@ describe('productIssues', () => {
     expect(codes(two, 'b')).toEqual(['critical:duplicateSku']);
     // a suffix that is not a number is not valid
     expect(codes([product({ skus: ['00011512/a'] })])).toEqual(['important:skuPattern']);
+  });
+
+  it('twins: not duplicates of each other, but they must agree', () => {
+    const twin = (id: string, over: Partial<IssueProduct> = {}) =>
+      product({ id, title: `Vest ${id}`, twinGroupId: 'g1', skus: ['0001', '0001/1'], ...over });
+    // the same SKUs in two listings of one group: fine
+    expect(codes([twin('a'), twin('b')], 'a')).toEqual([]);
+    // the same SKUs in listings that are not twins: a duplicate
+    expect(
+      codes([twin('a', { twinGroupId: null }), twin('b', { twinGroupId: null })], 'a'),
+    ).toEqual(['critical:duplicateSku']);
+    // a twin whose SKUs or price differ: both are told
+    const apart = [twin('a'), twin('b', { skus: ['0001'] })];
+    expect(productIssues(apart, NOW).get('a')).toEqual([
+      { code: 'twinMismatch', level: 'important', params: { twin: 'Vest b' } },
+    ]);
+    expect(codes(apart, 'b')).toEqual(['important:twinMismatch']);
+    expect(codes([twin('a'), twin('b', { price: 1000 })], 'a')).toEqual(['important:twinMismatch']);
+    // an inactive twin is not compared
+    expect(codes([twin('a'), twin('b', { state: 'inactive', skus: ['9'] })], 'a')).toEqual([]);
   });
 
   it('important: no tags, no pins — with or without sales', () => {

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   Body,
@@ -9,6 +10,8 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Put,
+  Delete,
   Query,
   Req,
   UnprocessableEntityException,
@@ -33,7 +36,7 @@ import {
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
 import { countsAsSale, monthlySales, moneyFlow, netRevenue, ordersByDay } from './sales.js';
-import { productIssues } from './product-issues.js';
+import { ISSUE_CODES, productIssues, type Issue } from './product-issues.js';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
@@ -41,6 +44,8 @@ const asDate = (d: string) => new Date(`${d}T00:00:00Z`);
 const PAGE_SIZE = 50;
 
 /** Shops of the project that are shown: not hidden, not disconnected (their history is kept). */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const SHOP_WHERE = {
   platform: 'ETSY',
   hiddenAt: null,
@@ -238,6 +243,7 @@ export class SalesController {
         skus: true,
         skuBy: true,
         skuGroups: true,
+        twinGroupId: true,
         listedAt: true,
         updatedAt: true,
         account: { select: { id: true, username: true, displayName: true, platform: true } },
@@ -288,7 +294,45 @@ export class SalesController {
     // Canceled and fully refunded orders are not sales.
     const sold = lines.filter((l) => countsAsSale(l.order.status));
     const flat = sold.map((l) => ({ ...l, orderedAt: l.order.orderedAt }));
-    const { externalId: _externalId, ...rest } = product;
+    // Twins: listings that are the same product. Suggested: other active listings with exactly the
+    // same SKUs. Candidates: every other listing, for choosing one by hand.
+    const twinSelect = { id: true, title: true, imageUrl: true, state: true, skus: true } as const;
+    const inShop = { projectId, workspaceId: request.workspace.workspaceId, account: SHOP_WHERE };
+    const [twins, sameSkus, candidates] = await Promise.all([
+      product.twinGroupId
+        ? db.shopProduct.findMany({
+            where: { ...inShop, twinGroupId: product.twinGroupId, id: { not: productId } },
+            select: twinSelect,
+            orderBy: { title: 'asc' },
+          })
+        : Promise.resolve([]),
+      product.skus.length
+        ? db.shopProduct.findMany({
+            where: {
+              ...inShop,
+              id: { not: productId },
+              state: 'active',
+              skus: { hasSome: product.skus },
+            },
+            select: { ...twinSelect, twinGroupId: true },
+          })
+        : Promise.resolve([]),
+      db.shopProduct.findMany({
+        where: { ...inShop, id: { not: productId }, state: { not: 'removed' } },
+        select: { id: true, title: true, state: true },
+        orderBy: { title: 'asc' },
+        take: 1000,
+      }),
+    ]);
+    const mine = [...product.skus].sort().join('\u0000');
+    const twinSuggestions = sameSkus
+      .filter(
+        (c) =>
+          [...c.skus].sort().join('\u0000') === mine &&
+          (!product.twinGroupId || c.twinGroupId !== product.twinGroupId),
+      )
+      .map(({ twinGroupId: _group, ...c }) => c);
+    const { externalId: _externalId, twinGroupId: _twinGroupId, ...rest } = product;
     return {
       ...rest,
       sales: {
@@ -308,7 +352,116 @@ export class SalesController {
         country: l.order.country,
       })),
       posts,
+      twins,
+      twinSuggestions,
+      twinCandidates: candidates,
     };
+  }
+
+  /** A product of the project's shops, or 404. */
+  private async shopProductOf(ctx: WorkspaceRequestContext, projectId: string, productId: string) {
+    await this.visibleProject(ctx, projectId);
+    const product = await this.prisma.client.shopProduct.findFirst({
+      where: { id: productId, projectId, workspaceId: ctx.workspaceId, account: SHOP_WHERE },
+      select: { id: true, twinGroupId: true },
+    });
+    if (!product) throw new NotFoundException();
+    return product;
+  }
+
+  /** Marks another listing as the same product (twins): one group, merged when both have one. */
+  @Put('products/:productId/twin')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async linkTwin(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Body() body: { twinProductId?: unknown },
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const otherId = typeof body?.twinProductId === 'string' ? body.twinProductId : '';
+    if (!UUID.test(otherId) || otherId === productId) throw new BadRequestException();
+    const a = await this.shopProductOf(request.workspace, projectId, productId);
+    const b = await this.shopProductOf(request.workspace, projectId, otherId);
+    const group = a.twinGroupId ?? b.twinGroupId ?? randomUUID();
+    const db = this.prisma.client;
+    const joined = [a.twinGroupId, b.twinGroupId].filter((g): g is string => !!g && g !== group);
+    await db.$transaction([
+      ...(joined.length
+        ? [
+            db.shopProduct.updateMany({
+              where: { projectId, twinGroupId: { in: joined } },
+              data: { twinGroupId: group },
+            }),
+          ]
+        : []),
+      db.shopProduct.updateMany({
+        where: { id: { in: [a.id, b.id] } },
+        data: { twinGroupId: group },
+      }),
+    ]);
+    return { ok: true };
+  }
+
+  /** Takes the listing out of its twin group; a group left with one listing is dissolved. */
+  @Delete('products/:productId/twin')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async unlinkTwin(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const product = await this.shopProductOf(request.workspace, projectId, productId);
+    if (!product.twinGroupId) return { ok: true };
+    const db = this.prisma.client;
+    await db.shopProduct.update({ where: { id: product.id }, data: { twinGroupId: null } });
+    const left = await db.shopProduct.findMany({
+      where: { projectId, twinGroupId: product.twinGroupId },
+      select: { id: true },
+    });
+    if (left.length === 1) {
+      await db.shopProduct.update({ where: { id: left[0]!.id }, data: { twinGroupId: null } });
+    }
+    return { ok: true };
+  }
+
+  /** "This is on purpose": the problem is no longer shown for the product. */
+  @Put('products/:productId/issues/:code/ignore')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async ignoreIssue(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Param('code') code: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+    @Session() session: UserSession,
+  ) {
+    if (!(ISSUE_CODES as readonly string[]).includes(code)) throw new BadRequestException();
+    await this.shopProductOf(request.workspace, projectId, productId);
+    await this.prisma.client.shopProductIssueIgnore.upsert({
+      where: { productId_code: { productId, code } },
+      create: {
+        workspaceId: request.workspace.workspaceId,
+        projectId,
+        productId,
+        code,
+        userId: session.user.id,
+      },
+      update: {},
+    });
+    return { ok: true };
+  }
+
+  /** Brings an ignored problem back. */
+  @Delete('products/:productId/issues/:code/ignore')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async unignoreIssue(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Param('code') code: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    await this.shopProductOf(request.workspace, projectId, productId);
+    await this.prisma.client.shopProductIssueIgnore.deleteMany({ where: { productId, code } });
+    return { ok: true };
   }
 
   /**
@@ -550,6 +703,7 @@ export class SalesController {
           skuBy: true,
           skuGroups: true,
           variationOptions: true,
+          twinGroupId: true,
           listedAt: true,
           account: { select: { id: true, username: true, platform: true } },
         },
@@ -588,6 +742,21 @@ export class SalesController {
     const postsOf = (p: Parameters<typeof keysOf>[0]) =>
       new Set(keysOf(p).flatMap((k) => [...(postsByKey.get(k) ?? [])])).size;
     const issues = productIssues(products.map((p) => ({ ...p, posts: postsOf(p) })));
+    // Problems the user marked "on purpose" are set apart (and can be brought back).
+    const ignores = await db.shopProductIssueIgnore.findMany({
+      where: {
+        projectId,
+        workspaceId: request.workspace.workspaceId,
+        productId: { in: products.map((p) => p.id) },
+      },
+      select: { productId: true, code: true },
+    });
+    const ignoredCodes = new Map<string, Set<string>>();
+    for (const i of ignores) {
+      ignoredCodes.set(i.productId, (ignoredCodes.get(i.productId) ?? new Set()).add(i.code));
+    }
+    const issuesOf = (id: string, ignored: boolean): Issue[] =>
+      (issues.get(id) ?? []).filter((i) => !!ignoredCodes.get(id)?.has(i.code) === ignored);
     const sold = new Map<string, { units: number; revenue: number }>();
     for (const l of lines) {
       if (!countsAsSale(l.order.status)) continue;
@@ -611,7 +780,8 @@ export class SalesController {
           sold: sold.get(p.id)?.units ?? 0,
           revenue: sold.get(p.id)?.revenue ?? 0,
           posts: postsOf({ ...p, externalId }),
-          issues: issues.get(p.id) ?? [],
+          issues: issuesOf(p.id, false),
+          ignored: issuesOf(p.id, true),
         }),
       ),
     };

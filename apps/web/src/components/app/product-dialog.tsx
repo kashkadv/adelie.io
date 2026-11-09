@@ -8,6 +8,7 @@ import {
   CircleAlert,
   ChevronRight,
   ExternalLink,
+  EyeOff,
   PenLine,
   Pin,
   X,
@@ -16,12 +17,20 @@ import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { Select } from '../ui/select';
 import { InfoTip } from '../ui/info-tip';
 import { PanelSheet } from '../ui/panel-sheet';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
 import { ISSUE_STYLE, sortIssues, type ProductIssue } from './product-issues';
 import { minorDigits, useMoney } from './sales-data';
 
+type TwinListing = {
+  id: string;
+  title: string;
+  imageUrl: string | null;
+  state: string;
+  skus: string[];
+};
 type Detail = {
   id: string;
   title: string;
@@ -37,6 +46,10 @@ type Detail = {
   skus: string[];
   /** Options the SKU goes by ("Color"); empty = one SKU for the whole listing. */
   skuBy: string[];
+  /** Listings that are the same product, suggestions (same SKUs) and everything to choose from. */
+  twins: TwinListing[];
+  twinSuggestions: TwinListing[];
+  twinCandidates: { id: string; title: string; state: string }[];
   listedAt: string | null;
   account: { username: string | null; displayName: string | null; platform: 'ETSY' };
   sales: {
@@ -77,17 +90,65 @@ type Detail = {
 /**
  * Possible improvements of the product, above its statistics: an accordion, open by default (the
  * chevron in the header says it can be closed). Worst first; a green check when there are none.
+ * A problem can be marked "on purpose" (ignored) and brought back from the list below.
  */
-function Improvements({ issues }: { issues: ProductIssue[] }) {
+function Improvements({
+  issues,
+  ignored,
+  onIgnore,
+  onRestore,
+}: {
+  issues: ProductIssue[];
+  ignored: ProductIssue[];
+  onIgnore: (code: string) => void;
+  onRestore: (code: string) => void;
+}) {
   const ti = useTranslations('Sales.issues');
   const [open, setOpen] = useState(true);
+  const [showIgnored, setShowIgnored] = useState(false);
   const bodyId = useId();
+  const ignoredBlock = ignored.length > 0 && (
+    <div className="px-4 pb-4">
+      <button
+        type="button"
+        aria-expanded={showIgnored}
+        onClick={() => setShowIgnored((v) => !v)}
+        className="flex items-center gap-1.5 text-xs text-muted hover:text-foreground"
+      >
+        <ChevronDown
+          size={13}
+          aria-hidden="true"
+          className={`transition-transform duration-200 ${showIgnored ? 'rotate-180' : ''}`}
+        />
+        {ti('ignoredTitle')} · {ignored.length}
+      </button>
+      {showIgnored && (
+        <ul className="mt-2 grid gap-1.5">
+          {sortIssues(ignored).map((i) => (
+            <li key={i.code} className="flex items-start gap-2 text-sm text-muted">
+              <span className="min-w-0 flex-1">{ti(`codes.${i.code}`, i.params)}</span>
+              <button
+                type="button"
+                onClick={() => onRestore(i.code)}
+                className="shrink-0 rounded-lg px-2 py-0.5 text-xs hover:bg-hover hover:text-foreground"
+              >
+                {ti('restore')}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
   if (!issues.length) {
     return (
-      <p className="mt-6 flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
-        <Check size={16} strokeWidth={2.25} aria-hidden="true" />
-        {ti('none')}
-      </p>
+      <section className="mt-6">
+        <p className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+          <Check size={16} strokeWidth={2.25} aria-hidden="true" />
+          {ti('none')}
+        </p>
+        {ignoredBlock && <div className="-mx-4 mt-2">{ignoredBlock}</div>}
+      </section>
     );
   }
   return (
@@ -110,23 +171,151 @@ function Improvements({ issues }: { issues: ProductIssue[] }) {
         />
       </button>
       {open && (
-        <ul id={bodyId} className="grid gap-2 px-4 pb-4">
-          {sortIssues(issues).map((i) => (
-            <li key={i.code} className="flex items-start gap-2 text-sm">
-              <CircleAlert
-                size={16}
-                className={`mt-0.5 shrink-0 ${ISSUE_STYLE[i.level].text}`}
-                aria-hidden="true"
-              />
-              <span>
-                {ti(`codes.${i.code}`, i.params)}{' '}
-                <span className="text-xs text-muted">({ti(`levels.${i.level}`)})</span>
-              </span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul id={bodyId} className="grid gap-2 px-4 pb-4">
+            {sortIssues(issues).map((i) => (
+              <li key={i.code} className="flex items-start gap-2 text-sm">
+                <CircleAlert
+                  size={16}
+                  className={`mt-0.5 shrink-0 ${ISSUE_STYLE[i.level].text}`}
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 flex-1">
+                  {ti(`codes.${i.code}`, i.params)}{' '}
+                  <span className="text-xs text-muted">({ti(`levels.${i.level}`)})</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onIgnore(i.code)}
+                  title={ti('ignoreHint')}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-0.5 text-xs text-muted hover:bg-hover hover:text-foreground"
+                >
+                  <EyeOff size={13} aria-hidden="true" />
+                  {ti('ignore')}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {ignoredBlock}
+        </>
       )}
     </section>
+  );
+}
+
+/**
+ * Twins (ADR-0021): listings that are the same product — the same variations, only their order or
+ * photos differ. They are not duplicates of each other's SKU, but must agree on SKUs and price.
+ */
+function Twins({
+  detail,
+  base,
+  productId,
+  onChanged,
+}: {
+  detail: Detail;
+  base: string;
+  productId: string;
+  onChanged: () => void;
+}) {
+  const t = useTranslations('Sales.card');
+  const ts = useTranslations('Sales');
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const act = async (path: string, method: 'PUT' | 'DELETE', json?: unknown) => {
+    setBusy(true);
+    setFailed(false);
+    try {
+      await api(`${base}/products/${path}`, { method, json });
+      onChanged();
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const link = (id: string) => act(`${productId}/twin`, 'PUT', { twinProductId: id });
+  const taken = new Set([productId, ...detail.twins.map((x) => x.id)]);
+  const row = (c: TwinListing, action: React.ReactNode) => (
+    <li key={c.id} className="flex items-center gap-2.5 px-3 py-2 text-sm">
+      <span className="h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-hover">
+        {c.imageUrl && (
+          // External platform image: plain <img>, lazy.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={c.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate">{c.title}</span>
+        <span className="tabular text-xs text-muted">
+          {c.state !== 'active' && `${ts(`states.${c.state as 'active'}`)} · `}
+          {c.skus.join(', ') || '—'}
+        </span>
+      </span>
+      {action}
+    </li>
+  );
+  const button = 'shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs hover:bg-hover';
+  return (
+    <div className="mt-5">
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
+        {t('twins', { count: detail.twins.length })}
+        <InfoTip text={t('twinsHint')} />
+      </p>
+      {detail.twins.length > 0 && (
+        <ul className="mb-2 divide-y divide-line rounded-2xl border border-line">
+          {detail.twins.map((c) =>
+            row(
+              c,
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => act(`${c.id}/twin`, 'DELETE')}
+                className={button}
+              >
+                {t('twinUnlink')}
+              </button>,
+            ),
+          )}
+        </ul>
+      )}
+      {detail.twinSuggestions.length > 0 && (
+        <div className="mb-2">
+          <p className="mb-1 px-1 text-xs text-muted">{t('twinSuggested')}</p>
+          <ul className="divide-y divide-line rounded-2xl border border-dashed border-line">
+            {detail.twinSuggestions.map((c) =>
+              row(
+                c,
+                <button type="button" disabled={busy} onClick={() => link(c.id)} className={button}>
+                  {t('twinLink')}
+                </button>,
+              ),
+            )}
+          </ul>
+        </div>
+      )}
+      <div className="max-w-sm">
+        <Select
+          value=""
+          onChange={(id) => id && link(id)}
+          options={detail.twinCandidates
+            .filter((c) => !taken.has(c.id))
+            .map((c) => ({
+              value: c.id,
+              label: c.title,
+              hint: c.state !== 'active' ? ts(`states.${c.state as 'active'}`) : undefined,
+            }))}
+          placeholder={t('twinAdd')}
+          searchable
+          searchPlaceholder={t('twinSearch')}
+          ariaLabel={t('twinAdd')}
+          disabled={busy}
+        />
+      </div>
+      {failed && (
+        <p className="mt-1 px-1 text-xs text-rose-600 dark:text-rose-400">{t('twinFailed')}</p>
+      )}
+    </div>
   );
 }
 
@@ -134,6 +323,8 @@ export function ProductDialog({
   base,
   productId,
   issues,
+  ignored,
+  onChanged,
   onClose,
   onPrevious,
   onNext,
@@ -143,6 +334,10 @@ export function ProductDialog({
   productId: string;
   /** Problems of the product (from the list); the block is hidden when absent. */
   issues?: ProductIssue[];
+  /** Problems marked "on purpose" for this product. */
+  ignored?: ProductIssue[];
+  /** The product's problems or twins changed: the list reloads. */
+  onChanged?: () => void;
   onClose: () => void;
   onPrevious?: () => void;
   onNext?: () => void;
@@ -159,6 +354,8 @@ export function ProductDialog({
   const [loaded, setLoaded] = useState<{ id: string; detail: Detail | null } | null>(null);
   const detail = loaded?.id === productId ? loaded.detail : null;
   const failed = loaded?.id === productId && loaded.detail === null;
+  /** Bumped after a change (twins), to read the card again. */
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,7 +366,7 @@ export function ProductDialog({
     return () => {
       cancelled = true;
     };
-  }, [base, productId]);
+  }, [base, productId, reloadKey]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -373,10 +570,35 @@ export function ProductDialog({
                       </p>
                     )}
                   </div>
+
+                  <Twins
+                    detail={detail}
+                    base={base}
+                    productId={productId}
+                    onChanged={() => {
+                      setReloadKey((k) => k + 1);
+                      onChanged?.();
+                    }}
+                  />
                 </div>
               </div>
 
-              {issues && <Improvements issues={issues} />}
+              {issues && (
+                <Improvements
+                  issues={issues}
+                  ignored={ignored ?? []}
+                  onIgnore={(code) =>
+                    api(`${base}/products/${productId}/issues/${code}/ignore`, {
+                      method: 'PUT',
+                    }).then(() => onChanged?.())
+                  }
+                  onRestore={(code) =>
+                    api(`${base}/products/${productId}/issues/${code}/ignore`, {
+                      method: 'DELETE',
+                    }).then(() => onChanged?.())
+                  }
+                />
+              )}
 
               <dl className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                 {stats.map((s) => (

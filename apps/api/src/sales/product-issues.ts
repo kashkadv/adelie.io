@@ -17,8 +17,27 @@ export type IssueCode =
   | 'noPins'
   | 'skuGaps'
   | 'skuOneForAll'
+  | 'twinMismatch'
   | 'fewTags'
   | 'noViews';
+
+/** Every issue code, for validating what a client sends. */
+export const ISSUE_CODES: readonly IssueCode[] = [
+  'pinToUnavailable',
+  'noPrice',
+  'noPhoto',
+  'soldOutActive',
+  'duplicateSku',
+  'noSku',
+  'skuPattern',
+  'noTags',
+  'noPins',
+  'skuGaps',
+  'skuOneForAll',
+  'twinMismatch',
+  'fewTags',
+  'noViews',
+];
 
 export interface Issue {
   code: IssueCode;
@@ -29,6 +48,9 @@ export interface Issue {
 
 export interface IssueProduct {
   id: string;
+  title: string;
+  /** Listings of one group are the same product: not duplicates of each other. */
+  twinGroupId: string | null;
   state: string;
   price: number | null;
   quantity: number | null;
@@ -78,6 +100,7 @@ const level: Record<IssueCode, IssueLevel> = {
   noPins: 'important',
   skuGaps: 'important',
   skuOneForAll: 'important',
+  twinMismatch: 'important',
   fewTags: 'note',
   noViews: 'note',
 };
@@ -90,12 +113,20 @@ export function productIssues(
   const active = products.filter((p) => p.state === 'active');
 
   // The same SKU on several active listings: the link to the website would be ambiguous.
+  // Twins (listings of one group) count as one owner.
   const owners = new Map<string, Set<string>>();
   for (const p of active) {
     // By article: "0001" and "0001/1" in two listings point to one product on the website.
     for (const sku of p.skus) {
-      owners.set(baseSku(sku), (owners.get(baseSku(sku)) ?? new Set<string>()).add(p.id));
+      const key = baseSku(sku);
+      owners.set(key, (owners.get(key) ?? new Set<string>()).add(p.twinGroupId ?? p.id));
     }
+  }
+  // Twins must agree: the same SKUs and the same price (they differ only in order or photos).
+  const signature = (p: IssueProduct) => JSON.stringify([[...p.skus].sort(), p.price]);
+  const twinsOf = new Map<string, IssueProduct[]>();
+  for (const p of active) {
+    if (p.twinGroupId) twinsOf.set(p.twinGroupId, [...(twinsOf.get(p.twinGroupId) ?? []), p]);
   }
   const result = new Map<string, Issue[]>();
   for (const p of products) {
@@ -108,6 +139,13 @@ export function productIssues(
       if (!p.imageUrl) codes.push('noPhoto');
       if (p.quantity === 0) codes.push('soldOutActive');
       if (p.skus.some((s) => (owners.get(baseSku(s))?.size ?? 0) > 1)) codes.push('duplicateSku');
+      const other = (p.twinGroupId ? (twinsOf.get(p.twinGroupId) ?? []) : []).find(
+        (t) => t.id !== p.id && signature(t) !== signature(p),
+      );
+      if (other) {
+        codes.push('twinMismatch');
+        params['twinMismatch'] = { twin: other.title };
+      }
       if (!p.skus.length) codes.push('noSku');
       // Our SKUs are numeric codes ("0040622", "0040622/1"); anything else (old schemes such as
       // "1896 AP_18/02/2021") is most likely a wrong one.
