@@ -32,6 +32,7 @@ import {
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
 import { countsAsSale, monthlySales, moneyFlow, netRevenue, ordersByDay } from './sales.js';
+import { productIssues } from './product-issues.js';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
@@ -527,7 +528,9 @@ export class SalesController {
           quantity: true,
           views: true,
           favorers: true,
+          tags: true,
           skus: true,
+          variationCount: true,
           listedAt: true,
           account: { select: { id: true, username: true, platform: true } },
         },
@@ -565,6 +568,7 @@ export class SalesController {
       postsByKey.set(l.key, (postsByKey.get(l.key) ?? new Set()).add(l.postId));
     const postsOf = (p: Parameters<typeof keysOf>[0]) =>
       new Set(keysOf(p).flatMap((k) => [...(postsByKey.get(k) ?? [])])).size;
+    const issues = productIssues(products.map((p) => ({ ...p, posts: postsOf(p) })));
     const sold = new Map<string, { units: number; revenue: number }>();
     for (const l of lines) {
       if (!countsAsSale(l.order.status)) continue;
@@ -575,11 +579,12 @@ export class SalesController {
     }
     return {
       period: period ? { from: period.from, to: period.to } : null,
-      items: products.map(({ externalId, ...p }) => ({
+      items: products.map(({ externalId, tags, variationCount, ...p }) => ({
         ...p,
         sold: sold.get(p.id)?.units ?? 0,
         revenue: sold.get(p.id)?.revenue ?? 0,
         posts: postsOf({ ...p, externalId }),
+        issues: issues.get(p.id) ?? [],
       })),
     };
   }

@@ -1,6 +1,15 @@
 'use client';
 
-import { ArrowDown, ExternalLink, Package, PenLine, Pin, Search, X } from 'lucide-react';
+import {
+  ArrowDown,
+  CircleAlert,
+  ExternalLink,
+  Package,
+  PenLine,
+  Pin,
+  Search,
+  X,
+} from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -30,12 +39,63 @@ type Product = {
   revenue: number;
   /** Posts (pins) leading to the product. */
   posts: number;
+  issues: { code: IssueCode; level: Level }[];
 };
+/** Mirrors apps/api sales/product-issues.ts. */
+type IssueCode =
+  | 'pinToUnavailable'
+  | 'noPrice'
+  | 'noPhoto'
+  | 'soldOutActive'
+  | 'duplicateSku'
+  | 'noSku'
+  | 'noTags'
+  | 'noPins'
+  | 'sharedSku'
+  | 'fewTags'
+  | 'skuFormat'
+  | 'noViews';
+type Level = 'critical' | 'important' | 'note';
+const LEVELS: Level[] = ['critical', 'important', 'note'];
+/** Icon colour by importance: red — critical, amber — important, grey — worth a look. */
+const LEVEL_STYLE: Record<Level, { text: string; dot: string }> = {
+  critical: { text: 'text-rose-600 dark:text-rose-400', dot: 'bg-rose-500' },
+  important: { text: 'text-amber-600 dark:text-amber-400', dot: 'bg-amber-500' },
+  note: { text: 'text-muted', dot: 'bg-accent-foreground/50' },
+};
+const topLevel = (p: Product): Level | null =>
+  LEVELS.find((l) => p.issues.some((i) => i.level === l)) ?? null;
 type Response = { period: { from: string; to: string } | null; items: Product[] };
 
 const COLUMNS = ['price', 'quantity', 'views', 'favorers', 'sold', 'revenue'] as const;
 type Column = (typeof COLUMNS)[number];
 const STATES = ['active', 'inactive', 'sold_out', 'draft', 'expired', 'removed'] as const;
+
+/** A coloured counter of the product's problems; hover or focus lists them, most serious first. */
+function Issues({ product }: { product: Product }) {
+  const t = useTranslations('Sales.issues');
+  const top = topLevel(product)!;
+  const sorted = [...product.issues].sort(
+    (a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level),
+  );
+  const label = t('count', { count: product.issues.length });
+  return (
+    <InfoTip
+      text={label}
+      lines={sorted.map((i) => ({
+        text: t(`codes.${i.code}`),
+        dotClassName: LEVEL_STYLE[i.level].dot,
+      }))}
+      triggerClassName={`px-1 ${LEVEL_STYLE[top].text} hover:bg-hover`}
+      trigger={
+        <>
+          <CircleAlert size={13} aria-hidden="true" />
+          <span className="tabular leading-4">{product.issues.length}</span>
+        </>
+      }
+    />
+  );
+}
 
 /** Products of the project's shops (ADR-0018): what sells, what is seen, what is in stock. */
 export function Products() {
@@ -50,6 +110,8 @@ export function Products() {
   const [state, setState] = useState('active');
   /** Products with posts leading to them (ADR-0018): '' = all. */
   const [pins, setPins] = useState<'' | 'with' | 'without'>('');
+  /** Problems filter: '' = all, 'any' = with any problem, else the most serious level. */
+  const [issues, setIssues] = useState('');
   const [sort, setSort] = useState<Column>('revenue');
   const [search, setSearch] = useState('');
   const [data, setData] = useState<{ key: string; value: Response } | null>(null);
@@ -88,6 +150,7 @@ export function Products() {
       (p) =>
         (!state || p.state === state) &&
         (!pins || (pins === 'with' ? p.posts > 0 : p.posts === 0)) &&
+        (!issues || (issues === 'any' ? p.issues.length > 0 : topLevel(p) === issues)) &&
         (!q ||
           p.title.toLowerCase().includes(q) ||
           p.skus.some((x) => x.toLowerCase().includes(q))),
@@ -103,7 +166,7 @@ export function Products() {
       }
       return (b.listedAt ?? '').localeCompare(a.listedAt ?? '');
     });
-  }, [shown, state, pins, search, sort]);
+  }, [shown, state, pins, issues, search, sort]);
 
   const openIndex = openId ? items.findIndex((p) => p.id === openId) : -1;
 
@@ -197,6 +260,20 @@ export function Products() {
             value: v,
             label: t(`products.pinsFilter.${v}`),
           }))}
+          clearLabel={tc('clearFilter')}
+        />
+        <FilterChip
+          label={t('issues.filter')}
+          value={issues}
+          onChange={(v) => {
+            setIssues(v);
+            // A pin to a product that is not on sale lives in a non-active state.
+            if (v) setState('');
+          }}
+          options={[
+            { value: 'any', label: t('issues.any') },
+            ...LEVELS.map((l) => ({ value: l, label: t(`issues.levels.${l}`) })),
+          ]}
           clearLabel={tc('clearFilter')}
         />
         <span className="xl:hidden">
@@ -303,6 +380,7 @@ export function Products() {
                           {t('products.posts', { count: p.posts })}
                         </span>
                       )}
+                      {p.issues.length > 0 && <Issues product={p} />}
                       {p.skus.length > 0 && (
                         <span className="tabular truncate" title={p.skus.join(', ')}>
                           {p.skus.length > 2

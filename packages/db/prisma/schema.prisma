@@ -664,6 +664,8 @@ model ShopProduct {
   /// Distinct non-empty SKUs of the product's variations (Etsy inventory); links it to the same
   /// product on other channels (ADR-0021).
   skus        String[]      @default([])
+  /// Live variations (Etsy inventory products); null = not read yet.
+  variationCount Int?
   listedAt    DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt

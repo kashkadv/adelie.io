@@ -112,6 +112,8 @@ export interface ProductData {
   tags: string[];
   /** Distinct non-empty SKUs of the product's variations; absent = not read this time. */
   skus?: string[];
+  /** Live variations (inventory products); absent = not read this time. */
+  variationCount?: number;
   listedAt?: Date;
 }
 

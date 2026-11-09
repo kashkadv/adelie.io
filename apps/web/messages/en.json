@@ -906,6 +906,30 @@
       "noLedger": "The Etsy ledger has no entries for this order yet.",
       "noPayment": "The payment for this order went around the Etsy ledger (e.g. PayPal) — only fees are shown.",
       "openInEtsy": "Open in Etsy Shop Manager"
+    },
+    "issues": {
+      "filter": "Issues",
+      "any": "Any issue",
+      "count": "{count, plural, one {# issue} other {# issues}}",
+      "levels": {
+        "critical": "Critical",
+        "important": "Important",
+        "note": "Worth a look"
+      },
+      "codes": {
+        "pinToUnavailable": "A pin leads to a product that is not on sale — buyers land nowhere.",
+        "noPrice": "The product has no price.",
+        "noPhoto": "The product has no photo.",
+        "soldOutActive": "Active, but nothing is in stock.",
+        "duplicateSku": "The same SKU is on another active listing — the link to the website would be ambiguous.",
+        "noSku": "No SKU — the product cannot be linked to the website.",
+        "noTags": "No tags — Etsy search hardly finds it.",
+        "noPins": "No pins lead to this product — no traffic from Pinterest.",
+        "sharedSku": "The variations share one SKU — give each its own.",
+        "fewTags": "Fewer than 13 tags — each free tag is a chance to be found.",
+        "skuFormat": "The SKU has no leading zeros, unlike others in the shop — check it matches the website.",
+        "noViews": "No views a month after publishing."
+      }
     }
   }
 }

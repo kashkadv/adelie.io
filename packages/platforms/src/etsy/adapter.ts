@@ -465,13 +465,9 @@ export class EtsyAdapter implements PlatformAdapter {
           ctx,
           `/listings/${product.externalId}/inventory`,
         );
-        product.skus = [
-          ...new Set(
-            liveProducts(inventory)
-              .map((p) => (p.sku ?? '').trim())
-              .filter(Boolean),
-          ),
-        ];
+        const live = liveProducts(inventory);
+        product.skus = [...new Set(live.map((p) => (p.sku ?? '').trim()).filter(Boolean))];
+        product.variationCount = live.length;
       } catch (error) {
         if (ctx.signal?.aborted) throw error;
       }

@@ -1,7 +1,15 @@
 'use client';
 
 import { Info } from 'lucide-react';
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 const GAP = 8;
@@ -21,11 +29,19 @@ export function InfoTip({
   text,
   title,
   tone = 'info',
+  lines,
+  trigger,
+  triggerClassName,
 }: {
   text: string;
   /** Optional bold first line (used for warnings: what happened, then `text`: what to do). */
   title?: string;
   tone?: 'info' | 'warning';
+  /** Instead of one paragraph: a list, each item with an optional coloured dot. */
+  lines?: { text: string; dotClassName?: string }[];
+  /** Instead of the "i" icon: any content (e.g. a coloured counter); `text` stays its label. */
+  trigger?: ReactNode;
+  triggerClassName?: string;
 }) {
   const id = useId();
   const anchor = useRef<HTMLButtonElement>(null);
@@ -90,12 +106,16 @@ export function InfoTip({
         onClick={() => setPinned((v) => !v)}
         onKeyDown={(e) => e.key === 'Escape' && close()}
         className={
-          warning
-            ? 'inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/15 text-xs leading-none font-bold text-amber-700 transition-colors duration-200 hover:bg-amber-500/25 dark:text-amber-400'
-            : 'inline-flex rounded-full text-muted transition-colors duration-200 hover:text-foreground focus-visible:text-foreground'
+          trigger
+            ? `inline-flex items-center gap-1 rounded-full transition-colors duration-200 ${triggerClassName ?? ''}`
+            : warning
+              ? 'inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/15 text-xs leading-none font-bold text-amber-700 transition-colors duration-200 hover:bg-amber-500/25 dark:text-amber-400'
+              : 'inline-flex rounded-full text-muted transition-colors duration-200 hover:text-foreground focus-visible:text-foreground'
         }
       >
-        {warning ? (
+        {trigger ? (
+          trigger
+        ) : warning ? (
           // Same height as a status badge (24px); a plain "!" reads lighter than a triangle icon.
           <span aria-hidden="true">!</span>
         ) : (
@@ -119,7 +139,23 @@ export function InfoTip({
             }`}
           >
             {title && <span className="mb-1 block font-semibold">{title}</span>}
-            {text}
+            {lines ? (
+              <span className="grid gap-1">
+                {lines.map((l) => (
+                  <span key={l.text} className="flex items-start gap-2">
+                    {l.dotClassName && (
+                      <span
+                        aria-hidden="true"
+                        className={`mt-1 h-2 w-2 shrink-0 rounded-full ${l.dotClassName}`}
+                      />
+                    )}
+                    <span>{l.text}</span>
+                  </span>
+                ))}
+              </span>
+            ) : (
+              text
+            )}
           </span>,
           document.body,
         )}

@@ -175,6 +175,7 @@ describe('EtsyAdapter data', () => {
     const products: ProductData[] = [];
     for await (const p of adapter.listProducts(ctx(client, '345'))) products.push(...p);
     expect(products[0]!.skus).toEqual(['RUG-1', 'RUG-2']);
+    expect(products[0]!.variationCount).toBe(4);
     expect(products[1]!.skus).toBeUndefined();
   });
 
