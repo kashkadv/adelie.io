@@ -32,6 +32,8 @@ const hostOfHeader = (value: unknown): string | null => {
 /** The body of a request, or null when it is larger than `limit` bytes. */
 function readBody(req: Request, limit: number): Promise<string | null> {
   return new Promise((resolve) => {
+    // Already read (or the connection is gone): waiting for 'end' would wait for ever.
+    if (req.readableEnded) return resolve('');
     const chunks: Buffer[] = [];
     let size = 0;
     req.on('data', (chunk: Buffer) => {
@@ -45,6 +47,7 @@ function readBody(req: Request, limit: number): Promise<string | null> {
     });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', () => resolve(null));
+    req.on('close', () => resolve(Buffer.concat(chunks).toString('utf8')));
   });
 }
 
@@ -224,13 +227,20 @@ export class FlipperIngestController {
     if (!site) return res.status(401).json({ error: 'unauthorized' });
     if (!this.perServerKey.allow(site.id)) return res.status(429).json({ error: 'rate_limited' });
 
-    const raw = await readBody(req, MAX_BODY_BYTES);
-    if (raw === null) return res.status(413).json({ error: 'too_large' });
+    // A JSON body may already have been read by the parser the auth module puts in front of
+    // application/json requests; otherwise (text/plain and the like) it is read here.
+    const parsedBody = (req as { body?: unknown }).body;
     let json: unknown;
-    try {
-      json = JSON.parse(raw);
-    } catch {
-      return res.status(400).json({ error: 'body' });
+    if (parsedBody && typeof parsedBody === 'object' && Object.keys(parsedBody).length > 0) {
+      json = parsedBody;
+    } else {
+      const raw = await readBody(req, MAX_BODY_BYTES);
+      if (raw === null) return res.status(413).json({ error: 'too_large' });
+      try {
+        json = JSON.parse(raw);
+      } catch {
+        return res.status(400).json({ error: 'body' });
+      }
     }
     const parsed = parseServerPurchase(json);
     if (!parsed.ok) return res.status(400).json({ error: parsed.error });
