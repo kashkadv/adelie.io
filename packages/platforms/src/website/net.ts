@@ -21,6 +21,8 @@ export class FeedFetchError extends Error {
 }
 
 const MAX_BYTES = 25 * 1024 * 1024;
+/** The bot Adelie introduces itself as; the site's owner lets it through (its own exceptions). */
+export const BOT_USER_AGENT = 'Mozilla/5.0 (compatible; adelie-bot/1.0; +https://adelie.space)';
 const TIMEOUT_MS = 30_000;
 const MAX_REDIRECTS = 3;
 
@@ -79,10 +81,18 @@ export interface FeedResponse {
   status: number;
   location?: string;
   body: string;
+  /** Response headers, names in lower case. */
+  headers?: Record<string, string>;
+}
+
+export interface GetOptions {
+  accept?: string;
+  maxBytes?: number;
 }
 
 /** One GET, with the resolved addresses checked at connect time. */
-export function httpsGet(url: URL): Promise<FeedResponse> {
+export function httpsGet(url: URL, options: GetOptions = {}): Promise<FeedResponse> {
+  const maxBytes = options.maxBytes ?? MAX_BYTES;
   return new Promise((resolve, reject) => {
     const req = request(
       url,
@@ -90,8 +100,8 @@ export function httpsGet(url: URL): Promise<FeedResponse> {
         method: 'GET',
         timeout: TIMEOUT_MS,
         headers: {
-          'user-agent': 'Adelie-feed/1.0',
-          accept: 'application/xml,text/xml;q=0.9,*/*;q=0.5',
+          'user-agent': BOT_USER_AGENT,
+          accept: options.accept ?? 'application/xml,text/xml;q=0.9,*/*;q=0.5',
         },
         // The name is resolved here, and refused when it points anywhere private.
         lookup: (hostname, options, callback) => {
@@ -116,7 +126,7 @@ export function httpsGet(url: URL): Promise<FeedResponse> {
         let size = 0;
         res.on('data', (chunk: Buffer) => {
           size += chunk.length;
-          if (size > MAX_BYTES) {
+          if (size > maxBytes) {
             res.destroy();
             reject(new FeedFetchError('TOO_LARGE', 'The feed is too large'));
             return;
@@ -127,6 +137,15 @@ export function httpsGet(url: URL): Promise<FeedResponse> {
           resolve({
             status: res.statusCode ?? 0,
             location: typeof res.headers.location === 'string' ? res.headers.location : undefined,
+            headers: Object.fromEntries(
+              Object.entries(res.headers).flatMap(([k, v]) =>
+                typeof v === 'string'
+                  ? [[k.toLowerCase(), v]]
+                  : Array.isArray(v)
+                    ? [[k.toLowerCase(), v.join(', ')]]
+                    : [],
+              ),
+            ),
             body: Buffer.concat(chunks).toString('utf8'),
           }),
         );
@@ -164,6 +183,71 @@ export async function fetchFeedText(
       throw new FeedFetchError('BAD_STATUS', `The site answered ${res.status}`, res.status);
     }
     return res.body;
+  }
+  throw new FeedFetchError('BAD_STATUS', 'Too many redirects');
+}
+
+export interface PageFetch {
+  /** The status of the last response. */
+  status: number;
+  /** Where the page finally was (after same-site redirects). */
+  finalUrl: string;
+  /** The hops taken, as `status url`. */
+  redirects: string[];
+  /** Milliseconds from the request to the end of the last response. */
+  loadMs: number;
+  bytes: number;
+  headers: Record<string, string>;
+  body: string;
+}
+
+const PAGE_MAX_BYTES = 3 * 1024 * 1024;
+const PAGE_MAX_HOPS = 5;
+const bare = (host: string) => host.replace(/^www\./, '').toLowerCase();
+
+/**
+ * One page of the site, as `adelie-bot` sees it (SEO check): redirects are followed only within the
+ * same site (the host without `www`) and each hop is checked like the first; a status that is not
+ * 2xx is a result, not an error. Anything on another host is not fetched.
+ */
+export async function fetchPage(
+  rawUrl: string,
+  get: (url: URL, options: GetOptions) => Promise<FeedResponse> = httpsGet,
+  clock: () => number = Date.now,
+): Promise<PageFetch> {
+  let url = parseFeedUrl(rawUrl);
+  const site = bare(url.hostname);
+  const redirects: string[] = [];
+  const started = clock();
+  for (let hop = 0; hop <= PAGE_MAX_HOPS; hop++) {
+    const res = await get(url, { accept: 'text/html,*/*;q=0.8', maxBytes: PAGE_MAX_BYTES });
+    if (res.status >= 300 && res.status < 400 && res.location) {
+      redirects.push(`${res.status} ${url.toString()}`);
+      const next = parseFeedUrl(new URL(res.location, url).toString());
+      if (bare(next.hostname) !== site) {
+        // Left the site: the redirect itself is the finding; the other host is not visited.
+        return {
+          status: res.status,
+          finalUrl: next.toString(),
+          redirects,
+          loadMs: clock() - started,
+          bytes: 0,
+          headers: res.headers ?? {},
+          body: '',
+        };
+      }
+      url = next;
+      continue;
+    }
+    return {
+      status: res.status,
+      finalUrl: url.toString(),
+      redirects,
+      loadMs: clock() - started,
+      bytes: Buffer.byteLength(res.body),
+      headers: res.headers ?? {},
+      body: res.body,
+    };
   }
   throw new FeedFetchError('BAD_STATUS', 'Too many redirects');
 }

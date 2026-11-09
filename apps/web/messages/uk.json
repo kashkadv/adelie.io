@@ -1061,6 +1061,78 @@
     "shopKind": {
       "ETSY": "Etsy",
       "WEBSITE": "Сайт"
+    },
+    "seo": {
+      "title": "SEO сторінки",
+      "hint": "Читає сторінку товару на сайті як adelie-bot і зберігає результат: індексацію, заголовок, опис, canonical, заголовки, розмітку й ціну в ній проти фіду. Лише за вашим кліком — ніколи за розкладом.",
+      "check": "Перевірити сторінку",
+      "recheck": "Перевірити ще раз",
+      "checking": "Перевіряємо…",
+      "last": "Остання перевірка: {date}",
+      "none": "Ще не перевіряли.",
+      "history": "Історія · {count}",
+      "first": "Перша перевірка",
+      "unchanged": "Без змін",
+      "changed": "Змінилось",
+      "failedCheck": "Сторінку не вдалося прочитати: {reason}",
+      "items": {
+        "status": "Відповідь",
+        "speed": "Швидкість",
+        "indexing": "Індексація",
+        "title": "Заголовок (title)",
+        "description": "Опис (description)",
+        "canonical": "Canonical",
+        "h1": "H1",
+        "structured": "Розмітка",
+        "price": "Ціна в розмітці",
+        "social": "Прев’ю для соцмереж",
+        "images": "Зображення",
+        "content": "Контент"
+      },
+      "values": {
+        "status": "{status}",
+        "statusMoved": "{status} → {url}",
+        "speed": "{ms} мс",
+        "indexingOk": "Відкрита для пошукових систем",
+        "indexingNo": "noindex — закрито від пошуку",
+        "missing": "Немає",
+        "length": "{length} символів",
+        "canonicalSelf": "Вказує на цю сторінку",
+        "canonicalOther": "Вказує на інше: {url}",
+        "h1": "{count, plural, one {# заголовок} few {# заголовки} many {# заголовків} other {# заголовка}}",
+        "structuredProduct": "Product знайдено ({types})",
+        "structuredNone": "Розмітки Product немає ({types})",
+        "priceNone": "У розмітці немає ціни",
+        "priceSame": "{price} {currency} — збігається з фідом",
+        "priceDiff": "Розмітка: {markup}; фід: {feed}",
+        "socialOk": "Заголовок і зображення задані",
+        "socialMissing": "Немає: {missing}",
+        "imagesOk": "{total} зображень, усі з alt",
+        "imagesNoAlt": "{count} із {total} зображень без alt",
+        "content": "{words} слів · {internal} внутрішніх і {external} зовнішніх посилань"
+      },
+      "changes": {
+        "status": "відповідь",
+        "indexing": "індексація",
+        "title": "заголовок",
+        "description": "опис",
+        "canonical": "canonical",
+        "h1": "H1",
+        "structured": "розмітка",
+        "price": "ціна"
+      },
+      "errors": {
+        "tooSoon": "Зачекайте кілька секунд перед новою перевіркою.",
+        "noUrl": "У товару немає адреси сторінки.",
+        "otherSite": "Можна перевіряти лише сторінки підключеного сайту.",
+        "failed": "Не вдалося перевірити сторінку.",
+        "UNREACHABLE": "сайт не відповів",
+        "TIMEOUT": "відповідь надто довга",
+        "NOT_ALLOWED": "адреса не дозволена",
+        "INVALID_URL": "адреса недійсна",
+        "TOO_LARGE": "сторінка завелика",
+        "BAD_STATUS": "несподівана відповідь"
+      }
     }
   }
 }

@@ -5,11 +5,13 @@ import {
   ConflictException,
   Controller,
   ForbiddenException,
+  HttpException,
   Get,
   NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Put,
   Delete,
   Query,
@@ -19,7 +21,10 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@adelie/db';
 import {
+  analyzePage,
   articlesOf,
+  FeedFetchError,
+  fetchPage,
   isAdapterError,
   productKeys,
   productChangeErrors,
@@ -338,6 +343,25 @@ export class SalesController {
           })
         : Promise.resolve([]),
     ]);
+    // The history of the page's SEO checks (a site product only).
+    const seoChecks = isShop
+      ? []
+      : await db.productSeoCheck.findMany({
+          where: { productId },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            createdAt: true,
+            url: true,
+            finalUrl: true,
+            status: true,
+            loadMs: true,
+            bytes: true,
+            error: true,
+            metrics: true,
+          },
+        });
     // The same article on the other channel (ADR-0021): a shop listing's site pages, a site
     // product's Etsy listings.
     const elsewhere = product.articles.length
@@ -400,7 +424,98 @@ export class SalesController {
       twinSuggestions,
       twinCandidates: candidates,
       elsewhere,
+      seoChecks,
     };
+  }
+
+  /**
+   * Reads the product's page on the site as `adelie-bot` and records what it says to search engines
+   * (ADR-0021). Only on a member's click, never on a schedule; only the connected site's own
+   * pages; at most one check in 15 seconds per product.
+   */
+  @Post('products/:productId/seo-check')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async seoCheck(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+    @Session() session: UserSession,
+  ) {
+    await this.visibleProject(request.workspace, projectId);
+    const db = this.prisma.client;
+    const product = await db.shopProduct.findFirst({
+      where: {
+        id: productId,
+        projectId,
+        workspaceId: request.workspace.workspaceId,
+        account: { ...CATALOG_WHERE, platform: 'WEBSITE' },
+      },
+      select: { id: true, url: true, account: { select: { externalId: true } } },
+    });
+    if (!product) throw new NotFoundException();
+    if (!product.url) throw new BadRequestException({ reason: 'noUrl' });
+    const hostOf = (u: string) => {
+      try {
+        return new URL(u).hostname.replace(/^www\./, '').toLowerCase();
+      } catch {
+        return '';
+      }
+    };
+    // Only pages of the site the member connected (its feed's host).
+    if (!hostOf(product.url) || hostOf(product.url) !== hostOf(product.account.externalId)) {
+      throw new BadRequestException({ reason: 'otherSite' });
+    }
+    const last = await db.productSeoCheck.findFirst({
+      where: { productId },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    if (last && Date.now() - last.createdAt.getTime() < 15_000) {
+      throw new HttpException({ reason: 'tooSoon' }, 429);
+    }
+    const base = {
+      workspaceId: request.workspace.workspaceId,
+      projectId,
+      productId,
+      userId: session.user.id,
+      url: product.url,
+    };
+    const select = {
+      id: true,
+      createdAt: true,
+      url: true,
+      finalUrl: true,
+      status: true,
+      loadMs: true,
+      bytes: true,
+      error: true,
+      metrics: true,
+    } as const;
+    try {
+      const page = await fetchPage(product.url);
+      const readable = page.status >= 200 && page.status < 300 && page.body;
+      return await db.productSeoCheck.create({
+        data: {
+          ...base,
+          finalUrl: page.finalUrl,
+          status: page.status,
+          loadMs: page.loadMs,
+          bytes: page.bytes,
+          metrics: readable
+            ? (analyzePage(
+                page.body,
+                page.finalUrl,
+                page.headers,
+              ) as unknown as Prisma.InputJsonValue)
+            : undefined,
+        },
+        select,
+      });
+    } catch (error) {
+      if (!(error instanceof FeedFetchError)) throw error;
+      // The page could not be read at all: that is a result worth keeping in the history.
+      return db.productSeoCheck.create({ data: { ...base, error: error.kind }, select });
+    }
   }
 
   /** A product of the project's shops, or 404. */

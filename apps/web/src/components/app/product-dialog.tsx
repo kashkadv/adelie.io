@@ -11,18 +11,20 @@ import {
   EyeOff,
   PenLine,
   Pin,
+  ScanSearch,
   X,
 } from 'lucide-react';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { Select } from '../ui/select';
 import { InfoTip } from '../ui/info-tip';
 import { PanelSheet } from '../ui/panel-sheet';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
 import { ISSUE_STYLE, sortIssues, type ProductIssue } from './product-issues';
 import { minorDigits, useMoney } from './sales-data';
+import { seoChanges, seoFindings, type SeoCheck, type SeoLevel } from './seo-rules';
 
 type TwinListing = {
   id: string;
@@ -49,6 +51,8 @@ type Detail = {
   /** Listings that are the same product, suggestions (same SKUs) and everything to choose from. */
   /** A site feed's own fields (description, brand, category…); null for shops. */
   details: Record<string, string> | null;
+  /** The history of the page's SEO checks, newest first (a site product). */
+  seoChecks: SeoCheck[];
   twins: TwinListing[];
   twinSuggestions: TwinListing[];
   twinCandidates: { id: string; title: string; state: string }[];
@@ -271,6 +275,159 @@ function SiteDetails({ details }: { details: Record<string, string> }) {
             >
               {more ? t('showLess') : t('showMore')}
             </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+const LEVEL_DOT: Record<SeoLevel, string> = {
+  ok: 'bg-emerald-500',
+  warn: 'bg-amber-500',
+  bad: 'bg-rose-500',
+  info: 'bg-[var(--field-focus)]',
+};
+
+/**
+ * SEO of a site product's page (ADR-0021): a check is made by a click — never on a schedule —
+ * reads the page as `adelie-bot` and is kept, so the history shows what changed between checks.
+ */
+function SeoSection({
+  detail,
+  base,
+  productId,
+  onChecked,
+}: {
+  detail: Detail;
+  base: string;
+  productId: string;
+  onChecked: () => void;
+}) {
+  const t = useTranslations('Sales.seo');
+  const format = useFormatter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const checks = detail.seoChecks;
+  const latest = checks[0];
+  const feed = {
+    price: detail.price,
+    currency: detail.currency,
+    digits: minorDigits(detail.currency ?? 'USD'),
+  };
+
+  async function run() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`${base}/products/${productId}/seo-check`, { method: 'POST' });
+      onChecked();
+    } catch (e) {
+      const reason = e instanceof ApiError ? (e.body as { reason?: string } | null)?.reason : null;
+      setError(reason && ['tooSoon', 'noUrl', 'otherSite'].includes(reason) ? reason : 'failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const when = (iso: string) =>
+    format.dateTime(new Date(iso), { dateStyle: 'medium', timeStyle: 'short' });
+  const state = (check: SeoCheck) =>
+    check.error
+      ? t('failedCheck', { reason: t(`errors.${check.error}` as 'errors.UNREACHABLE') })
+      : [check.status, check.loadMs !== null ? t('values.speed', { ms: check.loadMs }) : null]
+          .filter((x) => x !== null)
+          .join(' · ');
+
+  return (
+    <section className="mt-6">
+      <div className="mb-2 flex flex-wrap items-center gap-3 px-1">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+          {t('title')}
+          <InfoTip text={t('hint')} />
+        </h3>
+        {latest && (
+          <span className="text-xs text-muted">{t('last', { date: when(latest.createdAt) })}</span>
+        )}
+        <button
+          type="button"
+          onClick={run}
+          disabled={busy}
+          className="ml-auto inline-flex items-center gap-2 rounded-xl border border-line px-3 py-1.5 text-sm hover:bg-hover disabled:opacity-60"
+        >
+          <ScanSearch size={15} aria-hidden="true" className={busy ? 'animate-pulse' : undefined} />
+          {busy ? t('checking') : latest ? t('recheck') : t('check')}
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="mb-2 px-1 text-xs text-rose-600 dark:text-rose-400">
+          {t(`errors.${error}` as 'errors.failed')}
+        </p>
+      )}
+
+      {!latest ? (
+        <p className="px-1 text-sm text-muted">{t('none')}</p>
+      ) : latest.error ? (
+        <p className="px-1 text-sm text-rose-600 dark:text-rose-400">{state(latest)}</p>
+      ) : (
+        <ul className="divide-y divide-line rounded-2xl border border-line">
+          {seoFindings(latest, feed).map((f) => (
+            <li key={f.key} className="flex items-start gap-3 px-4 py-2.5 text-sm">
+              <span
+                aria-hidden="true"
+                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${LEVEL_DOT[f.level]}`}
+              />
+              <span className="w-44 shrink-0 text-muted">{t(`items.${f.key}`)}</span>
+              <span className="min-w-0 flex-1 break-words">
+                {f.text ? <span>{f.text} </span> : null}
+                <span className={f.text ? 'text-xs text-muted' : ''}>
+                  {t(`values.${f.state}` as 'values.status', f.params)}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {checks.length > 1 && (
+        <div className="mt-3 px-1">
+          <button
+            type="button"
+            aria-expanded={showHistory}
+            onClick={() => setShowHistory((v) => !v)}
+            className="flex items-center gap-1.5 text-xs text-muted hover:text-foreground"
+          >
+            <ChevronDown
+              size={13}
+              aria-hidden="true"
+              className={`transition-transform duration-200 ${showHistory ? 'rotate-180' : ''}`}
+            />
+            {t('history', { count: checks.length })}
+          </button>
+          {showHistory && (
+            <ul className="mt-2 grid gap-1.5">
+              {checks.map((c, i) => {
+                const changes = seoChanges(checks[i + 1], c);
+                return (
+                  <li key={c.id} className="flex flex-wrap items-baseline gap-x-3 text-xs">
+                    <span className="tabular text-muted">{when(c.createdAt)}</span>
+                    <span className="tabular">{state(c)}</span>
+                    {checks[i + 1] ? (
+                      changes.length > 0 ? (
+                        <span className="text-amber-700 dark:text-amber-400">
+                          {t('changed')}: {changes.map((k) => t(`changes.${k}`)).join(', ')}
+                        </span>
+                      ) : (
+                        <span className="text-muted">{t('unchanged')}</span>
+                      )
+                    ) : (
+                      <span className="text-muted">{t('first')}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       )}
@@ -746,6 +903,15 @@ export function ProductDialog({
 
               {detail.account.platform === 'WEBSITE' && detail.details && (
                 <SiteDetails details={detail.details} />
+              )}
+
+              {detail.account.platform === 'WEBSITE' && (
+                <SeoSection
+                  detail={detail}
+                  base={base}
+                  productId={productId}
+                  onChecked={() => setReloadKey((k) => k + 1)}
+                />
               )}
 
               <dl className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">

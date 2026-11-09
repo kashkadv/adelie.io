@@ -1061,6 +1061,78 @@
     "shopKind": {
       "ETSY": "Etsy",
       "WEBSITE": "Site"
+    },
+    "seo": {
+      "title": "SEO of the page",
+      "hint": "Reads the product’s page on the site as adelie-bot and keeps the result: indexing, title, description, canonical, headings, structured data and its price against the feed. Only when you click — never on a schedule.",
+      "check": "Check the page",
+      "recheck": "Check again",
+      "checking": "Checking…",
+      "last": "Last check: {date}",
+      "none": "Not checked yet.",
+      "history": "History · {count}",
+      "first": "First check",
+      "unchanged": "Nothing changed",
+      "changed": "Changed",
+      "failedCheck": "The page could not be read: {reason}",
+      "items": {
+        "status": "Response",
+        "speed": "Speed",
+        "indexing": "Indexing",
+        "title": "Title",
+        "description": "Description",
+        "canonical": "Canonical",
+        "h1": "H1",
+        "structured": "Structured data",
+        "price": "Price in the markup",
+        "social": "Social preview",
+        "images": "Images",
+        "content": "Content"
+      },
+      "values": {
+        "status": "{status}",
+        "statusMoved": "{status} → {url}",
+        "speed": "{ms} ms",
+        "indexingOk": "Open to search engines",
+        "indexingNo": "noindex — closed from search",
+        "missing": "Missing",
+        "length": "{length} characters",
+        "canonicalSelf": "Points at this page",
+        "canonicalOther": "Points elsewhere: {url}",
+        "h1": "{count, plural, one {# heading} other {# headings}}",
+        "structuredProduct": "Product found ({types})",
+        "structuredNone": "No Product markup ({types})",
+        "priceNone": "The markup has no price",
+        "priceSame": "{price} {currency} — same as the feed",
+        "priceDiff": "Markup: {markup}; feed: {feed}",
+        "socialOk": "Title and image are set",
+        "socialMissing": "Missing: {missing}",
+        "imagesOk": "{total} images, all with alt text",
+        "imagesNoAlt": "{count} of {total} images without alt text",
+        "content": "{words} words · {internal} internal and {external} external links"
+      },
+      "changes": {
+        "status": "response",
+        "indexing": "indexing",
+        "title": "title",
+        "description": "description",
+        "canonical": "canonical",
+        "h1": "H1",
+        "structured": "structured data",
+        "price": "price"
+      },
+      "errors": {
+        "tooSoon": "Wait a few seconds before checking again.",
+        "noUrl": "The product has no page address.",
+        "otherSite": "Only pages of the connected site can be checked.",
+        "failed": "Could not check the page.",
+        "UNREACHABLE": "the site did not answer",
+        "TIMEOUT": "it took too long",
+        "NOT_ALLOWED": "the address is not allowed",
+        "INVALID_URL": "the address is not valid",
+        "TOO_LARGE": "the page is too large",
+        "BAD_STATUS": "unexpected answer"
+      }
     }
   }
 }

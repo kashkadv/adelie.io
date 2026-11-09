@@ -695,6 +695,7 @@ model ShopProduct {
   orderItems   ShopOrderItem[]
   changes      ShopProductChange[]
   issueIgnores ShopProductIssueIgnore[]
+  seoChecks    ProductSeoCheck[]
 
   @@unique([accountId, externalId])
   @@index([projectId])
@@ -851,4 +852,29 @@ model ShopProductIssueIgnore {
 
   @@unique([productId, code])
   @@map("shop_product_issue_ignore")
+}
+
+/// One SEO check of a site product's page (ADR-0021): made by a member's click, never on a schedule.
+/// The history shows what changed between checks.
+model ProductSeoCheck {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  workspaceId String      @db.Uuid
+  projectId   String      @db.Uuid
+  productId   String      @db.Uuid
+  product     ShopProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId      String?
+  createdAt   DateTime    @default(now())
+  /// The address that was read, and where it ended up after redirects within the site.
+  url         String
+  finalUrl    String?
+  status      Int?
+  loadMs      Int?
+  bytes       Int?
+  /// The page could not be read at all (unreachable, not allowed…).
+  error       String?
+  /// SeoMetrics of packages/platforms.
+  metrics     Json?
+
+  @@index([productId, createdAt])
+  @@map("product_seo_check")
 }

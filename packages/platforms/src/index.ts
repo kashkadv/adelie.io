@@ -20,5 +20,14 @@ export {
 } from './etsy/mapping.js';
 export { baseSku, articlesOf } from './sku.js';
 export { WebsiteAdapter } from './website/adapter.js';
-export { FeedFetchError, fetchFeedText, isPrivateAddress, parseFeedUrl } from './website/net.js';
+export {
+  BOT_USER_AGENT,
+  FeedFetchError,
+  fetchFeedText,
+  fetchPage,
+  isPrivateAddress,
+  parseFeedUrl,
+  type PageFetch,
+} from './website/net.js';
+export { analyzePage, type SeoMetrics } from './website/seo.js';
 export { parseFeed, mapFeedItem, parsePrice } from './website/feed.js';
