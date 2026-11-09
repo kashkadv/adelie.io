@@ -77,7 +77,8 @@ type Product = {
 type Response = { period: { from: string; to: string } | null; items: Product[] };
 
 /** What each kind of channel offers: a shop has sales and views, a site's feed only a price. */
-const SHOP_COLUMNS = ['price', 'quantity', 'views', 'favorers', 'sold', 'revenue'] as const;
+// The price comes last; the revenue is in the product's card.
+const SHOP_COLUMNS = ['quantity', 'views', 'favorers', 'sold', 'price'] as const;
 const SITE_COLUMNS = ['price'] as const;
 type Column = (typeof SHOP_COLUMNS)[number];
 /** How long a row stays lit after its dialog closes, before it fades out. */
@@ -134,7 +135,7 @@ export function Products() {
   const [pins, setPins] = useState<'' | 'with' | 'without'>('');
   /** Problems filter: the chosen problems; a product matches if it has any of them. */
   const [issueCodes, setIssueCodes] = useState<IssueCode[]>([]);
-  const [sortChoice, setSortChoice] = useState<Column>('revenue');
+  const [sortChoice, setSortChoice] = useState<Column>('sold');
   const [search, setSearch] = useState('');
   const [data, setData] = useState<{ key: string; value: Response } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -282,7 +283,6 @@ export function Products() {
 
   const cell = (p: Product, c: Column) => {
     if (c === 'price') return money(p.price, p.currency);
-    if (c === 'revenue') return p.revenue ? money(p.revenue, p.currency) : '—';
     const v = p[c];
     return v === null ? '—' : format.number(v);
   };
@@ -430,7 +430,7 @@ export function Products() {
         <div className="hidden items-center gap-6 border-b border-line p-5 text-xs text-muted xl:flex">
           <span className="flex-1 pl-[100px]">{t('products.product')}</span>
           <span
-            className={`grid gap-6 text-right ${isSite ? 'w-[9rem] grid-cols-1' : 'w-[46rem] grid-cols-6'}`}
+            className={`grid gap-6 text-right ${isSite ? 'w-[9rem] grid-cols-1' : 'w-[38rem] grid-cols-5'}`}
           >
             {columns.map((c) => (
               <span key={c} className="flex items-center justify-end gap-1.5">
@@ -549,7 +549,7 @@ export function Products() {
                   </div>
                   <dl
                     className={`tabular grid shrink-0 gap-x-6 gap-y-2 text-right ${
-                      isSite ? 'grid-cols-1 xl:w-[9rem]' : 'grid-cols-3 sm:grid-cols-6 xl:w-[46rem]'
+                      isSite ? 'grid-cols-1 xl:w-[9rem]' : 'grid-cols-3 sm:grid-cols-5 xl:w-[38rem]'
                     }`}
                   >
                     {columns.map((c) => (
