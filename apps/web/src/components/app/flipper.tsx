@@ -34,7 +34,7 @@ type Summary = {
   daily: { day: string; visitors: number; views: number }[];
   funnel: { name: string; visitors: number }[];
   channels: { channel: string; views: number }[];
-  products: { item: string; views: number }[];
+  products: { item: string; views: number; visitors: number }[];
   consent: { consenting: number; anonymous: number };
 };
 
@@ -337,7 +337,9 @@ export function Flipper() {
                     {summary.products.map((p) => (
                       <li key={p.item} className="flex justify-between gap-3">
                         <span className="tabular">{p.item}</span>
-                        <span className="tabular text-muted">{format.number(p.views)}</span>
+                        <span className="tabular text-muted">
+                          {t('productViews', { views: p.views, visitors: p.visitors })}
+                        </span>
                       </li>
                     ))}
                   </ul>

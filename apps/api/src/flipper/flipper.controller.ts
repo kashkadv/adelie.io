@@ -226,8 +226,10 @@ export class FlipperController {
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
           AND name = 'PageView' AND channel IS NOT NULL
         GROUP BY channel ORDER BY views DESC LIMIT 10`,
-      db.$queryRaw<{ item: string; views: number }[]>`
-        SELECT properties->>'item_id' AS item, count(*)::int AS views FROM website_event
+      db.$queryRaw<{ item: string; views: number; visitors: number }[]>`
+        SELECT properties->>'item_id' AS item, count(*)::int AS views,
+               count(DISTINCT coalesce("visitorId", "dailyId"))::int AS visitors
+        FROM website_event
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
           AND name = 'ProductView' AND properties->>'item_id' IS NOT NULL
         GROUP BY 1 ORDER BY views DESC LIMIT 10`,

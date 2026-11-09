@@ -1231,6 +1231,7 @@
         "problems": "No events? Check: the script loaded (Network tab, the request to flipper.js), the collect request returned 204, the site is opened from an allowed domain, an ad blocker has not blocked the script.",
         "purchase": "Purchase is deliberately not sent from the browser: a click or a “thank you” page is not proof of payment. We will add it separately, as a server event from your backend after the payment is confirmed."
       }
-    }
+    },
+    "productViews": "{views, plural, one {# view} other {# views}} · {visitors, plural, one {# visitor} other {# visitors}}"
   }
 }
