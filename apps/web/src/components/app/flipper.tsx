@@ -470,11 +470,11 @@ export function Flipper() {
                 )}
               </div>
 
-              <dl className="animate-rise mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              <dl className="animate-rise mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
                 {STANDARD.map((n) => (
-                  <div key={n} className="rounded-2xl bg-hover px-4 py-3">
+                  <div key={n} className="rounded-2xl bg-hover px-3 py-2.5">
                     <dt className="text-xs text-muted">{t(`events.${n}`)}</dt>
-                    <dd className="tabular mt-1 font-display text-xl font-semibold">
+                    <dd className="tabular mt-0.5 font-display text-lg font-semibold">
                       {summary ? format.number(count(n)) : '—'}
                     </dd>
                     {summary && (
