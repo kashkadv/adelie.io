@@ -118,8 +118,6 @@ export interface ProductData {
   skuBy?: string[];
   /** How many SKUs the product should have: one per combination of the `skuBy` options. */
   skuGroups?: number;
-  /** Names of the options the variations are made of ("Primary color", "Size"). */
-  variationOptions?: string[];
   listedAt?: Date;
 }
 

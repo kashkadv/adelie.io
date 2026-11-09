@@ -539,7 +539,6 @@ export class SalesController {
           variationCount: true,
           skuBy: true,
           skuGroups: true,
-          variationOptions: true,
           listedAt: true,
           account: { select: { id: true, username: true, platform: true } },
         },
@@ -588,15 +587,13 @@ export class SalesController {
     }
     return {
       period: period ? { from: period.from, to: period.to } : null,
-      items: products.map(
-        ({ externalId, tags, variationCount, skuGroups, variationOptions, ...p }) => ({
-          ...p,
-          sold: sold.get(p.id)?.units ?? 0,
-          revenue: sold.get(p.id)?.revenue ?? 0,
-          posts: postsOf({ ...p, externalId }),
-          issues: issues.get(p.id) ?? [],
-        }),
-      ),
+      items: products.map(({ externalId, tags, variationCount, skuGroups, ...p }) => ({
+        ...p,
+        sold: sold.get(p.id)?.units ?? 0,
+        revenue: sold.get(p.id)?.revenue ?? 0,
+        posts: postsOf({ ...p, externalId }),
+        issues: issues.get(p.id) ?? [],
+      })),
     };
   }
 
@@ -828,7 +825,6 @@ function skuLayout(p: ProductEditable) {
     variationCount: p.variations.length || 1,
     skuBy: by,
     skuGroups: groups,
-    variationOptions: p.skuProperties.map((o) => o.name),
   };
 }
 

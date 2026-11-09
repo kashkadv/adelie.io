@@ -584,7 +584,6 @@ export async function runSync(
               ...(p.skus ? { skus: p.skus } : {}),
               ...(p.variationCount !== undefined ? { variationCount: p.variationCount } : {}),
               ...(p.skuBy ? { skuBy: p.skuBy } : {}),
-              ...(p.variationOptions ? { variationOptions: p.variationOptions } : {}),
               ...(p.skuGroups !== undefined ? { skuGroups: p.skuGroups } : {}),
               listedAt: p.listedAt ?? null,
             };

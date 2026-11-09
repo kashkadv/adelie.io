@@ -10,7 +10,6 @@ export type IssueCode =
   | 'noSku'
   | 'noTags'
   | 'noPins'
-  | 'skuColor'
   | 'skuGaps'
   | 'fewTags'
   | 'skuFormat'

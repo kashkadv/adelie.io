@@ -670,8 +670,6 @@ model ShopProduct {
   skuBy       String[]      @default([])
   /// How many SKUs the product should have: one per combination of the `skuBy` options.
   skuGroups   Int?
-  /// Names of the options the variations are made of ("Primary color", "Size").
-  variationOptions String[] @default([])
   listedAt    DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt

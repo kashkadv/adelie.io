@@ -13,7 +13,6 @@ const product = (over: Partial<IssueProduct> = {}): IssueProduct => ({
   skus: ['00031307'],
   variationCount: 1,
   skuBy: [],
-  variationOptions: [],
   skuGroups: 1,
   listedAt: new Date('2026-01-01T00:00:00Z'),
   posts: 2,
@@ -49,18 +48,13 @@ describe('productIssues', () => {
     const dup = [product({ id: 'a' }), product({ id: 'b' })];
     expect(codes(dup, 'a')).toEqual(['critical:duplicateSku']);
     expect(codes(dup, 'b')).toEqual(['critical:duplicateSku']);
-    // sizes only, one SKU for the product: a fine way to keep it
-    expect(codes([product({ variationCount: 5, variationOptions: ['Size'] })])).toEqual([]);
-    // colours that share one SKU: the SKU should go by the colour
-    expect(
-      codes([product({ variationCount: 8, variationOptions: ['Primary color', 'Size'] })]),
-    ).toEqual(['important:skuColor']);
+    // the SKU does not vary: one SKU for the whole product is exactly what was chosen
+    expect(codes([product({ variationCount: 8 })])).toEqual([]);
     // SKU by colour, every colour has its own: fine however many sizes there are
     expect(
       codes([
         product({
           variationCount: 8,
-          variationOptions: ['Color', 'Size'],
           skuBy: ['Color'],
           skuGroups: 2,
           skus: ['J-BLK', 'J-BLU'],

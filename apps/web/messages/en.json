@@ -846,9 +846,12 @@
       "bulletsHint": "Adds “• ” at the start of the selected lines (or removes it). Etsy shows descriptions as plain text — bold or italics do not work there, bullets do.",
       "skuHint": "The product’s article code, the same as the id in your website feed — Adelie links the product to the website by it. Each variation has its own SKU.",
       "variationSku": "SKU: {variation}",
-      "skuBy": "SKU varies by",
-      "skuByHint": "Etsy’s “SKUs vary”. Nothing chosen: one SKU for the whole product (e.g. a vest that differs only by size). Colour: one SKU per colour, shared by its sizes. Size: one SKU per size.",
-      "productSku": "SKU of the product"
+      "skuByHint": "Etsy’s “SKUs vary”. One for all: a single SKU for the whole product (e.g. a vest that differs only by size). By an option (colour, size): one SKU per value of it — all sizes of one colour share its SKU. Each variation: its own SKU.",
+      "productSku": "SKU of the product",
+      "skuMode": "SKU",
+      "skuOneForAll": "One for all",
+      "skuByOption": "By {name}",
+      "skuEach": "Each variation"
     },
     "card": {
       "close": "Close",
@@ -933,8 +936,7 @@
         "fewTags": "Fewer than 13 tags — each free tag is a chance to be found.",
         "skuFormat": "The SKU has no leading zeros, unlike others in the shop — check it matches the website.",
         "noViews": "No views a month after publishing.",
-        "skuGaps": "The SKU goes by {by}: only {have} of {groups} groups have their own SKU — some lack one or share it.",
-        "skuColor": "The SKU does not go by {options}, so the colours of this product share one SKU. Choose it in the editor."
+        "skuGaps": "The SKU goes by {by}: only {have} of {groups} groups have their own SKU — some lack one or share it."
       },
       "none": "No issues found",
       "title": "Possible improvements"

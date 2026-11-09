@@ -7,6 +7,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
 import { PanelSheet } from '../ui/panel-sheet';
+import { Segmented } from '../ui/segmented';
 import { Switch } from '../ui/switch';
 import { minorDigits, useMoney } from './sales-data';
 
@@ -292,11 +293,8 @@ export function ProductEditor({
       ),
     });
   /** Choosing what the SKU goes by regroups the variations; each group keeps one SKU. */
-  const toggleSkuOn = (propertyId: string) => {
+  const setSkuOn = (on: string[]) => {
     if (!values) return;
-    const on = values.skuOnProperty.includes(propertyId)
-      ? values.skuOnProperty.filter((x) => x !== propertyId)
-      : [...values.skuOnProperty, propertyId].sort();
     const first = new Map<string, string>();
     for (const v of values.variations) {
       const key = groupKey(v.id, on);
@@ -311,6 +309,30 @@ export function ProductEditor({
       })),
     });
   };
+  /** The ways the SKU can vary: for all at once, by one option, by every option together. */
+  const skuProps = data?.current?.skuProperties ?? [];
+  const sameSet = (a: string[], b: string[]) => same([...a].sort(), [...b].sort());
+  const skuModes: { key: string; ids: string[]; label: string }[] = [
+    { key: 'none', ids: [], label: t('skuOneForAll') },
+    ...skuProps.map((p) => ({
+      key: `p${p.id}`,
+      ids: [p.id],
+      label: t('skuByOption', { name: p.name }),
+    })),
+    ...(skuProps.length > 1
+      ? [{ key: 'all', ids: skuProps.map((p) => p.id), label: t('skuEach') }]
+      : []),
+  ];
+  const currentOn = values?.skuOnProperty ?? [];
+  if (values && !skuModes.some((m) => sameSet(m.ids, currentOn))) {
+    // A combination Etsy already has that is not one of the above: show it as it is.
+    skuModes.push({
+      key: 'custom',
+      ids: currentOn,
+      label: currentOn.map((id) => skuProps.find((p) => p.id === id)?.name ?? id).join(' + '),
+    });
+  }
+  const skuMode = skuModes.find((m) => sameSet(m.ids, currentOn))?.key ?? 'none';
   /** One variation changed — or all of them, when the value is shared. */
   const setVar = (id: string, patch: Partial<Var>) =>
     values &&
@@ -556,33 +578,19 @@ export function ProductEditor({
               {data.current?.hasVariations ? (
                 <div>
                   {label('variations', currency)}
-                  {/* What the SKU goes by: colour, size… or nothing (one SKU for all). */}
+                  {/* Etsy's "SKUs vary": one SKU for all, or by an option (colour, size…). */}
                   {data.current.skuProperties.length > 0 && (
                     <div className="mb-3">
                       <span className="mb-1.5 flex items-center gap-1.5 px-3.5 text-xs text-muted">
-                        {t('skuBy')}
+                        {t('skuMode')}
                         <InfoTip text={t('skuByHint')} />
                       </span>
-                      <div className="flex flex-wrap gap-2">
-                        {data.current.skuProperties.map((pr) => {
-                          const on = values.skuOnProperty.includes(pr.id);
-                          return (
-                            <button
-                              key={pr.id}
-                              type="button"
-                              aria-pressed={on}
-                              onClick={() => toggleSkuOn(pr.id)}
-                              className={`h-9 rounded-full border px-3.5 text-sm transition-colors duration-150 ${
-                                on
-                                  ? 'border-transparent bg-hover text-foreground'
-                                  : 'border-line text-muted hover:text-foreground'
-                              }`}
-                            >
-                              {pr.name}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <Segmented
+                        ariaLabel={t('skuMode')}
+                        value={skuMode}
+                        onChange={(key) => setSkuOn(skuModes.find((m) => m.key === key)?.ids ?? [])}
+                        options={skuModes.map((m) => ({ value: m.key, label: m.label }))}
+                      />
                     </div>
                   )}
                   {/* SKU does not vary: one SKU for the whole product, edited once. */}
