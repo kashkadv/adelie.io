@@ -2,6 +2,7 @@
 
 import {
   ArrowDown,
+  Check,
   CircleAlert,
   ExternalLink,
   Package,
@@ -20,6 +21,14 @@ import { InfoTip } from '../ui/info-tip';
 import { EmptyState, PageHeader } from './page-header';
 import { ProductDialog } from './product-dialog';
 import { ProductEditor } from './product-editor';
+import {
+  ISSUE_LEVELS,
+  ISSUE_STYLE,
+  sortIssues,
+  topIssueLevel,
+  type IssueLevel,
+  type ProductIssue,
+} from './product-issues';
 import { useMoney, useSalesBase, useShops } from './sales-data';
 
 type Product = {
@@ -39,60 +48,40 @@ type Product = {
   revenue: number;
   /** Posts (pins) leading to the product. */
   posts: number;
-  issues: { code: IssueCode; level: Level }[];
+  issues: ProductIssue[];
 };
-/** Mirrors apps/api sales/product-issues.ts. */
-type IssueCode =
-  | 'pinToUnavailable'
-  | 'noPrice'
-  | 'noPhoto'
-  | 'soldOutActive'
-  | 'duplicateSku'
-  | 'noSku'
-  | 'noTags'
-  | 'noPins'
-  | 'sharedSku'
-  | 'fewTags'
-  | 'skuFormat'
-  | 'noViews';
-type Level = 'critical' | 'important' | 'note';
-const LEVELS: Level[] = ['critical', 'important', 'note'];
-/** Icon colour by importance: red — critical, amber — important, grey — worth a look. */
-const LEVEL_STYLE: Record<Level, { text: string; dot: string }> = {
-  critical: { text: 'text-rose-600 dark:text-rose-400', dot: 'bg-rose-500' },
-  important: { text: 'text-amber-600 dark:text-amber-400', dot: 'bg-amber-500' },
-  note: { text: 'text-muted', dot: 'bg-accent-foreground/50' },
-};
-const topLevel = (p: Product): Level | null =>
-  LEVELS.find((l) => p.issues.some((i) => i.level === l)) ?? null;
 type Response = { period: { from: string; to: string } | null; items: Product[] };
 
 const COLUMNS = ['price', 'quantity', 'views', 'favorers', 'sold', 'revenue'] as const;
 type Column = (typeof COLUMNS)[number];
 const STATES = ['active', 'inactive', 'sold_out', 'draft', 'expired', 'removed'] as const;
 
-/** A coloured counter of the product's problems; hover or focus lists them, most serious first. */
+/**
+ * The product's health as one icon in a column of its own before the photo: a coloured alert by
+ * the most serious problem (hover or focus lists them, worst first), or a green check when there
+ * are none — so the column is never empty.
+ */
 function Issues({ product }: { product: Product }) {
   const t = useTranslations('Sales.issues');
-  const top = topLevel(product)!;
-  const sorted = [...product.issues].sort(
-    (a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level),
-  );
-  const label = t('count', { count: product.issues.length });
+  const top = topIssueLevel(product.issues);
+  if (!top) {
+    return (
+      <InfoTip
+        text={t('none')}
+        trigger={<Check size={16} strokeWidth={2.25} aria-hidden="true" />}
+        triggerClassName="text-emerald-600 dark:text-emerald-400"
+      />
+    );
+  }
   return (
     <InfoTip
-      text={label}
-      lines={sorted.map((i) => ({
+      text={t('count', { count: product.issues.length })}
+      lines={sortIssues(product.issues).map((i) => ({
         text: t(`codes.${i.code}`),
-        dotClassName: LEVEL_STYLE[i.level].dot,
+        dotClassName: ISSUE_STYLE[i.level].dot,
       }))}
-      triggerClassName={`px-1 ${LEVEL_STYLE[top].text} hover:bg-hover`}
-      trigger={
-        <>
-          <CircleAlert size={13} aria-hidden="true" />
-          <span className="tabular leading-4">{product.issues.length}</span>
-        </>
-      }
+      trigger={<CircleAlert size={16} aria-hidden="true" />}
+      triggerClassName={ISSUE_STYLE[top].text}
     />
   );
 }
@@ -150,7 +139,8 @@ export function Products() {
       (p) =>
         (!state || p.state === state) &&
         (!pins || (pins === 'with' ? p.posts > 0 : p.posts === 0)) &&
-        (!issues || (issues === 'any' ? p.issues.length > 0 : topLevel(p) === issues)) &&
+        (!issues ||
+          (issues === 'any' ? p.issues.length > 0 : topIssueLevel(p.issues) === issues)) &&
         (!q ||
           p.title.toLowerCase().includes(q) ||
           p.skus.some((x) => x.toLowerCase().includes(q))),
@@ -272,7 +262,10 @@ export function Products() {
           }}
           options={[
             { value: 'any', label: t('issues.any') },
-            ...LEVELS.map((l) => ({ value: l, label: t(`issues.levels.${l}`) })),
+            ...ISSUE_LEVELS.map((l) => ({
+              value: l,
+              label: t(`issues.levels.${l as IssueLevel}`),
+            })),
           ]}
           clearLabel={tc('clearFilter')}
         />
@@ -309,7 +302,7 @@ export function Products() {
 
       <section className="card animate-rise rounded-[24px]">
         <div className="hidden items-center gap-6 border-b border-line p-5 text-xs text-muted xl:flex">
-          <span className="flex-1 pl-[68px]">{t('products.product')}</span>
+          <span className="flex-1 pl-[100px]">{t('products.product')}</span>
           <span className="grid w-[46rem] grid-cols-6 gap-6 text-right">
             {COLUMNS.map((c) => (
               <span key={c} className="flex items-center justify-end gap-1.5">
@@ -340,65 +333,69 @@ export function Products() {
                 className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3 xl:flex-nowrap"
               >
                 {/* The product itself opens its card (sales, orders, pins). */}
-                <button
-                  type="button"
-                  onClick={() => setOpenId(p.id)}
-                  aria-haspopup="dialog"
-                  className="group flex min-w-0 flex-1 basis-72 items-center gap-3 rounded-xl text-left"
-                >
-                  <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-hover transition-transform duration-200 group-hover:scale-[1.04]">
-                    {p.imageUrl && (
-                      // External platform image: plain <img>, lazy.
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={p.imageUrl}
-                        alt=""
-                        loading="lazy"
-                        className="h-full w-full object-cover"
-                      />
-                    )}
+                <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
+                  <span className="flex w-5 shrink-0 justify-center">
+                    <Issues product={p} />
                   </span>
-                  <div className="min-w-0">
-                    <p
-                      className="truncate text-sm font-medium group-hover:underline group-hover:underline-offset-2"
-                      title={p.title}
-                    >
-                      {p.title}
-                    </p>
-                    <p className="flex items-center gap-2 text-xs text-muted">
-                      {p.state !== 'active' && (
-                        <span className="rounded-full border border-line px-1.5 leading-4">
-                          {t(`states.${p.state as (typeof STATES)[number]}`)}
-                        </span>
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(p.id)}
+                    aria-haspopup="dialog"
+                    className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left"
+                  >
+                    <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-hover transition-transform duration-200 group-hover:scale-[1.04]">
+                      {p.imageUrl && (
+                        // External platform image: plain <img>, lazy.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.imageUrl}
+                          alt=""
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
                       )}
-                      {p.posts > 0 && (
-                        <span
-                          className="flex items-center gap-1 rounded-full bg-hover px-1.5 leading-4 text-foreground"
-                          title={t('products.postsHint')}
-                        >
-                          <Pin size={11} aria-hidden="true" />
-                          {t('products.posts', { count: p.posts })}
-                        </span>
-                      )}
-                      {p.issues.length > 0 && <Issues product={p} />}
-                      {p.skus.length > 0 && (
-                        <span className="tabular truncate" title={p.skus.join(', ')}>
-                          {p.skus.length > 2
-                            ? `${p.skus.slice(0, 2).join(', ')} +${p.skus.length - 2}`
-                            : p.skus.join(', ')}
-                        </span>
-                      )}
-                      {p.listedAt &&
-                        t('products.listed', {
-                          date: format.dateTime(new Date(p.listedAt), {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          }),
-                        })}
-                    </p>
-                  </div>
-                </button>
+                    </span>
+                    <div className="min-w-0">
+                      <p
+                        className="truncate text-sm font-medium group-hover:underline group-hover:underline-offset-2"
+                        title={p.title}
+                      >
+                        {p.title}
+                      </p>
+                      <p className="flex items-center gap-2 text-xs text-muted">
+                        {p.state !== 'active' && (
+                          <span className="rounded-full border border-line px-1.5 leading-4">
+                            {t(`states.${p.state as (typeof STATES)[number]}`)}
+                          </span>
+                        )}
+                        {p.posts > 0 && (
+                          <span
+                            className="flex items-center gap-1 rounded-full bg-hover px-1.5 leading-4 text-foreground"
+                            title={t('products.postsHint')}
+                          >
+                            <Pin size={11} aria-hidden="true" />
+                            {t('products.posts', { count: p.posts })}
+                          </span>
+                        )}
+                        {p.skus.length > 0 && (
+                          <span className="tabular truncate" title={p.skus.join(', ')}>
+                            {p.skus.length > 2
+                              ? `${p.skus.slice(0, 2).join(', ')} +${p.skus.length - 2}`
+                              : p.skus.join(', ')}
+                          </span>
+                        )}
+                        {p.listedAt &&
+                          t('products.listed', {
+                            date: format.dateTime(new Date(p.listedAt), {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            }),
+                          })}
+                      </p>
+                    </div>
+                  </button>
+                </div>
                 <dl className="tabular grid shrink-0 grid-cols-3 gap-x-6 gap-y-2 text-right sm:grid-cols-6 xl:w-[46rem]">
                   {COLUMNS.map((c) => (
                     <div key={c}>
@@ -448,6 +445,7 @@ export function Products() {
         <ProductDialog
           base={base}
           productId={openId}
+          issues={items[openIndex]?.issues}
           onClose={() => setOpenId(null)}
           onPrevious={openIndex > 0 ? () => setOpenId(items[openIndex - 1]!.id) : undefined}
           onNext={

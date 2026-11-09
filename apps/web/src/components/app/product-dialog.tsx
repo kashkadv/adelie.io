@@ -2,7 +2,9 @@
 
 import {
   AlertTriangle,
+  Check,
   ChevronLeft,
+  CircleAlert,
   ChevronRight,
   ExternalLink,
   PenLine,
@@ -15,6 +17,7 @@ import { api } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
 import { PanelSheet } from '../ui/panel-sheet';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
+import { ISSUE_STYLE, sortIssues, type ProductIssue } from './product-issues';
 import { minorDigits, useMoney } from './sales-data';
 
 type Detail = {
@@ -69,6 +72,7 @@ type Detail = {
 export function ProductDialog({
   base,
   productId,
+  issues,
   onClose,
   onPrevious,
   onNext,
@@ -76,6 +80,8 @@ export function ProductDialog({
 }: {
   base: string;
   productId: string;
+  /** Problems of the product (from the list); the block is hidden when absent. */
+  issues?: ProductIssue[];
   onClose: () => void;
   onPrevious?: () => void;
   onNext?: () => void;
@@ -84,6 +90,7 @@ export function ProductDialog({
 }) {
   const t = useTranslations('Sales.card');
   const ts = useTranslations('Sales');
+  const ti = useTranslations('Sales.issues');
   const format = useFormatter();
   const locale = useLocale();
   const money = useMoney();
@@ -254,6 +261,41 @@ export function ProductDialog({
                       </button>
                     )}
                   </div>
+
+                  {/* Problems come first: what to fix is the point of opening the card. */}
+                  {issues &&
+                    (issues.length ? (
+                      <section
+                        aria-label={ti('title')}
+                        className="mt-5 grid gap-2 rounded-2xl border border-line p-4"
+                      >
+                        <h3 className="text-sm font-semibold">
+                          {ti('title')} · {issues.length}
+                        </h3>
+                        <ul className="grid gap-1.5">
+                          {sortIssues(issues).map((i) => (
+                            <li key={i.code} className="flex items-start gap-2 text-sm">
+                              <CircleAlert
+                                size={16}
+                                className={`mt-0.5 shrink-0 ${ISSUE_STYLE[i.level].text}`}
+                                aria-hidden="true"
+                              />
+                              <span>
+                                {ti(`codes.${i.code}`)}{' '}
+                                <span className="text-xs text-muted">
+                                  ({ti(`levels.${i.level}`)})
+                                </span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    ) : (
+                      <p className="mt-5 flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                        <Check size={16} strokeWidth={2.25} aria-hidden="true" />
+                        {ti('none')}
+                      </p>
+                    ))}
 
                   {/* SKUs: what links the product to the same one on the website (ADR-0021). */}
                   <div className="mt-5">

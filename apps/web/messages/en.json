@@ -929,7 +929,9 @@
         "fewTags": "Fewer than 13 tags — each free tag is a chance to be found.",
         "skuFormat": "The SKU has no leading zeros, unlike others in the shop — check it matches the website.",
         "noViews": "No views a month after publishing."
-      }
+      },
+      "none": "No issues found",
+      "title": "Issues to look at"
     }
   }
 }
