@@ -946,7 +946,30 @@
       "onEtsy": "{count, plural, =0 {On Etsy} other {On Etsy · #}}",
       "elsewhereHint": "The same article (SKU, the site’s g:id) on the other channel, with its price there.",
       "openOnSite": "Open on the site",
-      "open": "Open"
+      "open": "Open",
+      "details": {
+        "description": "Description",
+        "brand": "Brand",
+        "productType": "Category",
+        "availability": "Availability",
+        "condition": "Condition",
+        "groupId": "Product group",
+        "showMore": "Show more",
+        "showLess": "Show less",
+        "values": {
+          "availability": {
+            "in_stock": "In stock",
+            "backorder": "On request",
+            "out_of_stock": "Out of stock",
+            "preorder": "Pre-order"
+          },
+          "condition": {
+            "new": "New",
+            "used": "Used",
+            "refurbished": "Refurbished"
+          }
+        }
+      }
     },
     "orderCard": {
       "close": "Close",

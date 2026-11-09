@@ -675,6 +675,8 @@ model ShopProduct {
   /// The articles of `skus` (\"00011512/1\" → \"00011512\"): what products of different channels are
   /// matched by (a website feed's `g:id`).
   articles         String[]      @default([])
+  /// What a site's feed says about the product beyond the basics: description, brand, category…
+  details          Json?
   /// Live variations (Etsy inventory products); null = not read yet.
   variationCount   Int?
   /// Options the SKU goes by (e.g. ["Color"]); empty = one SKU for the whole listing.

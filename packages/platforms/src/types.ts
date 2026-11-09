@@ -120,6 +120,8 @@ export interface ProductData {
   skuGroups?: number;
   /** Names of the options the variations are made of ("Primary color", "Size"). */
   variationOptions?: string[];
+  /** A site feed's own fields (description, brand, category…); absent for shops. */
+  details?: Record<string, string>;
   listedAt?: Date;
 }
 

@@ -47,6 +47,8 @@ type Detail = {
   /** Options the SKU goes by ("Color"); empty = one SKU for the whole listing. */
   skuBy: string[];
   /** Listings that are the same product, suggestions (same SKUs) and everything to choose from. */
+  /** A site feed's own fields (description, brand, category…); null for shops. */
+  details: Record<string, string> | null;
   twins: TwinListing[];
   twinSuggestions: TwinListing[];
   twinCandidates: { id: string; title: string; state: string }[];
@@ -209,6 +211,68 @@ function Improvements({
           </ul>
           {ignoredBlock}
         </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * What a site's feed says about the product beyond price and photo: its description, brand,
+ * category, availability and condition. Shops have their own card parts (tags, sales…).
+ */
+function SiteDetails({ details }: { details: Record<string, string> }) {
+  const t = useTranslations('Sales.card.details');
+  const [more, setMore] = useState(false);
+  const known = (group: 'availability' | 'condition', value: string) => {
+    const key = value
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+    const path = `values.${group}.${key}` as 'values.availability.in_stock';
+    return t.has(path) ? t(path) : value;
+  };
+  const fields: [string, string][] = [
+    ['brand', details['brand'] ?? ''],
+    ['productType', details['productType'] ?? ''],
+    ['availability', details['availability'] ? known('availability', details['availability']) : ''],
+    ['condition', details['condition'] ? known('condition', details['condition']) : ''],
+    ['groupId', details['groupId'] ?? ''],
+  ].filter((f): f is [string, string] => !!f[1]);
+  const description = details['description'] ?? '';
+  return (
+    <section className="mt-6">
+      {fields.length > 0 && (
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3 lg:grid-cols-5">
+          {fields.map(([key, value]) => (
+            <div key={key} className="min-w-0">
+              <dt className="text-xs text-muted">{t(key as 'brand')}</dt>
+              <dd className="truncate" title={value}>
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {description && (
+        <div className="mt-4">
+          <h3 className="mb-1.5 px-1 text-sm font-semibold">{t('description')}</h3>
+          <p
+            className={`px-1 text-sm leading-relaxed whitespace-pre-line text-muted ${
+              more ? '' : 'line-clamp-5'
+            }`}
+          >
+            {description}
+          </p>
+          {description.length > 320 && (
+            <button
+              type="button"
+              onClick={() => setMore((v) => !v)}
+              className="mt-1.5 px-1 text-xs text-muted hover:text-foreground"
+            >
+              {more ? t('showLess') : t('showMore')}
+            </button>
+          )}
+        </div>
       )}
     </section>
   );
@@ -623,27 +687,29 @@ export function ProductDialog({
                     )}
                   </div>
 
-                  {/* Tags: what Etsy search finds the product by. */}
-                  <div className="mt-5">
-                    <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
-                      {t('tags', { count: detail.tags.length })}
-                      <InfoTip text={t('tagsHint')} />
-                    </p>
-                    {detail.tags.length ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {detail.tags.map((tag) => (
-                          <span key={tag} className="rounded-full bg-hover px-2 py-0.5 text-xs">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400">
-                        <AlertTriangle size={14} aria-hidden="true" />
-                        {t('noTags')}
+                  {/* Tags (Etsy shops only): what Etsy search finds the product by. */}
+                  {detail.account.platform === 'ETSY' && (
+                    <div className="mt-5">
+                      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
+                        {t('tags', { count: detail.tags.length })}
+                        <InfoTip text={t('tagsHint')} />
                       </p>
-                    )}
-                  </div>
+                      {detail.tags.length ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {detail.tags.map((tag) => (
+                            <span key={tag} className="rounded-full bg-hover px-2 py-0.5 text-xs">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400">
+                          <AlertTriangle size={14} aria-hidden="true" />
+                          {t('noTags')}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -677,6 +743,10 @@ export function ProductDialog({
               )}
 
               <Elsewhere detail={detail} />
+
+              {detail.account.platform === 'WEBSITE' && detail.details && (
+                <SiteDetails details={detail.details} />
+              )}
 
               <dl className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                 {stats.map((s) => (

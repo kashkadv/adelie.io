@@ -251,6 +251,7 @@ export class SalesController {
         tags: true,
         skus: true,
         articles: true,
+        details: true,
         skuBy: true,
         skuGroups: true,
         twinGroupId: true,

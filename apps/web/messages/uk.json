@@ -946,7 +946,30 @@
       "onEtsy": "{count, plural, =0 {В Etsy} other {В Etsy · #}}",
       "elsewhereHint": "Той самий артикул (SKU, `g:id` сайту) на іншому каналі та його ціна там.",
       "openOnSite": "Відкрити на сайті",
-      "open": "Відкрити"
+      "open": "Відкрити",
+      "details": {
+        "description": "Опис",
+        "brand": "Бренд",
+        "productType": "Категорія",
+        "availability": "Наявність",
+        "condition": "Стан",
+        "groupId": "Група товару",
+        "showMore": "Показати більше",
+        "showLess": "Згорнути",
+        "values": {
+          "availability": {
+            "in_stock": "В наявності",
+            "backorder": "Під замовлення",
+            "out_of_stock": "Немає в наявності",
+            "preorder": "Попереднє замовлення"
+          },
+          "condition": {
+            "new": "Новий",
+            "used": "Вживаний",
+            "refurbished": "Відновлений"
+          }
+        }
+      }
     },
     "orderCard": {
       "close": "Закрити",

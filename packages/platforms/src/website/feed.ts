@@ -72,5 +72,22 @@ export function mapFeedItem(item: FeedItem): ProductData | null {
     tags: [],
     // The id is the article: what the product is matched to Etsy by.
     skus: [id],
+    details: detailsOf(item),
   };
+}
+
+/** The feed fields worth showing on the product's card. */
+function detailsOf(item: FeedItem): Record<string, string> {
+  const pick = {
+    description: item['description'],
+    brand: item['brand'],
+    productType: item['product_type'],
+    availability: item['availability'],
+    condition: item['condition'],
+    groupId: item['item_group_id'],
+  };
+  return Object.fromEntries(Object.entries(pick).filter(([, v]) => !!v?.trim())) as Record<
+    string,
+    string
+  >;
 }
