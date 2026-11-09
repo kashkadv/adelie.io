@@ -4,9 +4,7 @@ import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
-import { Segmented } from '../ui/segmented';
 
-const PERIODS = ['7', '30', '90'] as const;
 type Count = { value: string; visitors: number };
 type Data = {
   steps: { name: string; visitors: number }[];
@@ -17,10 +15,17 @@ type Data = {
 };
 
 /** Where buyers stop on the checkout page: the steps, the fields, the failures, the choices. */
-export function FlipperCheckout({ base, accountId }: { base: string; accountId: string }) {
+export function FlipperCheckout({
+  base,
+  accountId,
+  days,
+}: {
+  base: string;
+  accountId: string;
+  days: string;
+}) {
   const t = useTranslations('Flipper');
   const format = useFormatter();
-  const [days, setDays] = useState<(typeof PERIODS)[number]>('30');
   const [data, setData] = useState<Data | null>(null);
 
   useEffect(() => {
@@ -56,15 +61,6 @@ export function FlipperCheckout({ base, accountId }: { base: string; accountId: 
   return (
     <>
       <div className="animate-rise mb-4 flex flex-wrap items-center gap-3">
-        <Segmented
-          ariaLabel={t('period')}
-          value={days}
-          onChange={(v) => {
-            setDays(v);
-            setData(null);
-          }}
-          options={PERIODS.map((p) => ({ value: p, label: t('days', { count: Number(p) }) }))}
-        />
         <span className="flex items-center gap-1.5 text-xs text-muted">
           {t('chkNote')}
           <InfoTip text={t('chkHint')} />

@@ -93,7 +93,8 @@ const STANDARD = [
   'BeginCheckout',
   'Purchase',
 ] as const;
-const PERIODS = ['7', '30', '90'] as const;
+const PERIODS = ['today', '7', '30', '90'] as const;
+const PRODUCTS_PER_PAGE = 10;
 
 /** A path and what it asks for, as a short line: "/product/00022502". */
 const shortUrl = (url: string) => {
@@ -121,6 +122,7 @@ export function Flipper() {
   const [events, setEvents] = useState<LiveEvent[] | null>(null);
   const [eventsTotal, setEventsTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [productPage, setProductPage] = useState(1);
   const [tabChoice, setTabChoice] = useState<Tab | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -155,7 +157,7 @@ export function Flipper() {
     const load = () => {
       if (document.visibilityState === 'hidden' || tab !== 'live') return;
       void api<{ total: number; rows: LiveEvent[] }>(
-        `${base}/${current.id}/events?limit=${PAGE_SIZE}&page=${page}`,
+        `${base}/${current.id}/events?limit=${PAGE_SIZE}&page=${page}&days=${days}`,
       ).then(
         (e) => {
           if (cancelled) return;
@@ -295,7 +297,7 @@ export function Flipper() {
 
       {current && site && (
         <>
-          <div className="animate-rise mb-5">
+          <div className="animate-rise mb-5 flex flex-wrap items-center justify-between gap-3">
             <Segmented
               ariaLabel={t('title')}
               value={tab}
@@ -308,6 +310,22 @@ export function Flipper() {
                 { value: 'settings', label: t('tabSettings') },
               ]}
             />
+            {tab !== 'settings' && (
+              <Segmented
+                ariaLabel={t('period')}
+                value={days}
+                onChange={(d) => {
+                  setDays(d);
+                  setPage(1);
+                  setProductPage(1);
+                  setSummary(null);
+                }}
+                options={PERIODS.map((p) => ({
+                  value: p,
+                  label: p === 'today' ? t('today') : t('days', { count: Number(p) }),
+                }))}
+              />
+            )}
           </div>
 
           {tab === 'settings' && (
@@ -389,9 +407,13 @@ export function Flipper() {
             </>
           )}
 
-          {tab === 'checkout' && base && <FlipperCheckout base={base} accountId={current.id} />}
+          {tab === 'checkout' && base && (
+            <FlipperCheckout base={base} accountId={current.id} days={days} />
+          )}
 
-          {tab === 'sources' && base && <FlipperSources base={base} accountId={current.id} />}
+          {tab === 'sources' && base && (
+            <FlipperSources base={base} accountId={current.id} days={days} />
+          )}
 
           {tab === 'live' && (
             <>
@@ -474,15 +496,6 @@ export function Flipper() {
           {tab === 'analytics' && (
             <>
               <div className="animate-rise mb-4 flex flex-wrap items-center gap-3">
-                <Segmented
-                  ariaLabel={t('period')}
-                  value={days}
-                  onChange={setDays}
-                  options={PERIODS.map((p) => ({
-                    value: p,
-                    label: t('days', { count: Number(p) }),
-                  }))}
-                />
                 {summary && total > 0 && (
                   <span className="flex items-center gap-1.5 text-xs text-muted">
                     {t('consentShare', {
@@ -509,13 +522,15 @@ export function Flipper() {
                 ))}
               </dl>
 
-              <section className="card animate-rise mb-6 rounded-[24px] p-5">
-                <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold">
-                  {t('visitorsPerDay')}
-                  <InfoTip text={t('visitorsHint')} />
-                </h2>
-                <ImpressionsChart points={daily(summary)} ariaLabel={t('visitorsPerDay')} />
-              </section>
+              {days !== 'today' && (
+                <section className="card animate-rise mb-6 rounded-[24px] p-5">
+                  <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold">
+                    {t('visitorsPerDay')}
+                    <InfoTip text={t('visitorsHint')} />
+                  </h2>
+                  <ImpressionsChart points={daily(summary)} ariaLabel={t('visitorsPerDay')} />
+                </section>
+              )}
 
               <div className="mb-6 grid gap-6 lg:grid-cols-2">
                 <section className="card animate-rise rounded-[24px] p-5">
@@ -569,33 +584,84 @@ export function Flipper() {
               </div>
 
               {summary && summary.products.length > 0 && (
-                <section className="card animate-rise mb-6 rounded-[24px] p-5">
-                  <h2 className="mb-3 text-sm font-semibold">{t('topProducts')}</h2>
-                  <ul className="grid gap-2 text-sm">
-                    {summary.products.map((p) => (
-                      <li key={p.item} className="flex items-start justify-between gap-3">
-                        <span className="min-w-0">
-                          {p.url ? (
-                            <a
-                              href={p.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block truncate hover:underline"
-                              title={p.title ?? p.item}
-                            >
-                              {p.title ?? p.item}
-                            </a>
-                          ) : (
-                            <span className="block truncate">{p.title ?? p.item}</span>
-                          )}
-                          {p.title && <span className="tabular text-xs text-muted">{p.item}</span>}
-                        </span>
-                        <span className="tabular text-muted">
-                          {t('productViews', { views: p.views, visitors: p.visitors })}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                <section className="card animate-rise mb-6 overflow-hidden rounded-[24px]">
+                  <h2 className="px-5 pt-5 pb-3 text-sm font-semibold">{t('topProducts')}</h2>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-line text-left text-xs text-muted">
+                        <th className="px-5 pb-2 font-normal">{t('productCol')}</th>
+                        <th className="px-3 pb-2 text-right font-normal">{t('viewsCol')}</th>
+                        <th className="px-5 pb-2 text-right font-normal">{t('visitorsCol')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {summary.products
+                        .slice(
+                          (productPage - 1) * PRODUCTS_PER_PAGE,
+                          productPage * PRODUCTS_PER_PAGE,
+                        )
+                        .map((p) => (
+                          <tr key={p.item}>
+                            <td className="max-w-0 px-5 py-2.5">
+                              {p.url ? (
+                                <a
+                                  href={p.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block truncate hover:underline"
+                                  title={p.title ?? p.item}
+                                >
+                                  {p.title ?? p.item}
+                                </a>
+                              ) : (
+                                <span className="block truncate">{p.title ?? p.item}</span>
+                              )}
+                              {p.title && (
+                                <span className="tabular text-xs text-muted">{p.item}</span>
+                              )}
+                            </td>
+                            <td className="tabular px-3 py-2.5 text-right">
+                              {format.number(p.views)}
+                            </td>
+                            <td className="tabular px-5 py-2.5 text-right">
+                              {format.number(p.visitors)}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                  {summary.products.length > PRODUCTS_PER_PAGE && (
+                    <nav
+                      aria-label={t('topProducts')}
+                      className="flex items-center justify-end gap-3 border-t border-line px-5 py-3 text-xs text-muted"
+                    >
+                      <span className="tabular">
+                        {t('liveRange', {
+                          from: (productPage - 1) * PRODUCTS_PER_PAGE + 1,
+                          to: Math.min(productPage * PRODUCTS_PER_PAGE, summary.products.length),
+                          total: summary.products.length,
+                        })}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={productPage <= 1}
+                        onClick={() => setProductPage((n) => n - 1)}
+                        aria-label={t('pagePrev')}
+                        className="rounded-lg border border-line p-1.5 hover:text-foreground"
+                      >
+                        <ChevronLeft size={14} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={productPage * PRODUCTS_PER_PAGE >= summary.products.length}
+                        onClick={() => setProductPage((n) => n + 1)}
+                        aria-label={t('pageNext')}
+                        className="rounded-lg border border-line p-1.5 hover:text-foreground"
+                      >
+                        <ChevronRight size={14} aria-hidden="true" />
+                      </button>
+                    </nav>
+                  )}
                 </section>
               )}
             </>

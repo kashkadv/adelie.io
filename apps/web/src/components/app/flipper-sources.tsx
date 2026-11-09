@@ -4,7 +4,6 @@ import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
-import { Segmented } from '../ui/segmented';
 
 type Group = 'channel' | 'source_medium' | 'source' | 'medium' | 'campaign' | 'content' | 'term';
 const GROUPS: Group[] = [
@@ -16,7 +15,6 @@ const GROUPS: Group[] = [
   'content',
   'term',
 ];
-const PERIODS = ['7', '30', '90'] as const;
 
 type Row = {
   label: string;
@@ -30,10 +28,17 @@ type Row = {
 };
 
 /** Where visitors came from, in detail: any dimension of the campaign labels, with what they did. */
-export function FlipperSources({ base, accountId }: { base: string; accountId: string }) {
+export function FlipperSources({
+  base,
+  accountId,
+  days,
+}: {
+  base: string;
+  accountId: string;
+  days: string;
+}) {
   const t = useTranslations('Flipper');
   const format = useFormatter();
-  const [days, setDays] = useState<(typeof PERIODS)[number]>('30');
   const [by, setBy] = useState<Group>('channel');
   const [channel, setChannel] = useState<string | null>(null);
   const [data, setData] = useState<{ currency: string | null; rows: Row[] } | null>(null);
@@ -75,15 +80,6 @@ export function FlipperSources({ base, accountId }: { base: string; accountId: s
           {t('srcTitle')}
           <InfoTip text={t('srcHint')} />
         </h2>
-        <Segmented
-          ariaLabel={t('period')}
-          value={days}
-          onChange={(v) => {
-            setDays(v);
-            setData(null);
-          }}
-          options={PERIODS.map((p) => ({ value: p, label: t('days', { count: Number(p) }) }))}
-        />
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">

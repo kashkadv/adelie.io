@@ -14,6 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Prisma } from '@adelie/db';
+import { periodOf } from './period.js';
 import { hashServerKey, newServerKey } from './server-purchase.js';
 import { CONNECT_ROLES } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
@@ -79,19 +80,20 @@ export class FlipperController {
   private async visibleProject(ctx: WorkspaceRequestContext, projectId: string) {
     const project = await this.prisma.client.project.findFirst({
       where: { id: projectId, ...visibleProjectsWhere(ctx) },
-      select: { id: true },
+      select: { id: true, timezone: true },
     });
     if (!project) throw new NotFoundException();
+    return project;
   }
 
   private async siteOf(ctx: WorkspaceRequestContext, projectId: string, accountId: string) {
-    await this.visibleProject(ctx, projectId);
+    const project = await this.visibleProject(ctx, projectId);
     const site = await this.prisma.client.trackedSite.findFirst({
       where: { accountId, projectId, workspaceId: ctx.workspaceId },
       select: { id: true, publicId: true, accountId: true },
     });
     if (!site) throw new NotFoundException();
-    return site;
+    return { ...site, timeZone: project.timezone };
   }
 
   /** The project's sites, and for those with a tracker: its id, and what arrived in a week. */
@@ -242,11 +244,16 @@ export class FlipperController {
     @Param('accountId', ParseUUIDPipe) accountId: string,
     @Query('limit') limit: string | undefined,
     @Query('page') page: string | undefined,
+    @Query('days') days: string | undefined,
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     const site = await this.siteOf(request.workspace, projectId, accountId);
     const take = Math.min(Math.max(Number(limit) || 25, 1), 200);
-    const where = { siteId: site.id, isBot: false };
+    const where = {
+      siteId: site.id,
+      isBot: false,
+      ...(days ? { occurredAt: { gte: periodOf(days, site.timeZone).since } } : {}),
+    };
     const [total, rows] = await Promise.all([
       this.prisma.client.websiteEvent.count({ where }),
       this.prisma.client.websiteEvent.findMany({
@@ -296,8 +303,7 @@ export class FlipperController {
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     const site = await this.siteOf(request.workspace, projectId, accountId);
-    const n = [7, 30, 90].includes(Number(days)) ? Number(days) : 7;
-    const since = new Date(Date.now() - n * 86_400_000);
+    const { n, since } = periodOf(days, site.timeZone);
     const group = GROUPS[(by ?? 'channel') as keyof typeof GROUPS] ?? GROUPS.channel;
     const within = channel ? Prisma.sql`AND "channel" = ${channel}` : Prisma.empty;
     const rows = await this.prisma.client.$queryRaw<
@@ -346,8 +352,7 @@ export class FlipperController {
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     const site = await this.siteOf(request.workspace, projectId, accountId);
-    const n = [7, 30, 90].includes(Number(days)) ? Number(days) : 7;
-    const since = new Date(Date.now() - n * 86_400_000);
+    const { n, since } = periodOf(days, site.timeZone);
     const db = this.prisma.client;
     const sid = site.id;
     const base = Prisma.sql`"siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot" AND "visitorId" IS NOT NULL`;
@@ -406,8 +411,7 @@ export class FlipperController {
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     const site = await this.siteOf(request.workspace, projectId, accountId);
-    const n = [7, 30, 90].includes(Number(days)) ? Number(days) : 7;
-    const since = new Date(Date.now() - n * 86_400_000);
+    const { n, since } = periodOf(days, site.timeZone);
     const db = this.prisma.client;
     const sid = site.id;
     const [counts, daily, funnel, channels, products, consent] = await Promise.all([
@@ -446,7 +450,7 @@ export class FlipperController {
         FROM website_event
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
           AND name = 'ProductView' AND properties->>'item_id' IS NOT NULL
-        GROUP BY 1 ORDER BY views DESC LIMIT 10`,
+        GROUP BY 1 ORDER BY views DESC, visitors DESC LIMIT 100`,
       db.$queryRaw<{ consenting: number; anonymous: number }[]>`
         SELECT count(*) FILTER (WHERE consent)::int AS consenting,
                count(*) FILTER (WHERE NOT consent)::int AS anonymous

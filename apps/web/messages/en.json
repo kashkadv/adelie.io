@@ -1171,7 +1171,7 @@
     "funnelHint": "How many unique visitors who agreed reached each step. The percentage is of the previous step.",
     "channels": "Channels (visits)",
     "noChannels": "Sources appear when visits with utm labels or from other sites arrive.",
-    "topProducts": "Most viewed products",
+    "topProducts": "Most popular products",
     "live": "Live events",
     "liveHint": "The latest events, refreshed by themselves. ● the visitor agreed and is recognised, ○ anonymous (a hash for the day). Bots are not shown.",
     "noEvents": "No events yet. Add the code to your site and open it.",
@@ -1328,7 +1328,6 @@
         "after": "The answer says created, or duplicate if this order was already reported (so a webhook, a poll and a cron job may all call it). The time of payment may be up to 7 days old. Errors: 401 wrong key, 400 the field named in error, 429 too many calls."
       }
     },
-    "productViews": "{views, plural, one {# view} other {# views}} · {visitors, plural, one {# visitor} other {# visitors}}",
     "mode": "Mode",
     "modeHint": "Anonymous: until the visitor agrees, nothing is stored in their browser and people are counted by a daily hash. Full: visitors are recognised at once, without a consent banner (your decision for this site). The change reaches the site within minutes — the code on the site stays the same.",
     "modeAnonymous": "Anonymous until consent",
@@ -1390,6 +1389,12 @@
       "DeliveryWarehouseSelected": "Chose a branch",
       "PaymentClicked": "Pressed Pay",
       "Purchase": "Paid"
-    }
+    },
+    "today": "Today",
+    "productCol": "Product",
+    "viewsCol": "Views",
+    "visitorsCol": "Visitors",
+    "pagePrev": "Previous page",
+    "pageNext": "Next page"
   }
 }
