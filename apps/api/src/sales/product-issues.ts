@@ -15,6 +15,7 @@ export type IssueCode =
   | 'noTags'
   | 'noPins'
   | 'skuGaps'
+  | 'skuOneForAll'
   | 'fewTags'
   | 'skuFormat'
   | 'noViews';
@@ -39,6 +40,8 @@ export interface IssueProduct {
   variationCount: number | null;
   /** Options the SKU goes by; empty = one SKU for the whole listing. */
   skuBy: string[];
+  /** Names of the options the variations are made of. */
+  variationOptions: string[];
   /** SKUs the product should have (one per combination of the `skuBy` options); null = unknown. */
   skuGroups: number | null;
   listedAt: Date | null;
@@ -62,6 +65,7 @@ const level: Record<IssueCode, IssueLevel> = {
   noTags: 'important',
   noPins: 'important',
   skuGaps: 'important',
+  skuOneForAll: 'important',
   fewTags: 'note',
   skuFormat: 'note',
   noViews: 'note',
@@ -102,6 +106,12 @@ export function productIssues(
       if (!p.tags.length) codes.push('noTags');
       // No pins, with or without sales: a product nobody is sent to has no traffic from there.
       if (p.posts === 0) codes.push('noPins');
+      // Variations differ by two or more options, yet one SKU is set for all: most likely a
+      // mistake (by one option it can be a choice — e.g. a vest that differs only by size).
+      if (p.variationOptions.length >= 2 && !p.skuBy.length && p.skus.length) {
+        codes.push('skuOneForAll');
+        params['skuOneForAll'] = { options: p.variationOptions.join(', ') };
+      }
       // The SKU goes by some options (colour…) but not every colour has a SKU of its own.
       if (
         p.skuBy.length &&

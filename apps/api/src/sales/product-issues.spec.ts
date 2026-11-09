@@ -13,6 +13,7 @@ const product = (over: Partial<IssueProduct> = {}): IssueProduct => ({
   skus: ['00031307'],
   variationCount: 1,
   skuBy: [],
+  variationOptions: [],
   skuGroups: 1,
   listedAt: new Date('2026-01-01T00:00:00Z'),
   posts: 2,
@@ -50,11 +51,23 @@ describe('productIssues', () => {
     expect(codes(dup, 'b')).toEqual(['critical:duplicateSku']);
     // the SKU does not vary: one SKU for the whole product is exactly what was chosen
     expect(codes([product({ variationCount: 8 })])).toEqual([]);
+    // two options (colour and size) but one SKU for all: most likely a mistake
+    expect(
+      productIssues(
+        [product({ variationCount: 8, variationOptions: ['Primary color', 'Size'] })],
+        NOW,
+      ).get('p1'),
+    ).toEqual([
+      { code: 'skuOneForAll', level: 'important', params: { options: 'Primary color, Size' } },
+    ]);
+    // one option (sizes) with one SKU is a legitimate way to keep a product
+    expect(codes([product({ variationCount: 5, variationOptions: ['Size'] })])).toEqual([]);
     // SKU by colour, every colour has its own: fine however many sizes there are
     expect(
       codes([
         product({
           variationCount: 8,
+          variationOptions: ['Color', 'Size'],
           skuBy: ['Color'],
           skuGroups: 2,
           skus: ['J-BLK', 'J-BLU'],

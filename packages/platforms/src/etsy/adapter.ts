@@ -565,6 +565,7 @@ export class EtsyAdapter implements PlatformAdapter {
         );
         product.skuBy = structure.by;
         product.skuGroups = structure.groups;
+        product.variationOptions = skuProperties(live).map((o) => o.name);
       } catch (error) {
         if (ctx.signal?.aborted) throw error;
       }

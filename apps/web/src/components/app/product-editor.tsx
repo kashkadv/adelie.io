@@ -764,6 +764,13 @@ export function ProductEditor({
                             <span className="mb-1.5 flex items-center gap-1.5 px-3.5 text-xs text-muted">
                               {t(label)}
                               <InfoTip text={t(hint)} />
+                              {/* Several options but one SKU for all: most likely a mistake. */}
+                              {label === 'skuMode' && skuProps.length >= 2 && on.length === 0 && (
+                                <InfoTip
+                                  tone="warning"
+                                  text={t('skuOneForAllWarning', { count: skuProps.length })}
+                                />
+                              )}
                             </span>
                             <Segmented
                               ariaLabel={t(label)}

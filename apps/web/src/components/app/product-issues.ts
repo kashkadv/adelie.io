@@ -11,6 +11,7 @@ export type IssueCode =
   | 'noTags'
   | 'noPins'
   | 'skuGaps'
+  | 'skuOneForAll'
   | 'fewTags'
   | 'skuFormat'
   | 'noViews';

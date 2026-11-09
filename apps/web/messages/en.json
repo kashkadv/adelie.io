@@ -859,7 +859,8 @@
       "quantityMode": "Quantity",
       "priceModeHint": "Etsy’s “Prices vary”. One for all: one price for every variation. By an option (colour, size): one price per value of it. Each variation: its own price.",
       "quantityModeHint": "Etsy’s “Quantities vary”. One for all: one stock for every variation. By an option: one stock per value of it. Each variation: its own stock.",
-      "openInEtsyEditor": "Edit in Etsy"
+      "openInEtsyEditor": "Edit in Etsy",
+      "skuOneForAllWarning": "The variations differ by {count} options, but one SKU is set for all — most likely a mistake."
     },
     "card": {
       "close": "Close",
@@ -944,7 +945,8 @@
         "fewTags": "Fewer than 13 tags — each free tag is a chance to be found.",
         "skuFormat": "The SKU has no leading zeros, unlike others in the shop — check it matches the website.",
         "noViews": "No views a month after publishing.",
-        "skuGaps": "The SKU goes by {by}: only {have} of {groups} groups have their own SKU — some lack one or share it."
+        "skuGaps": "The SKU goes by {by}: only {have} of {groups} groups have their own SKU — some lack one or share it.",
+        "skuOneForAll": "The variations differ by {options}, but one SKU is set for all — most likely a mistake. Choose in the editor what the SKU goes by."
       },
       "none": "No issues found",
       "title": "Possible improvements"
