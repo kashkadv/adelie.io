@@ -395,8 +395,10 @@ export function Flipper() {
                 <CodeBlock code={`POST ${apiUrl}/collect/server`} label={t('serverUrl')} />
                 {newKey && (
                   <>
-                    <CodeBlock code={newKey} label={t('serverTitle')} />
-                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                    <div className="mt-2">
+                      <CodeBlock code={newKey} label={t('serverTitle')} />
+                    </div>
+                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                       {t('serverShownOnce')}
                     </p>
                   </>
