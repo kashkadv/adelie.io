@@ -184,6 +184,7 @@ export function Flipper() {
     setBusy(true);
     try {
       await api(`${base}/${current.id}`, { method: 'POST' });
+      setTabChoice('settings'); // a new site starts with its install code
       setVersion((v) => v + 1);
     } finally {
       setBusy(false);
@@ -259,6 +260,8 @@ export function Flipper() {
                 setSummary(null);
                 setEvents(null);
                 setPage(1);
+                setProductPage(1);
+                setTabChoice(null);
               }}
               options={sites.map((s) => ({
                 value: s.id,
