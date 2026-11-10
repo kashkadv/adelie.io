@@ -455,6 +455,8 @@ export function init(env: Env): Flipper | null {
     const seenOrders = new Set<string>();
     const handle = safe((entry: unknown) => {
       for (const call of fromDataLayer(entry)) {
+        // A product page lists related products (view_item_list): that is not a category page.
+        if (call.method === 'viewCategory' && /\/product\//.test(win.location.pathname)) continue;
         if (call.method === 'purchase') {
           const id = (call.args[0] as { id?: string }).id;
           if (id && seenOrders.has(id)) continue; // one order, one purchase

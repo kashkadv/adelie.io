@@ -264,6 +264,26 @@ describe('events', () => {
     }
   });
 
+  it('a related-products list on a product page is not a category view', () => {
+    const w = window as unknown as { dataLayer?: unknown[] };
+    w.dataLayer = [];
+    history.replaceState(null, '', '/product/rug/00022502');
+    try {
+      load({ 'auto-pageview': 'false' });
+      w.dataLayer.push({ event: 'view_item_list', items: [{ item_id: '1' }] });
+      w.dataLayer.push({ event: 'view_item', items: [{ item_id: '00022502' }] });
+      vi.advanceTimersByTime(2000);
+      expect(
+        bodies()
+          .flatMap((b) => b.e)
+          .map((e) => e.n),
+      ).toEqual(['ProductView']);
+    } finally {
+      delete w.dataLayer;
+      history.replaceState(null, '', '/');
+    }
+  });
+
   it('data-datalayer="false" leaves dataLayer alone', () => {
     const w = window as unknown as { dataLayer?: unknown[] };
     w.dataLayer = [];
