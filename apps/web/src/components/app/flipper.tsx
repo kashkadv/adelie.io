@@ -117,7 +117,7 @@ export function Flipper() {
 
   const [sites, setSites] = useState<Site[] | null>(null);
   const [chosen, setChosen] = useState('');
-  const [days, setDays] = useState<(typeof PERIODS)[number]>('7');
+  const [days, setDays] = useState<(typeof PERIODS)[number]>('today');
   const [summary, setSummary] = useState<Summary | null>(null);
   const [events, setEvents] = useState<LiveEvent[] | null>(null);
   const [eventsTotal, setEventsTotal] = useState(0);
