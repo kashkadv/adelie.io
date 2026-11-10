@@ -21,6 +21,7 @@ const SESSION_MS = 30 * 60 * 1000;
 const FLUSH_MS = 1500;
 const MAX_BATCH = 20;
 /** The address parameter that carries the visitor between the owner's own domains. */
+const USER_ID = /^[A-Za-z0-9_.:-]{6,64}$/;
 const LINK_PARAM = '_fl';
 
 export interface Env {
@@ -78,6 +79,8 @@ export interface Flipper {
     shipping?: number;
     tax?: number;
   }): void;
+  /** The site's own id of the visitor (an opaque random id, never an email); full mode only. */
+  identify(id: string | number): void;
   debug(on?: boolean): void;
   version: string;
   loaded: true;
@@ -131,6 +134,16 @@ export function init(env: Env): Flipper | null {
   // A person who asked not to be tracked (Do Not Track, Global Privacy Control) is not.
   const nav = win.navigator as Navigator & { globalPrivacyControl?: boolean };
   const optedOut = nav.doNotTrack === '1' || nav.globalPrivacyControl === true;
+
+  // The site's own opaque id of the visitor: set by flipper('identify', id), or read from the
+  // cookie named in data-user-cookie. Sent only in full mode.
+  let userId: string | null = null;
+  const userCookie = attr('user-cookie');
+  const currentUser = (): string | null => {
+    if (userId) return userId;
+    const c = userCookie ? getCookie(userCookie) : null;
+    return c && USER_ID.test(c) ? c : null;
+  };
 
   let queue: Wire[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -255,7 +268,9 @@ export function init(env: Env): Flipper | null {
         JSON.stringify({
           s: site,
           c: id ? 1 : 0,
-          ...(id ? { v: id.v, ss: id.s, a: id.a } : {}),
+          ...(id
+            ? { v: id.v, ss: id.s, a: id.a, ...(currentUser() ? { u: currentUser() } : {}) }
+            : {}),
           e: events,
         }),
       );
@@ -358,6 +373,10 @@ export function init(env: Env): Flipper | null {
       item_count: items.reduce((n, p) => n + (p.quantity ?? 1), 0),
       items: items.map(productProps),
     });
+  };
+  api.identify = (id) => {
+    const value = String(id);
+    if (USER_ID.test(value)) userId = value;
   };
   api.debug = (on = true) => {
     debug = on;

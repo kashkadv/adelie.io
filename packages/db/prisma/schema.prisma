@@ -923,6 +923,8 @@ model WebsiteEvent {
   consent      Boolean
   visitorId    String?
   sessionId    String?
+  /// The site's own id of the visitor, as a salted hash (never the id itself); full mode only.
+  userKey      String?
   /// Without consent: a hash of what the request carried (address, browser, the site) with a salt
   /// that changes every day — it counts one visitor once a day and cannot follow anyone across days.
   dailyId      String?
@@ -945,5 +947,6 @@ model WebsiteEvent {
   @@unique([siteId, eventId])
   @@index([siteId, occurredAt])
   @@index([siteId, name, occurredAt])
+  @@index([siteId, userKey])
   @@map("website_event")
 }

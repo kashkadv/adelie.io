@@ -115,6 +115,7 @@ await fetch('__API__/collect/server', {
     transaction_id: order.number,          // required — one order is one purchase
     occurred_at: order.paidAt.toISOString(), // when it was paid, not when you send it (up to 7 days back)
     visitor_id: order.flVisitorId,         // the _fl_v cookie saved when the order was created
+    user_id: order.shopVisitorId,          // or your own opaque visitor id (see data-user-cookie)
     value: order.total,
     currency: 'UAH',
     shipping: order.shipping,

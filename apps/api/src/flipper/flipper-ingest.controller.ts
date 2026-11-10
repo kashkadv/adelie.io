@@ -15,6 +15,7 @@ import {
   parseBatch,
   cleanAddress,
   RateLimiter,
+  userKeyOf,
   visitOf,
 } from './ingest.js';
 import { hashServerKey, isServerKey, parseServerPurchase } from './server-purchase.js';
@@ -187,6 +188,7 @@ export class FlipperIngestController {
           consent: batch.consent,
           visitorId: batch.visitorId,
           sessionId: batch.sessionId,
+          userKey: batch.userId ? userKeyOf(this.secret, site.id, batch.userId) : null,
           dailyId: daily,
           url: e.url,
           title: e.title,
@@ -244,17 +246,17 @@ export class FlipperIngestController {
     }
     const parsed = parseServerPurchase(json);
     if (!parsed.ok) return res.status(400).json({ error: parsed.error });
-    const { orderId, occurredAt, visitorId, url, properties } = parsed.purchase;
+    const { orderId, occurredAt, visitorId, userId, url, properties } = parsed.purchase;
+    const userKey = userId ? userKeyOf(this.secret, site.id, userId) : null;
 
-    // The visitor's last known visit: the most recent one that did not come direct, else any.
+    // The visitor's last known visit: by the visitor id the shop saved, or by the shop's own id of
+    // the visitor — the most recent one that did not come direct, else any.
     const db = this.prisma.client;
     const since = new Date(occurredAt.getTime() - 30 * 86_400_000);
-    const known = {
-      siteId: site.id,
-      visitorId: visitorId ?? '-',
-      occurredAt: { gte: since, lte: occurredAt },
-    };
+    const who = [...(visitorId ? [{ visitorId }] : []), ...(userKey ? [{ userKey }] : [])];
+    const known = { siteId: site.id, OR: who, occurredAt: { gte: since, lte: occurredAt } };
     const select = {
+      visitorId: true,
       sessionId: true,
       referrerHost: true,
       source: true,
@@ -266,7 +268,7 @@ export class FlipperIngestController {
       channel: true,
       device: true,
     } as const;
-    const visit = visitorId
+    const visit = who.length
       ? ((await db.websiteEvent.findFirst({
           where: { ...known, channel: { notIn: ['Direct'] }, NOT: { channel: null } },
           orderBy: { occurredAt: 'desc' },
@@ -278,6 +280,7 @@ export class FlipperIngestController {
           select,
         })))
       : null;
+    const buyer = visitorId ?? visit?.visitorId ?? null;
 
     const address = cleanAddress(url ?? `https://${site.allowedHosts[0] ?? 'unknown.invalid'}/`);
     const created = await db.websiteEvent.createMany({
@@ -287,8 +290,9 @@ export class FlipperIngestController {
           eventId: `purchase:${orderId}`,
           name: 'Purchase',
           occurredAt,
-          consent: visitorId !== null,
-          visitorId,
+          consent: buyer !== null,
+          visitorId: buyer,
+          userKey,
           sessionId: visit?.sessionId ?? null,
           url: address?.url ?? `https://${site.allowedHosts[0] ?? 'unknown.invalid'}/`,
           referrerHost: visit?.referrerHost ?? null,

@@ -62,6 +62,12 @@ describe('parseServerPurchase', () => {
     expect(err(null)).toBe('body');
   });
 
+  it("takes the shop's own visitor id, if well formed", () => {
+    expect(ok({ transaction_id: '1', user_id: 'abc-DEF_123456' }).userId).toBe('abc-DEF_123456');
+    expect(ok({ transaction_id: '1', user_id: 'a b' }).userId).toBeNull();
+    expect(ok({ transaction_id: '1', user_id: 42 }).userId).toBeNull();
+  });
+
   it('ignores a malformed visitor id', () => {
     expect(ok({ transaction_id: '1', visitor_id: 'nope' }).visitorId).toBeNull();
   });

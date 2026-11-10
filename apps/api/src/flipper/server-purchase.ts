@@ -4,7 +4,7 @@
  * existing GA4 call can be reused almost as it is. Pure functions, tested without a server.
  */
 import { createHash, randomBytes } from 'node:crypto';
-import { cleanProperties, type Properties } from './ingest.js';
+import { cleanProperties, USER_ID, type Properties } from './ingest.js';
 
 const BASE62 = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 const KEY_FORMAT = /^fls_[A-Za-z0-9]{32}$/;
@@ -24,6 +24,8 @@ export interface ServerPurchase {
   orderId: string;
   occurredAt: Date;
   visitorId: string | null;
+  /** The site's own id of the visitor (the opaque cookie value), if the shop passes it. */
+  userId: string | null;
   url: string | null;
   properties: Properties;
 }
@@ -74,6 +76,7 @@ export function parseServerPurchase(body: unknown, now: Date = new Date()): Serv
       orderId: order,
       occurredAt,
       visitorId: visitor,
+      userId: typeof b.user_id === 'string' && USER_ID.test(b.user_id) ? b.user_id : null,
       url: typeof b.url === 'string' ? b.url : null,
       properties: props,
     },

@@ -13,6 +13,7 @@ const SITE_ID = /^fl_[A-Za-z0-9]{8,32}$/;
 const EVENT_ID = /^[0-9a-f]{16,64}$/;
 const EVENT_NAME = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
 const VISITOR = /^[0-9a-f]{32}$/;
+export const USER_ID = /^[A-Za-z0-9_.:-]{6,64}$/;
 const KEY = /^[a-z][a-z0-9_]{0,39}$/;
 /** An event stamped further than this from the receipt is stamped with the receipt instead. */
 const CLOCK_SKEW_MS = 24 * 3600 * 1000;
@@ -37,6 +38,8 @@ export interface Batch {
   consent: boolean;
   visitorId: string | null;
   sessionId: string | null;
+  /** The site's own id of the visitor (full mode only); stored only as a salted hash. */
+  userId: string | null;
   /** The attribution the consenting visitor's session began with. */
   attribution: { landing: string; referrer: string } | null;
   events: ParsedEvent[];
@@ -131,6 +134,8 @@ export function parseBatch(body: string, now: Date = new Date()): Batch | null {
     consent && typeof raw['v'] === 'string' && VISITOR.test(raw['v']) ? raw['v'] : null;
   const sessionId =
     consent && typeof raw['ss'] === 'string' && VISITOR.test(raw['ss']) ? raw['ss'] : null;
+  const userId =
+    consent && typeof raw['u'] === 'string' && USER_ID.test(raw['u']) ? raw['u'] : null;
   const events: ParsedEvent[] = [];
   for (const e of raw['e']) {
     if (!isObject(e)) continue;
@@ -157,6 +162,7 @@ export function parseBatch(body: string, now: Date = new Date()): Batch | null {
     consent,
     visitorId,
     sessionId,
+    userId,
     attribution: consent ? attribution(raw['a']) : null,
     events,
   };
@@ -227,3 +233,7 @@ export class RateLimiter {
       this.windows.delete(this.windows.keys().next().value as string);
   }
 }
+
+/** The site's own visitor id as it is stored: a salted hash per site, never the id itself. */
+export const userKeyOf = (secret: string, siteId: string, userId: string): string =>
+  createHmac('sha256', secret).update(`user:${siteId}:${userId}`).digest('hex').slice(0, 32);

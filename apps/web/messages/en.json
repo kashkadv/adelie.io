@@ -1185,7 +1185,7 @@
         "title": "1. Installation",
         "lead": "Add two lines to the head of every page (or once in a shared template). The first is a tiny stub so calls made before the script loads are not lost. The second is the script itself: it loads asynchronously, does not slow the site down and its errors never break the page.",
         "next": "In Next.js this goes in the root layout. Each domain has its own id. The mode of each site (full without a banner, or anonymous until consent) is switched in this cabinet above the code — the code on the site does not change. Copy the code with ?site=… in the address: that is how the mode reaches the site.",
-        "options": "Options are attributes of the script tag: data-consent=\"granted\" (do not wait for consent — see below), data-spa=\"false\" (do not count route changes as page views), data-auto-pageview=\"false\" (do not count the page view automatically), data-allow-params=\"page,sort\" (which more address parameters may be sent; by default only utm and click ids), data-link-domains=\"gushka.world\" (carry the visitor to your other domain)."
+        "options": "Options are attributes of the script tag: data-consent=\"granted\" (do not wait for consent — see below), data-spa=\"false\" (do not count route changes as page views), data-auto-pageview=\"false\" (do not count the page view automatically), data-allow-params=\"page,sort\" (which more address parameters may be sent; by default only utm and click ids), data-link-domains=\"gushka.world\" (carry the visitor to your other domain), data-user-cookie=\"shop_uid\" (the name of your own cookie with an opaque random visitor id: Flipper reads it and sends it with the events of visitors who agreed; or call flipper('identify', id). Use a random id, never an email or phone. It is stored only as a salted hash)."
       },
       "consent": {
         "title": "2. Cookie consent",
@@ -1324,7 +1324,7 @@
       },
       "server": {
         "title": "7. Purchases from the server",
-        "lead": "Send the purchase from your backend when the payment is confirmed. Create a key in the card Purchases from your server above, put it in the environment of your server (never in the browser code) and call the address below. Save the _fl_v cookie when the order is created, so the purchase can be joined to the visitor and the channel; without it the purchase still counts, just with no channel.",
+        "lead": "Send the purchase from your backend when the payment is confirmed. Create a key in the card Purchases from your server above, put it in the environment of your server (never in the browser code) and call the address below. Save the _fl_v cookie when the order is created, so the purchase can be joined to the visitor and the channel; without it the purchase still counts, just with no channel. If you have your own opaque visitor id, pass it as user_id: the purchase is joined to that visitor’s earlier visits even when the _fl_v cookie was not saved.",
         "after": "The answer says created, or duplicate if this order was already reported (so a webhook, a poll and a cron job may all call it). The time of payment may be up to 7 days old. Errors: 401 wrong key, 400 the field named in error, 429 too many calls."
       }
     },

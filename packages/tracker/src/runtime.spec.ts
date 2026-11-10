@@ -290,6 +290,29 @@ describe('events', () => {
     expect(views).toHaveLength(1);
   });
 
+  it("sends the site's own visitor id: identify(), or the cookie named in data-user-cookie", () => {
+    const f = load({ 'auto-pageview': 'false', consent: 'granted' })!;
+    f.identify('abcdef123456');
+    f.productView({ id: '1' });
+    vi.advanceTimersByTime(2000);
+    expect(bodies()[0]).toMatchObject({ c: 1, u: 'abcdef123456' });
+
+    sent.length = 0;
+    document.cookie = 'shop_uid=cookie-value-9; path=/';
+    delete (window as unknown as { flipper?: unknown }).flipper; // a fresh page
+    const g = load({ 'auto-pageview': 'false', consent: 'granted', 'user-cookie': 'shop_uid' })!;
+    g.productView({ id: '2' });
+    vi.advanceTimersByTime(2000);
+    expect(bodies()[0]).toMatchObject({ u: 'cookie-value-9' });
+
+    sent.length = 0;
+    g.identify('bad id with spaces');
+    g.productView({ id: '3' });
+    vi.advanceTimersByTime(2000);
+    expect(bodies()[0]).toMatchObject({ u: 'cookie-value-9' }); // the bad id was ignored
+    document.cookie = 'shop_uid=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+  });
+
   it('purchase carries the order number and sums the lines', () => {
     const f = load({ 'auto-pageview': 'false' })!;
     f.purchase({

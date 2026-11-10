@@ -358,12 +358,8 @@ export class FlipperController {
     const base = Prisma.sql`"siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot" AND "visitorId" IS NOT NULL`;
     const [steps, fields, failures, delivery, payment] = await Promise.all([
       db.$queryRaw<{ name: string; visitors: number }[]>`
-        SELECT name, count(DISTINCT coalesce("visitorId", "eventId"))::int AS visitors
-        FROM website_event
-        WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
-          AND ("visitorId" IS NOT NULL OR name = 'Purchase')
-          AND name IN (${Prisma.join([...CHECKOUT_STEPS])})
-        GROUP BY name`,
+        SELECT name, count(DISTINCT "visitorId")::int AS visitors FROM website_event
+        WHERE ${base} AND name IN (${Prisma.join([...CHECKOUT_STEPS])}) GROUP BY name`,
       db.$queryRaw<{ field: string; visitors: number; filled: number }[]>`
         SELECT properties->>'field' AS field,
                count(DISTINCT "visitorId")::int AS visitors,
@@ -428,11 +424,9 @@ export class FlipperController {
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot" AND name = 'PageView'
         GROUP BY 1 ORDER BY 1`,
       db.$queryRaw<{ name: string; visitors: number }[]>`
-        SELECT name, count(DISTINCT coalesce("visitorId", "eventId"))::int AS visitors
-        FROM website_event
+        SELECT name, count(DISTINCT "visitorId")::int AS visitors FROM website_event
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
-          AND ("visitorId" IS NOT NULL OR name = 'Purchase')
-          AND name IN (${Prisma.join([...FUNNEL])})
+          AND "visitorId" IS NOT NULL AND name IN (${Prisma.join([...FUNNEL])})
         GROUP BY name`,
       // A visit is a session of someone who agreed, or an arrival of someone who did not (their
       // page view of the landing is the only one that says where they came from): comparable.
