@@ -330,7 +330,7 @@ export class FlipperController {
                  THEN (properties->>'value')::numeric END)::float8 AS revenue
       FROM website_event
       WHERE "siteId" = ${site.id}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
-        AND "channel" IS NOT NULL ${within}
+        AND ("channel" IS NOT NULL OR (name = 'Purchase' AND ${channel ? Prisma.sql`false` : Prisma.sql`true`})) ${within}
       GROUP BY 1 ORDER BY visits DESC, purchases DESC LIMIT 200`;
     const currency = await this.prisma.client.$queryRaw<{ currency: string | null }[]>`
       SELECT properties->>'currency' AS currency FROM website_event

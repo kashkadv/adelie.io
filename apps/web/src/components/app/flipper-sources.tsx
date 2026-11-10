@@ -150,11 +150,11 @@ export function FlipperSources({
                         }}
                         className="max-w-full truncate text-left hover:underline"
                       >
-                        {r.label}
+                        {r.label === '(none)' ? t('srcUnattributed') : r.label}
                       </button>
                     ) : (
                       <span className="block truncate" title={r.label}>
-                        {r.label}
+                        {r.label === '(none)' ? t('srcUnattributed') : r.label}
                       </span>
                     )}
                   </td>

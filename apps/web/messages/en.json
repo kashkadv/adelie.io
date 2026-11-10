@@ -1347,7 +1347,7 @@
     "tabSettings": "Settings and installation",
     "tabSources": "Sources",
     "srcTitle": "Sources in detail",
-    "srcHint": "Visits count arrivals, also of those who did not agree. The steps after the visit (product views, cart, checkout) count the visitors who agreed, because only they can be followed, so for sites in anonymous mode they are lower. Purchases and revenue come from the server report. Click a channel to see its sources and campaigns.",
+    "srcHint": "Visits count arrivals, also of those who did not agree. The steps after the visit (product views, cart, checkout) count the visitors who agreed, because only they can be followed, so for sites in anonymous mode they are lower. Purchases and revenue come from the server report. Click a channel to see its sources and campaigns. A purchase reported without a visitor id has no source: it is shown as Unattributed.",
     "srcGroupBy": "Group by",
     "srcChannel": "Channel: {channel}",
     "srcDrill": "Show the sources of this channel",
@@ -1395,6 +1395,7 @@
     "viewsCol": "Views",
     "visitorsCol": "Visitors",
     "pagePrev": "Previous page",
-    "pageNext": "Next page"
+    "pageNext": "Next page",
+    "srcUnattributed": "Unattributed"
   }
 }
