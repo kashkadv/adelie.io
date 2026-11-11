@@ -207,6 +207,9 @@ gushka.world, з лічильниками), у кожного свої коло�
   і поради. Чернетка: [specs/promotion-strategy.md](specs/promotion-strategy.md), [ADR-0024](decisions/0024-promotion-strategy-module.md)
   (запропоновано; AI — OpenAI за абстракцією). Спершу фундамент вимірювання: сайт без каталогу, Link Builder, цілі Flipper.
   До вечора власнику перевірити: Gushka (тип акаунта TikTok, канал YouTube, Threads, GA4, Merchant Center); мод (де розповсюджувати).
+- **Product Factory (2026-11-11, задум):** третій проєкт власника — цифрові продукти для Etsy: ніша в тренді → AI-продукт → Etsy →
+  Pinterest/TikTok/YouTube → вимірювання → нові ніші. [specs/product-factory.md](specs/product-factory.md). Спільне ядро «Дослідження ніш»
+  із Pebble й планом просування. **Перед розробкою:** прочитати офіційні правила Etsy щодо AI (Creativity Standards) і API Terms.
 - **Ідея: Adelie Tracker** — скрипт на сайті клієнта, джерела трафіку, Link Builder, атрибуція продажів до каналів:
   [specs/tracker.md](specs/tracker.md). Перший сценарій — сайт Gushka. Порядок: після етапу 2 → трекер етап 1 + Link Builder.
   Сайт Gushka — Next.js + Sanity + NestJS: покупки підтверджуються з бекенду (серверна подія).

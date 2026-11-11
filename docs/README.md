@@ -12,6 +12,7 @@
 | [specs/tracker.md](specs/tracker.md) | Adelie Tracker: події на сайті, джерела трафіку, атрибуція (концепція) |
 | [guides/flipper.md](guides/flipper.md) | Flipper: швидкий старт (встановлення, події магазину й оплата, згода, два домени, джерела) |
 | [specs/promotion-strategy.md](specs/promotion-strategy.md) | План просування: ціль, стратегія, календар, поради що публікувати (чернетка) |
+| [specs/product-factory.md](specs/product-factory.md) | Product Factory: цифрові продукти для Etsy — ніша → AI-продукт → Etsy → просування (задум) |
 | [specs/pebble.md](specs/pebble.md) | Pebble: пошук трендів і комерційних можливостей (ідея, формат не визначено) |
 | [plans/mvp-1.md](plans/mvp-1.md) | План MVP-1: Pinterest end-to-end (в роботі) |
 | [plans/stage-2-data-model.md](plans/stage-2-data-model.md) | Етап 2: модель даних соцмереж і метрик (узгоджено) |
