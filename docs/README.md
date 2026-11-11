@@ -18,6 +18,7 @@
 | [plans/stage-2-data-model.md](plans/stage-2-data-model.md) | Етап 2: модель даних соцмереж і метрик (узгоджено) |
 | [plans/mvp-discussion.md](plans/mvp-discussion.md) | Обговорення обсягу MVP і стеку (завершено) |
 | [plans/infra-discussion.md](plans/infra-discussion.md) | Обговорення інфраструктури на домашньому Proxmox (в роботі) |
+| [infra/local-llm.md](infra/local-llm.md) | Локальна LLM на робочому ПК: що потягне залізо, GPU-воркер за потреби, перевірка якості (план) |
 | [infra/server-setup.md](infra/server-setup.md) | Сервер на Proxmox: створення VM, доступ, журнал налаштування |
 | [integrations/pinterest.md](integrations/pinterest.md) | Pinterest API: scopes, endpoints, метрики, обмеження, як створити застосунок |
 | [integrations/instagram.md](integrations/instagram.md) | Instagram API (Instagram Login): доступ, дозволи, метрики, обмеження, кроки |
