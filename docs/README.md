@@ -44,3 +44,4 @@
 - [ADR-0020](decisions/0020-connection-features-update-access.md) — Функції підключення й «Оновити доступ» (прийнято)
 - [ADR-0021](decisions/0021-website-catalog-feeds.md) — Каталог сайтів через фід Google Merchant, кілька сайтів-ринків (прийнято)
 - [ADR-0022](decisions/0022-flipper-tracker.md) — Flipper: трекер подій сайту (прийнято)
+- [ADR-0023](decisions/0023-tiktok-integration.md) — Інтеграція TikTok: статистика, публікація, редагування (запропоновано)
