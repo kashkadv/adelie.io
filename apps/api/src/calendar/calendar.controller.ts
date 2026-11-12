@@ -14,8 +14,12 @@ import {
   Query,
   Req,
   UseGuards,
+  HttpException,
 } from '@nestjs/common';
-import type { Prisma } from '@adelie/db';
+import { Prisma } from '@adelie/db';
+import { Session, type UserSession } from '@thallesp/nestjs-better-auth';
+import { OpenAiProvider, costMicros } from '../ai/provider.js';
+import { config } from '../config.js';
 import { CONNECT_ROLES } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
 import { visibleProjectsWhere } from '../workspaces/project-visibility.js';
@@ -38,6 +42,14 @@ import {
   weekStartOf,
   type ItemInput,
 } from './calendar.js';
+import {
+  IDEAS_INSTRUCTIONS,
+  IDEAS_SCHEMA,
+  ideasInput,
+  parseBrief,
+  parseIdeas,
+  type IdeasContext,
+} from './ideas.js';
 
 const LINK = {
   select: {
@@ -85,6 +97,8 @@ const ITEM_SELECT = {
   notes: true,
   minutes: true,
   status: true,
+  why: true,
+  evidence: true,
   link: LINK,
   post: POST,
 } as const;
@@ -447,5 +461,224 @@ export class CalendarController {
       }),
     ]);
     return { review };
+  }
+
+  /** This month's AI spending of the project, in millionths of a dollar. */
+  private async spentMicros(projectId: string) {
+    const now = new Date();
+    const month = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const sum = await this.prisma.client.aiRun.aggregate({
+      where: { projectId, createdAt: { gte: month } },
+      _sum: { costMicros: true },
+    });
+    return sum._sum.costMicros ?? 0;
+  }
+
+  /** The project's brief, and whether AI is available and how much of the month's limit is used. */
+  @Get('brief')
+  async brief(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    await this.visibleProject(request.workspace, projectId);
+    const row = await this.prisma.client.project.findUnique({
+      where: { id: projectId },
+      select: { brief: true },
+    });
+    return {
+      brief: parseBrief(row?.brief),
+      ai: config.ai
+        ? {
+            enabled: true,
+            model: config.ai.model,
+            spentUsd: (await this.spentMicros(projectId)) / 1e6,
+            limitUsd: config.ai.monthlyLimitUsd,
+          }
+        : { enabled: false },
+    };
+  }
+
+  @Put('brief')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async saveBrief(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body() body: unknown,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    await this.visibleProject(request.workspace, projectId);
+    const brief = parseBrief(body);
+    if (!brief) throw new BadRequestException({ errors: { about: 'invalid' } });
+    await this.prisma.client.project.update({
+      where: { id: projectId },
+      data: { brief: brief as unknown as Prisma.InputJsonValue },
+    });
+    return { brief };
+  }
+
+  /**
+   * Ideas for the week from the AI (ADR-0029): from the brief, the budget, the last four weeks'
+   * results and the best posts; saved as ideas (no day) with why and on what evidence.
+   */
+  @Post('ideas')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async ideas(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body() body: { week?: unknown; locale?: unknown } | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+    @Session() session: UserSession,
+  ) {
+    const ai = config.ai;
+    if (!ai) throw new HttpException({ errors: { ai: 'off' } }, 503);
+    if (!isDay(body?.week)) throw new BadRequestException({ errors: { week: 'invalid' } });
+    const ctx = request.workspace;
+    await this.visibleProject(ctx, projectId);
+    const db = this.prisma.client;
+    const project = (await db.project.findUnique({
+      where: { id: projectId },
+      select: { name: true, brief: true, dailyMinutes: true },
+    }))!;
+    const brief = parseBrief(project.brief);
+    if (!brief) throw new BadRequestException({ errors: { brief: 'missing' } });
+    if ((await this.spentMicros(projectId)) >= ai.monthlyLimitUsd * 1e6) {
+      throw new HttpException({ errors: { ai: 'limit' } }, 429);
+    }
+    await this.matchPublished(projectId, ctx.workspaceId);
+
+    const start = weekStartOf(body.week);
+    const since = addDays(start, -28);
+    const where = { projectId, workspaceId: ctx.workspaceId };
+    const [accounts, planned, past, posts] = await Promise.all([
+      db.socialAccount.findMany({
+        where: { ...where, hiddenAt: null, connection: { status: { not: 'REVOKED' } } },
+        select: { platform: true },
+      }),
+      db.calendarItem.findMany({
+        where: {
+          ...where,
+          OR: [{ date: null }, { date: { gte: asDate(start), lte: asDate(addDays(start, 6)) } }],
+        },
+        select: { date: true, title: true, channel: true, format: true, minutes: true },
+      }),
+      db.calendarItem.findMany({
+        where: { ...where, date: { gte: asDate(since), lt: asDate(start) } },
+        orderBy: { date: 'asc' },
+        select: ITEM_SELECT,
+      }),
+      db.socialPost.findMany({
+        where: {
+          ...where,
+          publishedAt: { gte: new Date(Date.now() - 90 * 86_400_000) },
+          account: { hiddenAt: null },
+          latest: { isNot: null },
+        },
+        select: {
+          title: true,
+          publishedAt: true,
+          account: { select: { platform: true } },
+          latest: POST.select.latest,
+        },
+      }),
+    ]);
+    const links = past.flatMap((i) => (i.link ? [i.link] : []));
+    const results = await linkResults(db, projectId, ctx.workspaceId, links, asDate(since));
+    const reach = (l: (typeof posts)[number]['latest']) =>
+      (l?.impressions ?? l?.views ?? l?.videoViews ?? 0) as number;
+    const numbers = (l: (typeof posts)[number]['latest']) =>
+      Object.fromEntries(Object.entries(l ?? {}).filter(([, v]) => typeof v === 'number'));
+    const context: IdeasContext = {
+      project: project.name,
+      brief,
+      dailyMinutes: project.dailyMinutes,
+      connected: [...new Set(accounts.map((a) => a.platform))],
+      weekStart: start,
+      planned: planned.map((p) => ({ ...p, date: p.date ? dayOf(p.date) : null })),
+      history: past.map((i) => {
+        const r = i.link ? results.get(i.link.id) : undefined;
+        return {
+          date: i.date ? dayOf(i.date) : null,
+          title: i.title,
+          channel: i.channel,
+          format: i.format,
+          minutes: i.minutes,
+          status: i.status,
+          ...(r
+            ? {
+                linkClicks: r.clicks,
+                siteVisits: r.site?.visits ?? null,
+                siteGoals: r.site?.conversions ?? null,
+              }
+            : {}),
+          ...(i.post ? { post: numbers(i.post.latest) } : {}),
+        };
+      }),
+      topPosts: posts
+        .sort((a, b) => reach(b.latest) - reach(a.latest))
+        .slice(0, 12)
+        .map((p) => ({
+          platform: p.account.platform,
+          title: (p.title ?? '').slice(0, 140),
+          published: p.publishedAt ? dayOf(p.publishedAt) : null,
+          ...numbers(p.latest),
+        })),
+      ownerLanguage: body?.locale === 'uk' ? 'Ukrainian' : 'English',
+    };
+
+    const provider = new OpenAiProvider(ai.apiKey, ai.model);
+    const answer = await provider.structured({
+      instructions: IDEAS_INSTRUCTIONS,
+      input: ideasInput(context),
+      schema: IDEAS_SCHEMA as unknown as Record<string, unknown>,
+      schemaName: 'calendar_ideas',
+    });
+    const ideas = answer.ok ? parseIdeas(answer.data) : [];
+    const run = await db.aiRun.create({
+      data: {
+        workspaceId: ctx.workspaceId,
+        projectId,
+        userId: session.user.id,
+        kind: 'calendar_ideas',
+        provider: provider.name,
+        model: answer.model,
+        status: answer.ok && ideas.length ? 'ok' : 'error',
+        inputTokens: answer.usage.inputTokens,
+        cachedTokens: answer.usage.cachedTokens,
+        outputTokens: answer.usage.outputTokens,
+        costMicros: costMicros(answer.usage, ai.price),
+        input: context as unknown as Prisma.InputJsonValue,
+        output: answer.ok ? (answer.data as Prisma.InputJsonValue) : Prisma.DbNull,
+        error: answer.ok ? (ideas.length ? null : 'no valid ideas') : answer.error,
+      },
+      select: { id: true, costMicros: true },
+    });
+    if (!ideas.length) throw new HttpException({ errors: { ai: 'failed' } }, 502);
+
+    const last = await db.calendarItem.aggregate({
+      where: { projectId, date: null },
+      _max: { position: true },
+    });
+    const first = (last._max.position ?? -1) + 1;
+    await db.calendarItem.createMany({
+      data: ideas.map((idea, i) => ({
+        workspaceId: ctx.workspaceId,
+        projectId,
+        date: null,
+        position: first + i,
+        channel: idea.channel,
+        format: idea.format,
+        title: idea.title,
+        notes: idea.notes || null,
+        minutes: idea.minutes,
+        status: 'idea',
+        why: idea.why || null,
+        evidence: idea.evidence,
+        aiRunId: run.id,
+      })),
+    });
+    return {
+      created: ideas.length,
+      costUsd: run.costMicros / 1e6,
+      spentUsd: (await this.spentMicros(projectId)) / 1e6,
+      limitUsd: ai.monthlyLimitUsd,
+    };
   }
 }

@@ -27,6 +27,9 @@ export interface CalendarItem {
   notes: string | null;
   minutes: number | null;
   status: Status;
+  /** An AI idea (ADR-0029): why it was proposed, and on what evidence. */
+  why: string | null;
+  evidence: 'hypothesis' | 'results' | null;
   link: {
     id: string;
     code: string;

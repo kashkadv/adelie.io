@@ -63,6 +63,22 @@ export const config = {
         }
       : undefined,
   goClickSecret: process.env['GO_CLICK_SECRET'] || undefined,
+  /**
+   * AI (ADR-0024, ADR-0029): OpenAI Responses API. Optional: without the key AI features are off.
+   * Prices are USD per million tokens of the model in use; the limit is per project per month.
+   */
+  ai: process.env['OPENAI_API_KEY']
+    ? {
+        apiKey: process.env['OPENAI_API_KEY'],
+        model: process.env['AI_MODEL'] || 'gpt-6.1-terra',
+        price: {
+          input: Number(process.env['AI_PRICE_INPUT'] ?? 1),
+          cachedInput: Number(process.env['AI_PRICE_CACHED_INPUT'] ?? 0.05),
+          output: Number(process.env['AI_PRICE_OUTPUT'] ?? 5),
+        },
+        monthlyLimitUsd: Number(process.env['AI_MONTHLY_LIMIT_USD'] ?? 5),
+      }
+    : undefined,
   auth: {
     secret: required('BETTER_AUTH_SECRET'),
     url: process.env['BETTER_AUTH_URL'] ?? 'http://localhost:4000',

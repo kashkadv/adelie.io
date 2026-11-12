@@ -1,9 +1,18 @@
 'use client';
 
-import { Check, ChevronLeft, ChevronRight, Clock, Lightbulb, Link2, Plus } from 'lucide-react';
-import { useFormatter, useTranslations } from 'next-intl';
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Lightbulb,
+  Link2,
+  Plus,
+  Sparkles,
+} from 'lucide-react';
+import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState, type DragEvent } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
 import { usePopover } from '../ui/popover';
 import { Segmented } from '../ui/segmented';
@@ -16,13 +25,17 @@ import {
   weekStartOf,
   type CalendarItem,
 } from './calendar-data';
+import { CalendarBrief } from './calendar-brief';
 import { CalendarItemDialog } from './calendar-item-dialog';
 import { CalendarReview } from './calendar-review';
 import { ChannelIcon } from './link-ui';
 import { PageHeader } from './page-header';
 import { useWorkspace } from './workspace-context';
 
-type Tab = 'week' | 'review';
+type Tab = 'week' | 'review' | 'brief';
+type IdeasNotice =
+  | { kind: 'created'; count: number; cost: number; spent: number; limit: number }
+  | { kind: 'brief' | 'limit' | 'off' | 'failed' };
 /** Where a dragged card lands: a day (null = ideas) and the card it goes before. */
 type Drop = { date: string | null; before: string | null };
 
@@ -47,10 +60,51 @@ export function Calendar() {
   const [dialog, setDialog] = useState<{ item: CalendarItem } | { date: string | null } | null>(
     null,
   );
+  const locale = useLocale();
+  const [suggesting, setSuggesting] = useState(false);
+  const [notice, setNotice] = useState<IdeasNotice | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<Drop | null>(null);
 
   const reload = useCallback(() => setVersion((v) => v + 1), []);
+
+  /** Ideas for the shown week from the AI (ADR-0029): they land in Ideas, the page reloads. */
+  async function suggest() {
+    if (!base || suggesting) return;
+    setSuggesting(true);
+    setNotice(null);
+    try {
+      const r = await api<{ created: number; costUsd: number; spentUsd: number; limitUsd: number }>(
+        `${base}/ideas`,
+        { method: 'POST', json: { week, locale } },
+      );
+      setNotice({
+        kind: 'created',
+        count: r.created,
+        cost: r.costUsd,
+        spent: r.spentUsd,
+        limit: r.limitUsd,
+      });
+      reload();
+    } catch (err) {
+      const errors =
+        err instanceof ApiError
+          ? (err.body as { errors?: Record<string, string> } | null)?.errors
+          : undefined;
+      const kind =
+        errors?.['brief'] === 'missing'
+          ? 'brief'
+          : errors?.['ai'] === 'limit'
+            ? 'limit'
+            : errors?.['ai'] === 'off'
+              ? 'off'
+              : 'failed';
+      setNotice({ kind });
+      if (kind === 'brief') setTab('brief');
+    } finally {
+      setSuggesting(false);
+    }
+  }
   useEffect(() => {
     if (!base || tab !== 'week') return;
     let cancelled = false;
@@ -147,6 +201,7 @@ export function Calendar() {
           <ChannelIcon channel={item.channel} />
           <span className="truncate">{t(`formats.${item.format}`)}</span>
           {item.link && <Link2 size={12} className="shrink-0" aria-label={t('hasLink')} />}
+          {item.why && <Sparkles size={12} className="ml-auto shrink-0" aria-label={t('fromAi')} />}
         </span>
         <span className="mt-1 line-clamp-2 leading-snug">{item.title}</span>
         <span className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted">
@@ -242,14 +297,29 @@ export function Calendar() {
         action={
           canManage &&
           tab === 'week' && (
-            <button
-              type="button"
-              onClick={() => setDialog({ date: null })}
-              className="btn-primary flex w-auto items-center gap-2 px-4"
-            >
-              <Plus size={16} aria-hidden="true" />
-              {t('new')}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void suggest()}
+                disabled={suggesting}
+                className="inline-flex h-11 items-center gap-2 rounded-2xl border border-line px-4 text-sm hover:bg-hover"
+              >
+                <Sparkles
+                  size={16}
+                  className={suggesting ? 'animate-pulse' : ''}
+                  aria-hidden="true"
+                />
+                {suggesting ? t('suggesting') : t('suggest')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDialog({ date: null })}
+                className="btn-primary flex w-auto items-center gap-2 px-4"
+              >
+                <Plus size={16} aria-hidden="true" />
+                {t('new')}
+              </button>
+            </div>
           )
         }
       />
@@ -262,45 +332,48 @@ export function Calendar() {
           options={[
             { value: 'week', label: t('tabWeek') },
             { value: 'review', label: t('tabReview') },
+            { value: 'brief', label: t('tabBrief') },
           ]}
         />
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => {
-              setWeek(addDays(week, -7));
-              setItems(null);
-            }}
-            className="icon-btn h-9 w-9"
-            aria-label={t('previousWeek')}
-          >
-            <ChevronLeft size={16} aria-hidden="true" />
-          </button>
-          <span className="tabular min-w-44 text-center text-sm">{weekLabel}</span>
-          <button
-            type="button"
-            onClick={() => {
-              setWeek(addDays(week, 7));
-              setItems(null);
-            }}
-            className="icon-btn h-9 w-9"
-            aria-label={t('nextWeek')}
-          >
-            <ChevronRight size={16} aria-hidden="true" />
-          </button>
-          {week !== weekStartOf(today) && (
+        {tab !== 'brief' && (
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => {
-                setWeek(weekStartOf(today));
+                setWeek(addDays(week, -7));
                 setItems(null);
               }}
-              className="rounded-xl px-2.5 py-1.5 text-sm text-muted hover:bg-hover hover:text-foreground"
+              className="icon-btn h-9 w-9"
+              aria-label={t('previousWeek')}
             >
-              {t('thisWeek')}
+              <ChevronLeft size={16} aria-hidden="true" />
             </button>
-          )}
-        </div>
+            <span className="tabular min-w-44 text-center text-sm">{weekLabel}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setWeek(addDays(week, 7));
+                setItems(null);
+              }}
+              className="icon-btn h-9 w-9"
+              aria-label={t('nextWeek')}
+            >
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
+            {week !== weekStartOf(today) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setWeek(weekStartOf(today));
+                  setItems(null);
+                }}
+                className="rounded-xl px-2.5 py-1.5 text-sm text-muted hover:bg-hover hover:text-foreground"
+              >
+                {t('thisWeek')}
+              </button>
+            )}
+          </div>
+        )}
         {tab === 'week' && base && (
           <Budget
             value={budget}
@@ -313,7 +386,39 @@ export function Calendar() {
         )}
       </div>
 
-      {tab === 'review' && base ? (
+      {notice && (
+        <div
+          role="status"
+          className={`animate-rise mb-4 flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 text-sm ${
+            notice.kind === 'created'
+              ? 'border-line bg-hover'
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300'
+          }`}
+        >
+          <span>
+            {notice.kind === 'created'
+              ? t('ideasCreated', {
+                  count: notice.count,
+                  cost: notice.cost.toFixed(3),
+                  spent: notice.spent.toFixed(2),
+                  limit: notice.limit.toFixed(2),
+                })
+              : t(`ideasErrors.${notice.kind}`)}
+          </span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="text-muted hover:text-foreground"
+            aria-label={t('close')}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {tab === 'brief' && base ? (
+        <CalendarBrief base={base} canManage={canManage} onSaved={() => setNotice(null)} />
+      ) : tab === 'review' && base ? (
         <CalendarReview
           key={week}
           base={base}

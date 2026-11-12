@@ -1,6 +1,16 @@
 'use client';
 
-import { CalendarPlus, Check, Copy, ExternalLink, Link2, Trash2, Unlink, X } from 'lucide-react';
+import {
+  CalendarPlus,
+  Check,
+  Copy,
+  ExternalLink,
+  Link2,
+  Sparkles,
+  Trash2,
+  Unlink,
+  X,
+} from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -175,6 +185,18 @@ export function CalendarItemDialog({
             <X size={16} aria-hidden="true" />
           </button>
         </div>
+
+        {item?.why && (
+          <div className="mt-4 flex gap-2.5 rounded-2xl bg-hover px-4 py-3 text-sm">
+            <Sparkles size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <div>
+              <p className="text-xs text-muted">
+                {t('aiIdea')} · {t(`evidence.${item.evidence ?? 'hypothesis'}`)}
+              </p>
+              <p className="mt-0.5 leading-relaxed">{item.why}</p>
+            </div>
+          </div>
+        )}
 
         <fieldset disabled={!canManage} className="mt-5 grid gap-4">
           <label className="block">

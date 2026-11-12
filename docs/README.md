@@ -57,3 +57,4 @@
 - [ADR-0026](decisions/0026-flipper-site-goals.md) — Flipper: тип сайту, цілі й воронка як налаштування (прийнято)
 - [ADR-0027](decisions/0027-link-builder.md) — Link Builder: мічені й короткі посилання (`go.adelie.space`) (прийнято)
 - [ADR-0028](decisions/0028-content-calendar.md) — Календар публікацій і огляд тижня (прийнято)
+- [ADR-0029](decisions/0029-ai-brief-and-ideas.md) — Бриф проєкту й ідеї AI для календаря (прийнято)

@@ -188,6 +188,8 @@ model Project {
   accountOrder String[]  @default([])
   /// Minutes a day the owner plans to spend on this project's publications (ADR-0028); null = no budget.
   dailyMinutes Int?
+  /// What the project is, for whom, in which language and channels (ADR-0029); the AI's starting point.
+  brief        Json?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -1026,6 +1028,10 @@ model CalendarItem {
   link        TrackedLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
   postId      String?      @db.Uuid
   post        SocialPost?  @relation(fields: [postId], references: [id], onDelete: SetNull)
+  /// An AI suggestion (ADR-0029): why it is proposed, and on what evidence (hypothesis | results).
+  why         String?
+  evidence    String?
+  aiRunId     String?      @db.Uuid
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -1046,4 +1052,31 @@ model WeeklyReview {
 
   @@unique([projectId, weekStart])
   @@map("weekly_review")
+}
+
+/// One request to the AI (ADR-0029): who asked what, the model, tokens and cost — for explaining
+/// suggestions and keeping each project within its monthly limit. Never holds tokens or buyer data.
+model AiRun {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  workspaceId  String   @db.Uuid
+  projectId    String   @db.Uuid
+  userId       String?
+  /// calendar_ideas, …
+  kind         String
+  provider     String
+  model        String
+  /// ok | error
+  status       String
+  inputTokens  Int      @default(0)
+  cachedTokens Int      @default(0)
+  outputTokens Int      @default(0)
+  /// Cost in millionths of a US dollar.
+  costMicros   Int      @default(0)
+  input        Json
+  output       Json?
+  error        String?
+  createdAt    DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@map("ai_run")
 }
