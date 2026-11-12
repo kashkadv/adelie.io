@@ -431,7 +431,7 @@ const ROLES: Record<SocialAccount['platform'], ('content' | 'ads' | 'sales' | 'c
 
 /** Platforms that can be connected now, grouped by the section they feed (ADR-0018). */
 const CONNECTABLE: {
-  key: 'PINTEREST' | 'INSTAGRAM' | 'ETSY';
+  key: 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK' | 'ETSY';
   slug: PlatformSlug;
   group: 'promotion' | 'sales';
   /** Read-only or full access is chosen first (ADR-0019). */
@@ -439,11 +439,11 @@ const CONNECTABLE: {
 }[] = [
   { key: 'PINTEREST', slug: 'pinterest', group: 'promotion' },
   { key: 'INSTAGRAM', slug: 'instagram', group: 'promotion' },
+  { key: 'TIKTOK', slug: 'tiktok', group: 'promotion' },
   { key: 'ETSY', slug: 'etsy', group: 'sales', levels: true },
 ];
 /** Listed as "soon", so the menu shows where Adelie is going. */
 const SOON: { group: 'promotion' | 'sales'; name: string }[] = [
-  { group: 'promotion', name: 'TikTok' },
   { group: 'sales', name: 'Shopify' },
 ];
 

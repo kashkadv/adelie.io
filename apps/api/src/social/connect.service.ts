@@ -16,6 +16,8 @@ import {
   META_GRAPH_API,
   PINTEREST_API,
   PinterestAdapter,
+  TIKTOK_API,
+  TiktokAdapter,
   WebsiteAdapter,
   FeedFetchError,
   parseFeedUrl,
@@ -33,6 +35,7 @@ import { pkceFor } from './oauth-state.js';
 export const PLATFORMS: Record<string, SocialPlatform> = {
   pinterest: 'PINTEREST',
   instagram: 'INSTAGRAM',
+  tiktok: 'TIKTOK',
   etsy: 'ETSY',
 };
 export const PLATFORM_SLUGS: Record<SocialPlatform, string> = {
@@ -115,6 +118,14 @@ export class ConnectService {
         platform,
         adapter: new InstagramAdapter(config.instagram),
         http: new HttpClient({ baseUrl: META_GRAPH_API }),
+      };
+    }
+    if (platform === 'TIKTOK') {
+      if (!config.tiktok) throw new ServiceUnavailableException('TikTok is not configured');
+      return {
+        platform,
+        adapter: new TiktokAdapter(config.tiktok),
+        http: new HttpClient({ baseUrl: TIKTOK_API }),
       };
     }
     if (!config.pinterest) throw new ServiceUnavailableException('Pinterest is not configured');

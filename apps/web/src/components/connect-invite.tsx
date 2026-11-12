@@ -9,7 +9,7 @@ import { PlatformIcon } from './ui/platform-icon';
 
 type Invitation = {
   status: 'valid' | 'used' | 'revoked' | 'expired';
-  platform: 'pinterest' | 'instagram' | 'etsy';
+  platform: 'pinterest' | 'instagram' | 'tiktok' | 'etsy';
   /** Access the connection will ask for (ADR-0019). */
   access: 'read' | 'write';
   /** Updating access of a connected account: its name and the features it gains (ADR-0020). */
@@ -23,6 +23,7 @@ type Invitation = {
 const PLATFORM_NAMES: Record<string, string> = {
   pinterest: 'Pinterest',
   instagram: 'Instagram',
+  tiktok: 'TikTok',
   etsy: 'Etsy',
 };
 
@@ -93,7 +94,13 @@ export function ConnectInvite({ token }: { token: string }) {
       <div className="flex flex-col gap-5">
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
           <PlatformIcon
-            platform={invitation.platform === 'instagram' ? 'INSTAGRAM' : 'PINTEREST'}
+            platform={
+              invitation.platform === 'instagram'
+                ? 'INSTAGRAM'
+                : invitation.platform === 'tiktok'
+                  ? 'TIKTOK'
+                  : 'PINTEREST'
+            }
             size={22}
             strokeWidth={1.75}
             aria-hidden="true"

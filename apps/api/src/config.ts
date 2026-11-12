@@ -40,6 +40,14 @@ export const config = {
           sharedSecret: process.env['ETSY_SHARED_SECRET'],
         }
       : undefined,
+  /** Optional: connecting TikTok (Login Kit, read-only scopes) needs the app's client key and secret. */
+  tiktok:
+    process.env['TIKTOK_CLIENT_KEY'] && process.env['TIKTOK_CLIENT_SECRET']
+      ? {
+          clientKey: process.env['TIKTOK_CLIENT_KEY'],
+          clientSecret: process.env['TIKTOK_CLIENT_SECRET'],
+        }
+      : undefined,
   auth: {
     secret: required('BETTER_AUTH_SECRET'),
     url: process.env['BETTER_AUTH_URL'] ?? 'http://localhost:4000',

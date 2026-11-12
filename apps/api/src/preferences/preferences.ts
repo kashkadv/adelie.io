@@ -5,7 +5,7 @@
 export const CONTENT_COLUMNS = {
   PINTEREST: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'videoViews', 'publishedAt'],
   INSTAGRAM: ['views', 'reach', 'likes', 'comments', 'saves', 'shares', 'publishedAt'],
-  TIKTOK: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'videoViews', 'publishedAt'],
+  TIKTOK: ['views', 'likes', 'comments', 'shares', 'publishedAt'],
 } as const;
 type ContentPlatform = keyof typeof CONTENT_COLUMNS;
 

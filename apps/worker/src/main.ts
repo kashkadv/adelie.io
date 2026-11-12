@@ -7,6 +7,8 @@ import {
   ETSY_API,
   EtsyAdapter,
   PinterestAdapter,
+  TIKTOK_API,
+  TiktokAdapter,
   WebsiteAdapter,
 } from '@adelie/platforms';
 import {
@@ -62,6 +64,14 @@ const etsy =
       })
     : null;
 
+const tiktok =
+  process.env['TIKTOK_CLIENT_KEY'] && process.env['TIKTOK_CLIENT_SECRET']
+    ? new TiktokAdapter({
+        clientKey: process.env['TIKTOK_CLIENT_KEY'],
+        clientSecret: process.env['TIKTOK_CLIENT_SECRET'],
+      })
+    : null;
+
 const website = new WebsiteAdapter();
 
 const deps: SyncDeps = {
@@ -74,6 +84,7 @@ const deps: SyncDeps = {
       return { adapter: instagram, baseUrl: META_GRAPH_API };
     }
     if (platform === 'ETSY' && etsy) return { adapter: etsy, baseUrl: ETSY_API };
+    if (platform === 'TIKTOK' && tiktok) return { adapter: tiktok, baseUrl: TIKTOK_API };
     // A website feed: no API, no tokens (the adapter fetches the feed itself).
     if (platform === 'WEBSITE') return { adapter: website, baseUrl: 'https://feed.invalid' };
     return null;

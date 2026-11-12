@@ -21,7 +21,13 @@ export const PLATFORM_FEATURES: Record<Platform, readonly PlatformFeature[]> = {
     { id: 'core', scopes: ['instagram_basic', 'instagram_manage_insights'], optional: false },
   ],
   ETSY: [{ id: 'core', scopes: ['shops_r', 'listings_r', 'transactions_r'], optional: false }],
-  TIKTOK: [],
+  TIKTOK: [
+    {
+      id: 'core',
+      scopes: ['user.info.basic', 'user.info.profile', 'user.info.stats', 'video.list'],
+      optional: false,
+    },
+  ],
   // A website feed needs no permissions.
   WEBSITE: [],
 };

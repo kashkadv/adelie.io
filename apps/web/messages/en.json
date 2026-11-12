@@ -478,7 +478,8 @@
       "pinterest": "You will sign in on Pinterest and confirm access there. Adelie can only read profile, boards, pins and their statistics — it cannot post, edit or delete anything. Access can be revoked at any time in your Pinterest settings.",
       "instagram": "You will sign in with Meta (Facebook / Instagram) and choose your professional Instagram account. Adelie can only read the profile, posts and their statistics — it cannot post, edit, delete or read messages. Access can be revoked at any time in your Instagram or Facebook settings.",
       "etsy": "You will sign in to Etsy and confirm access there. Adelie can only read your shop, products and orders (amounts, items, country) — not buyers’ names, addresses or emails. It cannot change, publish or delete anything. You can revoke access any time in your Etsy settings.",
-      "etsyWrite": "You will sign in to Etsy and confirm access there. Adelie can read your shop, products and orders (not buyers’ names, addresses or emails) and edit or create products — only when a project member does it in Adelie. It cannot delete products or change orders or shop settings. You can revoke access any time in your Etsy settings."
+      "etsyWrite": "You will sign in to Etsy and confirm access there. Adelie can read your shop, products and orders (not buyers’ names, addresses or emails) and edit or create products — only when a project member does it in Adelie. It cannot delete products or change orders or shop settings. You can revoke access any time in your Etsy settings.",
+      "tiktok": "You will sign in on TikTok and confirm access there. Adelie can only read the profile, its statistics and public videos with their statistics — it cannot post, edit or delete anything. Access can be revoked at any time in your TikTok settings."
     },
     "continue": "Continue to {platform}",
     "startFailed": "Could not start the connection. Please try again.",
@@ -641,7 +642,9 @@
       "site": "another site",
       "none": "no link",
       "toProduct": "Leads to product: {title}"
-    }
+    },
+    "lifetimeHintTiktok": "TikTok video statistics are lifetime totals as reported by TikTok, updated daily. “—” means no data, not zero.",
+    "periodHintTiktok": "TikTok does not report video statistics per day, so Adelie records the totals daily and takes the change from the previous day. Days accumulate from when Adelie started doing so (no history before that); a day ends at the daily sync. “—” means no data, not zero."
   },
   "Post": {
     "close": "Close",
@@ -691,7 +694,8 @@
     },
     "leadsToProduct": "Leads to product",
     "leadsTo": "Leads to",
-    "linkInText": "Link from the description"
+    "linkInText": "Link from the description",
+    "tiktokNoDaily": "TikTok does not report video statistics per day — Adelie derives them from daily totals; this video has no days yet."
   },
   "Sales": {
     "shop": "Shop",

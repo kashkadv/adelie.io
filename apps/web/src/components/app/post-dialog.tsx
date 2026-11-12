@@ -72,13 +72,13 @@ const METRIC_ORDER: Record<Platform, string[]> = {
     'video_p95_views',
   ],
   INSTAGRAM: ['views', 'reach', 'likes', 'comments', 'saves', 'shares', 'engagements'],
-  TIKTOK: [],
+  TIKTOK: ['views', 'likes', 'comments', 'shares'],
 };
 /** Metrics with a daily chart: Pinterest per day (ADR-0013), Instagram from snapshots (ADR-0017). */
 const DAILY_METRICS: Record<Platform, string[]> = {
   PINTEREST: ['impressions', 'saves', 'pin_clicks', 'outbound_clicks'],
   INSTAGRAM: ['views', 'reach', 'likes', 'saves'],
-  TIKTOK: [],
+  TIKTOK: ['views', 'likes', 'comments', 'shares'],
 };
 const KNOWN = new Set(Object.values(METRIC_ORDER).flat());
 const PLATFORM_NAMES: Record<Platform, string> = {
@@ -346,6 +346,7 @@ export function PostDialog({
                         ? t('metricsHint', { date: dateOf(detail.asOf) })
                         : t('metricsHintNoDate'),
                       platform === 'INSTAGRAM' && !daily ? t('instagramNoDaily') : '',
+                      platform === 'TIKTOK' && !daily ? t('tiktokNoDaily') : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}

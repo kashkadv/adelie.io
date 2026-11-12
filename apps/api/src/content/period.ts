@@ -19,6 +19,13 @@ export const PERIOD_METRICS: Record<string, Record<string, string>> = {
     saves: 'saves',
     shares: 'shares',
   },
+  // Lifetime totals only: daily values come from the day-to-day change of snapshots (ADR-0017).
+  TIKTOK: {
+    views: 'views',
+    likes: 'likes',
+    comments: 'comments',
+    shares: 'shares',
+  },
 };
 export type PeriodValues = Record<string, number>;
 

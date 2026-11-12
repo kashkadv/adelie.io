@@ -5,6 +5,7 @@ export * from './links.js';
 export * from './types.js';
 export { PinterestAdapter, PINTEREST_API, PINTEREST_SCOPES } from './pinterest/adapter.js';
 export { InstagramAdapter, META_GRAPH_API } from './instagram/adapter.js';
+export { TiktokAdapter, TIKTOK_API, TIKTOK_SCOPES } from './tiktok/adapter.js';
 export {
   EtsyAdapter,
   ETSY_API,

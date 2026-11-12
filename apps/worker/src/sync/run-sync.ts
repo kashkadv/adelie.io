@@ -47,6 +47,7 @@ const REFRESH_REFRESH_BEFORE_MS = 30 * 24 * 3600 * 1000;
 const API_VERSION: Record<string, string> = {
   PINTEREST: 'v5',
   INSTAGRAM: 'v27.0',
+  TIKTOK: 'v2',
   ETSY: 'v3',
   WEBSITE: 'merchant-feed',
 };

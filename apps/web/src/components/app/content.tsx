@@ -83,23 +83,23 @@ type Board = { id: string; name: string; accountId: string; pinCount: number | n
 const ALL_COLUMNS: Record<Platform, Column[]> = {
   PINTEREST: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'videoViews', 'publishedAt'],
   INSTAGRAM: ['views', 'reach', 'likes', 'comments', 'saves', 'shares', 'publishedAt'],
-  TIKTOK: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'videoViews', 'publishedAt'],
+  TIKTOK: ['views', 'likes', 'comments', 'shares', 'publishedAt'],
 };
 /** Shown until the person picks their own (Content → Columns). */
 const DEFAULT_COLUMNS: Record<Platform, Column[]> = {
   PINTEREST: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'publishedAt'],
   INSTAGRAM: ['views', 'reach', 'likes', 'saves', 'publishedAt'],
-  TIKTOK: ['impressions', 'saves', 'pinClicks', 'outboundClicks', 'publishedAt'],
+  TIKTOK: ['views', 'likes', 'comments', 'shares', 'publishedAt'],
 };
 /** Daily post values exist only for these (ADR-0013): others show "—" for a period. */
 const PERIOD_METRICS: Record<Platform, Column[]> = {
   PINTEREST: ['impressions', 'saves', 'pinClicks', 'outboundClicks'],
   // From the day-to-day change of lifetime totals (ADR-0017).
   INSTAGRAM: ['views', 'reach', 'likes', 'comments', 'saves', 'shares'],
-  TIKTOK: [],
+  TIKTOK: ['views', 'likes', 'comments', 'shares'],
 };
 /** Platforms whose posts have daily values; others show lifetime totals only. */
-const HAS_PERIODS: Platform[] = ['PINTEREST', 'INSTAGRAM'];
+const HAS_PERIODS: Platform[] = ['PINTEREST', 'INSTAGRAM', 'TIKTOK'];
 type Sort = Column;
 const OWNERSHIP = ['own', 'saved', 'all'] as const;
 type Ownership = (typeof OWNERSHIP)[number];
@@ -562,10 +562,14 @@ export function Content() {
                   data.period
                     ? platform === 'INSTAGRAM'
                       ? t('periodHintInstagram')
-                      : t('periodHint')
+                      : platform === 'TIKTOK'
+                        ? t('periodHintTiktok')
+                        : t('periodHint')
                     : platform === 'INSTAGRAM'
                       ? t('lifetimeHintInstagram')
-                      : t('lifetimeHint')
+                      : platform === 'TIKTOK'
+                        ? t('lifetimeHintTiktok')
+                        : t('lifetimeHint')
                 }
               />
             </span>
