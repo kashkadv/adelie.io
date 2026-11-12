@@ -36,11 +36,13 @@ export interface TrackedLink {
 export interface LinkRow extends TrackedLink {
   clicks: number;
   /** Null: the destination is not a project site with Flipper. */
-  site: {
-    visits: number;
-    visitors: number;
-    conversions: number;
-    value: number | null;
-    currency: string | null;
-  } | null;
+  site: SiteResult | null;
+}
+
+export interface SiteResult {
+  visits: number;
+  visitors: number;
+  conversions: number;
+  value: number | null;
+  currency: string | null;
 }

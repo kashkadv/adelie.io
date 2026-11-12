@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  CalendarDays,
   FileChartColumn,
   Waves,
   Images,
@@ -25,6 +26,7 @@ type NavKey =
   | 'statistics'
   | 'content'
   | 'links'
+  | 'calendar'
   | 'products'
   | 'orders'
   | 'flipper'
@@ -50,6 +52,8 @@ const NAV: { group?: 'promotion' | 'sales' | 'site'; items: NavItem[] }[] = [
       { key: 'content', href: '/content', icon: Images },
       // Tracked links (ADR-0027).
       { key: 'links', href: '/links', icon: Link2 },
+      // Content calendar and weekly review (ADR-0028).
+      { key: 'calendar', href: '/calendar', icon: CalendarDays },
     ],
   },
   {

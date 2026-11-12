@@ -186,6 +186,8 @@ model Project {
   /// list and the channel switch of Products follow it, the first catalogue channel is the default.
   /// Accounts not listed follow in the order they were connected.
   accountOrder String[]  @default([])
+  /// Minutes a day the owner plans to spend on this project's publications (ADR-0028); null = no budget.
+  dailyMinutes Int?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -403,10 +405,11 @@ model SocialPost {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  metricValues PostMetricValue[]
-  dailyValues  PostMetricDaily[]
-  latest       PostMetricsLatest?
-  links        SocialPostLink[]
+  metricValues  PostMetricValue[]
+  dailyValues   PostMetricDaily[]
+  latest        PostMetricsLatest?
+  links         SocialPostLink[]
+  calendarItems CalendarItem[]
 
   @@unique([accountId, externalId])
   @@index([accountId, publishedAt])
@@ -884,29 +887,29 @@ model ProductSeoCheck {
 
 /// A website that sends events through Flipper, Adelie's tracker (ADR-0022). One per connected site.
 model TrackedSite {
-  id           String        @id @default(uuid(7)) @db.Uuid
-  workspaceId  String        @db.Uuid
-  projectId    String        @db.Uuid
-  accountId    String        @unique @db.Uuid
-  account      SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  id            String        @id @default(uuid(7)) @db.Uuid
+  workspaceId   String        @db.Uuid
+  projectId     String        @db.Uuid
+  accountId     String        @unique @db.Uuid
+  account       SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   /// The id in the install snippet: it names the site, it is not a secret ("fl_" + random).
-  publicId     String        @unique
+  publicId      String        @unique
   /// Hosts the site's events may come from (the feed's host to begin with). A hint against
   /// misuse, not authentication: browsers can be made to send anything.
-  allowedHosts String[]      @default([])
+  allowedHosts  String[]      @default([])
   /// "anonymous" (wait for consent) or "granted" (the site's own decision: no banner). Baked
   /// into the script the site loads, so changing it needs no change on the site.
-  consentMode  String        @default("anonymous")
+  consentMode   String        @default("anonymous")
   /// SHA-256 of the site's server key (the shop's backend reports purchases with it); the key
   /// itself is shown once. serverKeyHint is its last four characters, to tell keys apart.
-  serverKeyHash String?      @unique
+  serverKeyHash String?       @unique
   serverKeyHint String?
   /// What the site measures (ADR-0026): its kind ("store", "landing"), its goals and funnel steps.
   /// Validated by the API; funnel null = the kind's funnel. Evaluated when reading.
-  kind         String        @default("store")
-  goals        Json          @default("[]")
-  funnel       Json?
-  createdAt    DateTime      @default(now())
+  kind          String        @default("store")
+  goals         Json          @default("[]")
+  funnel        Json?
+  createdAt     DateTime      @default(now())
 
   events WebsiteEvent[]
 
@@ -960,25 +963,26 @@ model WebsiteEvent {
 /// carries. Two forms: the full address with the labels, and go.adelie.space/<code> that counts the
 /// click and redirects. Labels never change once created (they are in published addresses).
 model TrackedLink {
-  id            String      @id @default(uuid(7)) @db.Uuid
-  workspaceId   String      @db.Uuid
-  projectId     String      @db.Uuid
+  id          String    @id @default(uuid(7)) @db.Uuid
+  workspaceId String    @db.Uuid
+  projectId   String    @db.Uuid
   /// The short form's code: 7 characters a-z0-9, unique across all projects.
-  code          String      @unique
-  name          String?
+  code        String    @unique
+  name        String?
   /// Where the link leads, without the labels (they are added from the fields below).
-  destination   String
-  source        String
-  medium        String
-  campaign      String?
+  destination String
+  source      String
+  medium      String
+  campaign    String?
   /// utm_content: the place of the link ("bio", "pin-123"), the code when none was given.
-  content       String
+  content     String
   /// When the short form was last written to Workers KV; null = not (yet) there.
-  publishedAt   DateTime?
-  createdAt     DateTime    @default(now())
-  archivedAt    DateTime?
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  archivedAt  DateTime?
 
-  clicks LinkClick[]
+  clicks        LinkClick[]
+  calendarItems CalendarItem[]
 
   @@index([projectId])
   @@map("tracked_link")
@@ -998,4 +1002,48 @@ model LinkClick {
 
   @@index([linkId, occurredAt])
   @@map("link_click")
+}
+
+/// A planned publication (ADR-0028): when, where, what, how long it takes and how far it got. No
+/// date = an idea. Linked to its tracked link and, once published, to the synced post.
+model CalendarItem {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  workspaceId String       @db.Uuid
+  projectId   String       @db.Uuid
+  date        DateTime?    @db.Date
+  /// Order within the day (or among ideas).
+  position    Int          @default(0)
+  /// A Link Builder channel (pinterest, instagram…, other).
+  channel     String
+  /// pin | post | short | video | story | forum | email | other
+  format      String
+  title       String
+  notes       String?
+  minutes     Int?
+  /// idea | draft | ready | published | measured
+  status      String       @default("idea")
+  linkId      String?      @db.Uuid
+  link        TrackedLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  postId      String?      @db.Uuid
+  post        SocialPost?  @relation(fields: [postId], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([projectId, date])
+  @@map("calendar_item")
+}
+
+/// The owner's conclusion about a week of the calendar (ADR-0028): one per project and week.
+model WeeklyReview {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  workspaceId String   @db.Uuid
+  projectId   String   @db.Uuid
+  /// The Monday the week starts on.
+  weekStart   DateTime @db.Date
+  notes       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([projectId, weekStart])
+  @@map("weekly_review")
 }

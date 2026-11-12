@@ -21,6 +21,7 @@ export function LinkDialog({
   base,
   link,
   initialDestination,
+  initialChannel,
   onClose,
   onSaved,
 }: {
@@ -29,6 +30,8 @@ export function LinkDialog({
   link?: TrackedLink;
   /** A new link's destination to start with (from a product's card). */
   initialDestination?: string;
+  /** A new link's channel to start with (from a calendar item). */
+  initialChannel?: LinkChannel;
   onClose: () => void;
   onSaved: (link: TrackedLink) => void;
 }) {
@@ -36,7 +39,7 @@ export function LinkDialog({
   const titleId = useId();
   const [destination, setDestination] = useState(link?.destination ?? initialDestination ?? '');
   const [name, setName] = useState(link?.name ?? '');
-  const [channel, setChannel] = useState<LinkChannel | ''>('');
+  const [channel, setChannel] = useState<LinkChannel | ''>(initialChannel ?? '');
   const [source, setSource] = useState('');
   const [campaign, setCampaign] = useState('');
   const [content, setContent] = useState('');

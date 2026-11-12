@@ -1,6 +1,7 @@
 // Link Builder (ADR-0027): the channels a link can be made for, how its labels are normalised and
 // how its full address is built. Pure and unit-tested.
 import { randomBytes } from 'node:crypto';
+import { shortLinkCode } from '@adelie/platforms';
 
 /**
  * Channels: the `utm_source` and `utm_medium` a link for it carries. The mediums are the ones
@@ -130,3 +131,28 @@ export const hostOfUrl = (raw: string): string | null => {
     return null;
   }
 };
+
+/**
+ * What tracked links a post's links carry: short links by their code, full ones by their labels
+ * (`utm_source` + `utm_content`) — to recognise a planned publication once it is published.
+ */
+export function carriedLinks(urls: string[]) {
+  const codes = new Set<string>();
+  const labels = new Set<string>();
+  for (const url of urls) {
+    const code = shortLinkCode(url);
+    if (code) codes.add(code);
+    try {
+      const q = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).searchParams;
+      const source = q.get('utm_source')?.toLowerCase();
+      const content = q.get('utm_content')?.toLowerCase();
+      if (source && content) labels.add(`${source}\u0000${content}`);
+    } catch {
+      // not an address
+    }
+  }
+  return {
+    has: (link: { code: string; source: string; content: string }) =>
+      codes.has(link.code) || labels.has(`${link.source}\u0000${link.content}`),
+  };
+}

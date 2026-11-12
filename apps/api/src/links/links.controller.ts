@@ -14,9 +14,8 @@ import {
 } from '@nestjs/common';
 import { UseGuards } from '@nestjs/common';
 import { Prisma } from '@adelie/db';
-import { linkKey, productKeys, shortLinkCode } from '@adelie/platforms';
+import { linkKey, productKeys } from '@adelie/platforms';
 import { periodOf } from '../flipper/period.js';
-import { goalSql, settingsOf } from '../flipper/site-kinds.js';
 import { CONNECT_ROLES } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
 import { visibleProjectsWhere } from '../workspaces/project-visibility.js';
@@ -27,12 +26,13 @@ import {
 } from '../workspaces/workspace-access.guard.js';
 import {
   buildLinkUrl,
+  carriedLinks,
   channelOf,
-  hostOfUrl,
   newLinkCode,
   parseDestination,
   parseLinkInput,
 } from './links.js';
+import { linkResults } from './link-stats.js';
 import { publishShortLink, shortUrlOf } from './short-links.js';
 
 const LINK_SELECT = {
@@ -62,9 +62,6 @@ function present(link: LinkRow) {
 
 const isUuid = (v: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-
-const key = (l: { source: string; medium: string; campaign: string | null; content: string }) =>
-  [l.source, l.medium, l.campaign ?? '', l.content].join('\u0000');
 
 /**
  * Link Builder (ADR-0027): a project's tracked links — the full address with campaign labels and a
@@ -145,112 +142,14 @@ export class LinksController {
       links = links.map((l) => done.get(l.id) ?? l);
     }
 
-    const ids = links.map((l) => l.id);
-    const clicks = ids.length
-      ? await db.$queryRaw<{ linkId: string; clicks: number }[]>`
-          SELECT "linkId", count(*)::int AS clicks FROM link_click
-          WHERE "linkId" = ANY(${ids}::uuid[]) AND "occurredAt" >= ${since} AND NOT "isBot"
-          GROUP BY 1`
-      : [];
-    const clicksOf = new Map(clicks.map((c) => [c.linkId, c.clicks]));
-
-    // Visits and goals: on the project's sites with Flipper, by the links' labels.
-    const sites = links.length
-      ? await db.trackedSite.findMany({
-          where: { projectId, workspaceId: ctx.workspaceId },
-          select: { id: true, allowedHosts: true, kind: true, goals: true, funnel: true },
-        })
-      : [];
-    const results = new Map<
-      string,
-      {
-        visits: number;
-        visitors: number;
-        conversions: number;
-        value: number | null;
-        currency: string | null;
-      }
-    >();
-    for (const site of sites) {
-      const hosts = site.allowedHosts.map((h) => h.replace(/^www\./, '').toLowerCase());
-      const mine = links.filter((l) => hosts.includes(hostOfUrl(l.destination) ?? ''));
-      if (!mine.length) continue;
-      const { goals } = settingsOf(site);
-      const anyGoal = goals.length
-        ? Prisma.join(
-            goals.map((g) => goalSql(g.rule)),
-            ' OR ',
-          )
-        : Prisma.sql`false`;
-      const valued = goals.filter((g) => g.valued);
-      const anyValued = valued.length
-        ? Prisma.join(
-            valued.map((g) => goalSql(g.rule)),
-            ' OR ',
-          )
-        : Prisma.sql`false`;
-      const rows = await db.$queryRaw<
-        {
-          source: string;
-          medium: string;
-          campaign: string;
-          content: string;
-          visits: number;
-          visitors: number;
-          conversions: number;
-          value: number | null;
-        }[]
-      >`
-        SELECT "source", "medium", coalesce("campaign", '') AS campaign, "content",
-          (count(DISTINCT "sessionId") FILTER (WHERE consent AND name = 'PageView')
-            + count(*) FILTER (WHERE NOT consent AND name = 'PageView'))::int AS visits,
-          count(DISTINCT coalesce("visitorId", "dailyId")) FILTER (WHERE name = 'PageView')::int AS visitors,
-          count(*) FILTER (WHERE ${anyGoal})::int AS conversions,
-          sum(CASE WHEN (${anyValued}) AND jsonb_typeof(properties->'value') = 'number'
-            THEN (properties->>'value')::numeric END)::float8 AS value
-        FROM website_event
-        WHERE "siteId" = ${site.id}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
-          AND "content" = ANY(${[...new Set(mine.map((l) => l.content))]}::text[])
-        GROUP BY 1, 2, 3, 4`;
-      // The site's currency: the latest one an event with a value reported (as Flipper shows it).
-      const currency = valued.length
-        ? ((
-            await db.$queryRaw<{ currency: string | null }[]>`
-              SELECT properties->>'currency' AS currency FROM website_event
-              WHERE "siteId" = ${site.id}::uuid AND properties->>'currency' IS NOT NULL
-              ORDER BY "occurredAt" DESC LIMIT 1`
-          )[0]?.currency ?? null)
-        : null;
-      for (const r of rows) {
-        results.set(key({ ...r, campaign: r.campaign || null }), {
-          visits: r.visits,
-          visitors: r.visitors,
-          conversions: r.conversions,
-          value: valued.length ? (r.value ?? 0) : null,
-          currency,
-        });
-      }
-    }
-    const tracked = new Set(
-      sites.flatMap((s) => s.allowedHosts.map((h) => h.replace(/^www\./, '').toLowerCase())),
-    );
+    const results = await linkResults(this.prisma.client, projectId, ctx.workspaceId, links, since);
 
     return {
       days: n,
       shortLinks: !!shortUrlOf('x'),
       links: links.map((l) => ({
         ...present(l),
-        clicks: clicksOf.get(l.id) ?? 0,
-        // null: the destination is not a site with Flipper, so visits are not known here.
-        site: tracked.has(hostOfUrl(l.destination) ?? '')
-          ? (results.get(key(l)) ?? {
-              visits: 0,
-              visitors: 0,
-              conversions: 0,
-              value: null,
-              currency: null,
-            })
-          : null,
+        ...results.get(l.id)!,
       })),
     };
   }
@@ -284,21 +183,8 @@ export class LinksController {
       select: { links: { select: { url: true } } },
     });
     if (!post) throw new NotFoundException();
-    const codes = new Set<string>();
-    const labels = new Set<string>();
-    for (const { url } of post.links) {
-      const code = shortLinkCode(url);
-      if (code) codes.add(code);
-      try {
-        const q = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).searchParams;
-        const source = q.get('utm_source')?.toLowerCase();
-        const content = q.get('utm_content')?.toLowerCase();
-        if (source && content) labels.add(`${source}\u0000${content}`);
-      } catch {
-        // not an address
-      }
-    }
-    return (l: LinkRow) => codes.has(l.code) || labels.has(`${l.source}\u0000${l.content}`);
+    const carried = carriedLinks(post.links.map((l) => l.url));
+    return (l: LinkRow) => carried.has(l);
   }
 
   /**

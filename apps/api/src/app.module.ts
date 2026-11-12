@@ -3,6 +3,7 @@ import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { auth } from './auth/auth.js';
 import { FlipperController } from './flipper/flipper.controller.js';
 import { FlipperIngestController } from './flipper/flipper-ingest.controller.js';
+import { CalendarController } from './calendar/calendar.controller.js';
 import { ContentController } from './content/content.controller.js';
 import { HealthController } from './health.controller.js';
 import { GoClicksController } from './links/go-clicks.controller.js';
@@ -24,6 +25,7 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
   // unless marked with @AllowAnonymous().
   imports: [AuthModule.forRoot({ auth })],
   controllers: [
+    CalendarController,
     ContentController,
     FlipperController,
     FlipperIngestController,
