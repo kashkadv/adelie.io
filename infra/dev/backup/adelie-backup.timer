@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly Adelie dev database backup (before the 04:00 UTC sync)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
