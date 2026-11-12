@@ -60,9 +60,9 @@ if [ -f "$R2_ENV" ]; then
   set -a; . "$R2_ENV"; set +a
   enc="$file.age"
   "$BIN/age" -r "$AGE_RECIPIENT" -o "$enc" "$file"
-  "$BIN/rclone" copyto "$enc" "r2:$R2_BUCKET/daily/$(basename "$enc")"
+  "$BIN/rclone" -q copyto "$enc" "r2:$R2_BUCKET/daily/$(basename "$enc")"
   if [ "$weekly" = 1 ]; then
-    "$BIN/rclone" copyto "$enc" "r2:$R2_BUCKET/weekly/$(basename "$enc")"
+    "$BIN/rclone" -q copyto "$enc" "r2:$R2_BUCKET/weekly/$(basename "$enc")"
   fi
   rm -f "$enc"
   log "off-site copy → r2:$R2_BUCKET"
