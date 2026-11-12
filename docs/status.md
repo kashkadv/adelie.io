@@ -71,8 +71,8 @@ Tailscale. Dev-сервер — VM `adelie` на Proxmox (Docker, PostgreSQL 18,
 
 **Просування → Посилання (Link Builder)** ([ADR-0027](decisions/0027-link-builder.md)): мічені посилання (канал з
 реєстру, кампанія з підказками, місце) у двох формах — повна з UTM і коротка `go.adelie.space/<код>` (Cloudflare Worker +
-KV, клік у фоні в `POST /go/clicks`); по кожному — кліки, візити й цілі Flipper за період; зміна адреси, архів. Коротка
-форма запрацює після налаштування Cloudflare ([plans/link-builder.md](plans/link-builder.md)).
+KV, клік у фоні в `POST /go/clicks`); по кожному — кліки, візити й цілі Flipper за період; зміна адреси, архів. Налаштування
+Cloudflare — [plans/link-builder.md](plans/link-builder.md).
 
 **Дані Gushka на dev:** Pinterest `gushkawool` (~55 пінів; 26 ведуть на gushka.ua, 2 — на Etsy), Instagram
 `gushka.wool` (~780 публікацій, 87 тис. підписників), Etsy `GushkaWoolRugs` (повний доступ; 109 активних товарів,
@@ -82,8 +82,8 @@ KV, клік у фоні в `POST /go/clicks`); по кожному — клік
 ## На чому зупинились
 
 **2026-11-13 — Link Builder** (ADR-0027): API, інтерфейс, Worker `infra/go` і `pnpm deploy:go` готові; перевірено на
-локальній базі (візити, цілі, кліки без ботів, архів). Для коротких посилань чекаємо від власника токен Cloudflare —
-кроки в [plans/link-builder.md](plans/link-builder.md).
+локальній базі (візити, цілі, кліки без ботів, архів). Cloudflare налаштовано: Worker `adelie-go` на
+`go.adelie.space`, KV `adelie-go-links`; перенаправлення перевірено. Лишилось перевірити клік на справжньому посиланні.
 
 Перед тим, 2026-11-12 — Flipper: тип сайту, цілі й воронка ([ADR-0026](decisions/0026-flipper-site-goals.md)).
 
@@ -100,8 +100,7 @@ KV, клік у фоні в `POST /go/clicks`); по кожному — клік
 
 ## Наступні кроки
 
-1. **Link Builder:** токен Cloudflare → `pnpm deploy:go` → перевірити коротке посилання й клік (кроки —
-   [plans/link-builder.md](plans/link-builder.md)). Далі: вибір товару з каталогу як адреси, зв'язок посилання з дописом.
+1. **Link Builder:** створити перше справжнє посилання й перевірити клік ([plans/link-builder.md](plans/link-builder.md)). Далі: вибір товару з каталогу як адреси, зв'язок посилання з дописом.
 2. **Резервні копії бази dev** ([infra/backups.md](infra/backups.md)): скрипт з перевіркою відновлення і зашифрована копія
    в Cloudflare R2 працюють (2026-11-12). Щонічний таймер на VM встановлено. Розшифрування ключем власника перевірено. Третя копія —
    на Mac власника: `pnpm backup:pull` (час від часу).

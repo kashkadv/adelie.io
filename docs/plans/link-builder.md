@@ -8,9 +8,12 @@
 - [x] API: запис у Workers KV (якщо налаштовано Cloudflare); прийом кліків `POST /go/clicks`.
 - [x] Worker `go.adelie.space` (`infra/go`): перенаправлення з KV, клік у фоні, боти; розгортання `pnpm deploy:go`.
 - [x] Інтерфейс: Просування → «Посилання»: таблиця, створення й зміна у вікні, копіювання повної й короткої форми.
-- [ ] Від власника: токен Cloudflare API → `~/adelie/env/dev.env`; розгорнути Worker; перевірити клік і перехід.
+- [x] Від власника: токен Cloudflare API → `~/adelie/env/dev.env`; розгорнути Worker; перевірити клік і перехід.
 
 ## Налаштування Cloudflare (один раз)
+
+Зроблено 2026-11-13: токен `adelie-go-worker` (дві політики: акаунт і зона `adelie.space`, без терміну дії), KV
+`adelie-go-links`, Worker `adelie-go` на `go.adelie.space`. Перевірено перенаправлення з KV.
 
 1. **Токен API** (dash.cloudflare.com → My Profile → API Tokens → Create Token → Custom token), дозволи:
    - Account → **Workers Scripts: Edit**, **Workers KV Storage: Edit**;
