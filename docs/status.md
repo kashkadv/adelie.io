@@ -92,8 +92,9 @@ Tailscale. Dev-сервер — VM `adelie` на Proxmox (Docker, PostgreSQL 18,
    на Mac власника: `pnpm backup:pull` (час від часу).
 2. **TikTok:** публічне відео в тестовому акаунті → перевірити таблицю й картку; демо-відео й заявка на App Review; потім
    бойові ключі. Публікація (Content Posting API) — окремою ревізією; до аудиту пости лише приватні.
-3. **Flipper:** підтвердити серверний `Purchase` з розробником Gushka (+ `flVisitorId` у замовленні); увімкнути
-   gushka.world; далі — правила з кабінету (шаблони адрес, CSS-селектори), JSON-LD `Product`, Link Builder, режим-проксі,
+3. **Flipper:** серверний `Purchase` з бекенду Gushka **працює** (підтверджено 2026-11-12: 4 покупки з gushka.ua, 3 з
+   них прив'язані до візиту й успадкували канал — Google, Facebook, прямий; одна без відвідувача — «Без джерела»). Далі: увімкнути
+   gushka.world; потім — правила з кабінету (шаблони адрес, CSS-селектори), JSON-LD `Product`, Link Builder, режим-проксі,
    production-хости `cdn.`/`events.`, оновлення privacy policy.
 4. **Від власника:** Gushka — тип акаунта TikTok, канал YouTube, Threads, GA4, Merchant Center; мод — де розповсюджувати;
    **реклама Instagram** — кроки в Meta (Marketing API, `ads_read` у конфігурації, перепідключення).
