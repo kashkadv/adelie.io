@@ -81,3 +81,36 @@ export function productKeys(product: {
   if (byUrl && !keys.includes(byUrl)) keys.push(byUrl);
   return keys;
 }
+
+/**
+ * The code of a short link of Link Builder (ADR-0027) — `go.adelie.space/<code>` — or null. A post
+ * that carries one leads where the link leads: the sync stores the destination's key for it.
+ */
+export function shortLinkCode(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+    if (parsed.hostname.toLowerCase() !== 'go.adelie.space') return null;
+    return /^\/([a-z0-9]{7})\/?$/.exec(parsed.pathname)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A post's links with short links resolved: `resolve(code)` gives the link's destination, and the
+ * post is then linked by the destination's key (the short address stays as the url). Unknown codes
+ * keep their own key. De-duplicated by key, the first one wins.
+ */
+export function resolveShortLinks<T extends { url: string; key: string }>(
+  links: T[],
+  resolve: (code: string) => string | null | undefined,
+): T[] {
+  const out = new Map<string, T>();
+  for (const l of links) {
+    const code = shortLinkCode(l.url);
+    const key = (code && linkKey(resolve(code))) || l.key;
+    if (!out.has(key)) out.set(key, { ...l, key });
+  }
+  return [...out.values()];
+}

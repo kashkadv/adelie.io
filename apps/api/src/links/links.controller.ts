@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { UseGuards } from '@nestjs/common';
 import { Prisma } from '@adelie/db';
+import { linkKey, productKeys, shortLinkCode } from '@adelie/platforms';
 import { periodOf } from '../flipper/period.js';
 import { goalSql, settingsOf } from '../flipper/site-kinds.js';
 import { CONNECT_ROLES } from '../social/connect.service.js';
@@ -58,6 +59,9 @@ function present(link: LinkRow) {
     shortUrl: link.publishedAt ? shortUrlOf(link.code) : null,
   };
 }
+
+const isUuid = (v: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
 const key = (l: { source: string; medium: string; campaign: string | null; content: string }) =>
   [l.source, l.medium, l.campaign ?? '', l.content].join('\u0000');
@@ -107,21 +111,30 @@ export class LinksController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query('days') days: string | undefined,
     @Query('archived') archived: string | undefined,
+    @Query('product') productId: string | undefined,
+    @Query('post') postId: string | undefined,
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     const ctx = request.workspace;
     const project = await this.visibleProject(ctx, projectId);
     const { n, since } = periodOf(days, project.timezone);
     const db = this.prisma.client;
+    // For a product's or a post's card: every link of it, archived ones included.
+    const of = productId
+      ? await this.productFilter(projectId, ctx.workspaceId, productId)
+      : postId
+        ? await this.postFilter(projectId, ctx.workspaceId, postId)
+        : null;
     let links = await db.trackedLink.findMany({
       where: {
         projectId,
         workspaceId: ctx.workspaceId,
-        archivedAt: archived === '1' ? { not: null } : null,
+        ...(of ? {} : { archivedAt: archived === '1' ? { not: null } : null }),
       },
       orderBy: { createdAt: 'desc' },
       select: LINK_SELECT,
     });
+    if (of) links = links.filter(of);
 
     // A short form that did not reach Cloudflare is tried again (a few at a time).
     const unpublished = links.filter((l) => !l.publishedAt && !l.archivedAt).slice(0, 5);
@@ -238,6 +251,93 @@ export class LinksController {
               currency: null,
             })
           : null,
+      })),
+    };
+  }
+
+  /** Links that lead to the product: their destination is the product's page or listing. */
+  private async productFilter(projectId: string, workspaceId: string, productId: string) {
+    if (!isUuid(productId)) throw new BadRequestException();
+    const product = await this.prisma.client.shopProduct.findFirst({
+      where: { id: productId, projectId, workspaceId },
+      select: { externalId: true, url: true, account: { select: { platform: true } } },
+    });
+    if (!product) throw new NotFoundException();
+    const keys = new Set(
+      productKeys({
+        platform: product.account.platform,
+        externalId: product.externalId,
+        url: product.url,
+      }),
+    );
+    return (l: LinkRow) => keys.has(linkKey(l.destination) ?? '');
+  }
+
+  /**
+   * Links a post carries: a short link by its code, a full one by its labels (`utm_source` and
+   * `utm_content` of an address in the post).
+   */
+  private async postFilter(projectId: string, workspaceId: string, postId: string) {
+    if (!isUuid(postId)) throw new BadRequestException();
+    const post = await this.prisma.client.socialPost.findFirst({
+      where: { id: postId, projectId, workspaceId },
+      select: { links: { select: { url: true } } },
+    });
+    if (!post) throw new NotFoundException();
+    const codes = new Set<string>();
+    const labels = new Set<string>();
+    for (const { url } of post.links) {
+      const code = shortLinkCode(url);
+      if (code) codes.add(code);
+      try {
+        const q = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).searchParams;
+        const source = q.get('utm_source')?.toLowerCase();
+        const content = q.get('utm_content')?.toLowerCase();
+        if (source && content) labels.add(`${source}\u0000${content}`);
+      } catch {
+        // not an address
+      }
+    }
+    return (l: LinkRow) => codes.has(l.code) || labels.has(`${l.source}\u0000${l.content}`);
+  }
+
+  /**
+   * The project's catalogue products with a page — for choosing where a new link leads. Etsy
+   * listings and site products, without removed ones.
+   */
+  @Get('products')
+  async products(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    await this.visibleProject(request.workspace, projectId);
+    const rows = await this.prisma.client.shopProduct.findMany({
+      where: {
+        projectId,
+        workspaceId: request.workspace.workspaceId,
+        url: { not: null },
+        state: { not: 'removed' },
+        account: {
+          platform: { in: ['ETSY', 'WEBSITE'] },
+          hiddenAt: null,
+          connection: { status: { not: 'REVOKED' } },
+        },
+      },
+      orderBy: { title: 'asc' },
+      take: 2000,
+      select: {
+        id: true,
+        title: true,
+        url: true,
+        account: { select: { platform: true, displayName: true, username: true } },
+      },
+    });
+    return {
+      products: rows.map((p) => ({
+        id: p.id,
+        title: p.title,
+        url: p.url!,
+        channel: p.account.displayName ?? p.account.username ?? p.account.platform,
       })),
     };
   }

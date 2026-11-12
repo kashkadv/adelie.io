@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
 import { PanelSheet } from '../ui/panel-sheet';
 import { Segmented } from '../ui/segmented';
+import { LinksSection } from './links-section';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
 import { useMoney } from './sales-data';
 
@@ -335,6 +336,9 @@ export function PostDialog({
                   )}
                 </div>
               </div>
+
+              {/* Tracked links in this post (ADR-0027): what they brought. */}
+              <LinksSection post={postId} />
 
               {/* All metrics the platform reports for this post. */}
               <section className="mt-6">

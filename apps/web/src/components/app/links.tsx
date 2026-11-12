@@ -1,55 +1,20 @@
 'use client';
 
-import {
-  Archive,
-  ArchiveRestore,
-  Check,
-  Copy,
-  Link2,
-  Mail,
-  Pencil,
-  Plus,
-  type LucideIcon,
-} from 'lucide-react';
+import { Archive, ArchiveRestore, Check, Copy, Link2, Pencil, Plus } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
-import { PlatformIcon, type PlatformKey } from '../ui/platform-icon';
 import { Segmented } from '../ui/segmented';
 import { CONNECT_ROLES } from './accounts-data';
 import { LinkDialog } from './link-dialog';
-import type { LinkChannel, LinkRow, TrackedLink } from './links-data';
+import { ChannelIcon, shortDestination } from './link-ui';
+import type { LinkRow, TrackedLink } from './links-data';
 import { EmptyState, PageHeader } from './page-header';
 import { useWorkspace } from './workspace-context';
 
 const PERIODS = ['today', '7', '30', '90'] as const;
 type Period = (typeof PERIODS)[number];
-
-const PLATFORM_OF: Partial<Record<LinkChannel, PlatformKey>> = {
-  pinterest: 'PINTEREST',
-  instagram: 'INSTAGRAM',
-  tiktok: 'TIKTOK',
-  etsy: 'ETSY',
-};
-const ICON_OF: Partial<Record<LinkChannel, LucideIcon>> = { email: Mail };
-
-function ChannelIcon({ channel }: { channel: LinkChannel }) {
-  const platform = PLATFORM_OF[channel];
-  if (platform) return <PlatformIcon platform={platform} size={15} strokeWidth={1.75} />;
-  const Icon = ICON_OF[channel] ?? Link2;
-  return <Icon size={15} strokeWidth={1.75} aria-hidden="true" />;
-}
-
-/** "gushka.ua/shop/rug" — the destination without the scheme and `www.`. */
-const shortDestination = (url: string) => {
-  try {
-    const u = new URL(url);
-    return `${u.hostname.replace(/^www\./, '')}${u.pathname === '/' ? '' : u.pathname}${u.search}`;
-  } catch {
-    return url;
-  }
-};
 
 /**
  * Link Builder (ADR-0027): the project's tracked links — both forms to copy — and what each brought

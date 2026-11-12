@@ -9,6 +9,8 @@ import {
   hasFeature,
   isAdapterError,
   postLinks,
+  resolveShortLinks,
+  shortLinkCode,
   type AdapterContext,
   type MetricPoint,
   type PlatformAdapter,
@@ -443,6 +445,8 @@ export async function runSync(
     await step('posts', async () => {
       for await (const page of adapter.listPosts(ctx())) {
         const postIds = new Map<string, string>();
+        /** Short link code → its destination (null: not a link of this project). */
+        const shortLinks = new Map<string, string | null>();
         for (const p of page.posts) {
           const data = {
             boardId: p.boardExternalId ? (boardIds.get(p.boardExternalId) ?? null) : null,
@@ -469,8 +473,21 @@ export async function runSync(
           });
           postIds.set(p.externalId, post.id);
           count('posts');
-          // Links of the post: its own and those in its text (ADR-0018), replaced as a whole.
-          const links = postLinks(p);
+          // Links of the post: its own and those in its text (ADR-0018), replaced as a whole. A short
+          // link of Link Builder (ADR-0027) counts as a link to where it leads.
+          const found = postLinks(p);
+          const codes = found.map((l) => shortLinkCode(l.url)).filter((c): c is string => !!c);
+          const unknown = codes.filter((c) => !shortLinks.has(c));
+          if (unknown.length) {
+            const rows = await prisma.trackedLink.findMany({
+              where: { projectId: account.projectId, code: { in: unknown } },
+              select: { code: true, destination: true },
+            });
+            for (const c of unknown) {
+              shortLinks.set(c, rows.find((r) => r.code === c)?.destination ?? null);
+            }
+          }
+          const links = codes.length ? resolveShortLinks(found, (c) => shortLinks.get(c)) : found;
           await prisma.$transaction([
             prisma.socialPostLink.deleteMany({ where: { postId: post.id } }),
             prisma.socialPostLink.createMany({

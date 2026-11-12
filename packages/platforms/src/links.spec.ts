@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { linkKey, linksInText, postLinks, productLinkKey } from './links.js';
+import {
+  linkKey,
+  linksInText,
+  postLinks,
+  productLinkKey,
+  resolveShortLinks,
+  shortLinkCode,
+} from './links.js';
 
 describe('linkKey', () => {
   it('finds the Etsy listing in listing and shop links', () => {
@@ -48,6 +55,27 @@ describe('links in text', () => {
     ).toEqual([
       { url: 'https://www.etsy.com/listing/1/a', key: 'etsy:1', source: 'link' },
       { url: 'https://gushka.ua/pillows/', key: 'url:gushka.ua/pillows', source: 'text' },
+    ]);
+  });
+});
+
+describe('short links', () => {
+  it('a go.adelie.space link leads where its tracked link leads', () => {
+    expect(shortLinkCode('https://go.adelie.space/qv0pl6d')).toBe('qv0pl6d');
+    expect(shortLinkCode('go.adelie.space/qv0pl6d/')).toBe('qv0pl6d');
+    expect(shortLinkCode('https://go.adelie.space/')).toBeNull();
+    expect(shortLinkCode('https://gushka.ua/qv0pl6d')).toBeNull();
+    const links = postLinks({
+      description:
+        'Rug: go.adelie.space/qv0pl6d and https://gushka.ua/product/00022502 , go.adelie.space/zzzzzzz',
+    });
+    expect(
+      resolveShortLinks(links, (c) =>
+        c === 'qv0pl6d' ? 'https://gushka.ua/product/00022502?utm_source=instagram' : null,
+      ),
+    ).toEqual([
+      { url: 'go.adelie.space/qv0pl6d', key: 'url:gushka.ua/product/00022502', source: 'text' },
+      { url: 'go.adelie.space/zzzzzzz', key: 'url:go.adelie.space/zzzzzzz', source: 'text' },
     ]);
   });
 });

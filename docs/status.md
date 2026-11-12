@@ -71,7 +71,8 @@ Tailscale. Dev-сервер — VM `adelie` на Proxmox (Docker, PostgreSQL 18,
 
 **Просування → Посилання (Link Builder)** ([ADR-0027](decisions/0027-link-builder.md)): мічені посилання (канал з
 реєстру, кампанія з підказками, місце) у двох формах — повна з UTM і коротка `go.adelie.space/<код>` (Cloudflare Worker +
-KV, клік у фоні в `POST /go/clicks`); по кожному — кліки, візити й цілі Flipper за період; зміна адреси, архів. Налаштування
+KV, клік у фоні в `POST /go/clicks`); по кожному — кліки, візити й цілі Flipper за період; зміна адреси, архів. Адреса — з каталогу товарів; блок
+«Посилання» в картках товару й допису; допис з `go.adelie.space/<код>` веде до товару посилання. Налаштування
 Cloudflare — [plans/link-builder.md](plans/link-builder.md).
 
 **Дані Gushka на dev:** Pinterest `gushkawool` (~55 пінів; 26 ведуть на gushka.ua, 2 — на Etsy), Instagram
@@ -100,15 +101,15 @@ Cloudflare — [plans/link-builder.md](plans/link-builder.md).
 
 ## Наступні кроки
 
-1. **Link Builder:** працює ([plans/link-builder.md](plans/link-builder.md)). Далі: вибір товару з каталогу як адреси, зв'язок посилання з дописом.
+1. **Link Builder:** працює ([plans/link-builder.md](plans/link-builder.md)). 
 2. **Резервні копії бази dev** ([infra/backups.md](infra/backups.md)): скрипт з перевіркою відновлення і зашифрована копія
    в Cloudflare R2 працюють (2026-11-12). Щонічний таймер на VM встановлено. Розшифрування ключем власника перевірено. Третя копія —
    на Mac власника: `pnpm backup:pull` (час від часу).
 3. **TikTok:** публічне відео в тестовому акаунті → перевірити таблицю й картку; демо-відео й заявка на App Review; потім
    бойові ключі. Публікація (Content Posting API) — окремою ревізією; до аудиту пости лише приватні.
 4. **Flipper:** серверний `Purchase` з бекенду Gushka **працює** (підтверджено 2026-11-12: 4 покупки з gushka.ua, 3 з
-   них прив'язані до візиту й успадкували канал — Google, Facebook, прямий; одна без відвідувача — «Без джерела»). Далі: увімкнути
-   gushka.world; потім — правила з кабінету (шаблони адрес, CSS-селектори), JSON-LD `Product`, режим-проксі,
+   них прив'язані до візиту й успадкували канал — Google, Facebook, прямий; одна без відвідувача — «Без джерела»). Далі: gushka.world —
+   **відкладено** (2026-11-13), поки власник не визначився з банером згоди; потім — правила з кабінету (шаблони адрес, CSS-селектори), JSON-LD `Product`, режим-проксі,
    production-хости `cdn.`/`events.`, оновлення privacy policy.
 5. **Від власника:** Gushka — тип акаунта TikTok, канал YouTube, Threads, GA4, Merchant Center; мод — де розповсюджувати;
    **реклама Instagram** — кроки в Meta (Marketing API, `ads_read` у конфігурації, перепідключення).

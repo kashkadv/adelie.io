@@ -1493,6 +1493,11 @@
     "newLead": "Where it leads and where you will place it",
     "editTitle": "Edit link",
     "editLead": "The labels stay — they are in published addresses already",
+    "product": "Product",
+    "productHint": "Choose a product from the project's catalogue — its address is filled in. Or type any address below.",
+    "productPlaceholder": "Choose from the catalogue",
+    "productSearch": "Search products",
+    "productNone": "Nothing found",
     "destination": "Leads to",
     "destinationHint": "The page address: a site, a product, an Etsy shop, a mod page. The short address redirects here; you can change it after publishing.",
     "channel": "Channel",
@@ -1526,6 +1531,11 @@
       "source": "Enter the source",
       "content": "A link with these labels already exists — enter another placement or campaign",
       "failed": "Could not save. Please try again."
-    }
+    },
+    "cardTitle": "Links",
+    "cardHint": "Tracked Link Builder links that lead here: clicks, visits and goals in 30 days.",
+    "cardStats": "{clicks} clicks · {visits} visits · {goals} goals",
+    "cardEmpty": "No links yet. Create one here or in",
+    "archivedOne": "archived"
   }
 }

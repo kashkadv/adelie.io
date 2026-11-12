@@ -22,6 +22,7 @@ import { Select } from '../ui/select';
 import { InfoTip } from '../ui/info-tip';
 import { PanelSheet } from '../ui/panel-sheet';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
+import { LinksSection } from './links-section';
 import { ISSUE_STYLE, sortIssues, type ProductIssue } from './product-issues';
 import { minorDigits, useMoney } from './sales-data';
 import { seoChanges, seoFindings, type SeoCheck, type SeoLevel } from './seo-rules';
@@ -1035,6 +1036,9 @@ export function ProductDialog({
                   )}
                 </section>
               </div>
+
+              {/* Tracked links to this product (ADR-0027). */}
+              <LinksSection product={productId} destination={detail.url} />
             </>
           )}
         </div>

@@ -9,6 +9,8 @@ import { InfoTip } from '../ui/info-tip';
 import { Select } from '../ui/select';
 import { LINK_CHANNELS, type LinkChannel, type TrackedLink } from './links-data';
 
+type CatalogProduct = { id: string; title: string; url: string; channel: string };
+
 type Field = 'destination' | 'channel' | 'source' | 'content' | 'failed';
 
 /**
@@ -18,26 +20,38 @@ type Field = 'destination' | 'channel' | 'source' | 'content' | 'failed';
 export function LinkDialog({
   base,
   link,
+  initialDestination,
   onClose,
   onSaved,
 }: {
   base: string;
   /** The link to change; none = a new one. */
   link?: TrackedLink;
+  /** A new link's destination to start with (from a product's card). */
+  initialDestination?: string;
   onClose: () => void;
   onSaved: (link: TrackedLink) => void;
 }) {
   const t = useTranslations('Links');
   const titleId = useId();
-  const [destination, setDestination] = useState(link?.destination ?? '');
+  const [destination, setDestination] = useState(link?.destination ?? initialDestination ?? '');
   const [name, setName] = useState(link?.name ?? '');
   const [channel, setChannel] = useState<LinkChannel | ''>('');
   const [source, setSource] = useState('');
   const [campaign, setCampaign] = useState('');
   const [content, setContent] = useState('');
   const [campaigns, setCampaigns] = useState<string[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Field | null>(null);
+
+  useEffect(() => {
+    api<{ products: CatalogProduct[] }>(`${base}/products`).then(
+      (r) => setProducts(r.products),
+      () => undefined,
+    );
+  }, [base]);
+  const product = products.find((p) => p.url === destination);
 
   useEffect(() => {
     if (link) return;
@@ -133,10 +147,29 @@ export function LinkDialog({
         </div>
 
         <div className="mt-5 grid gap-4">
+          {products.length > 0 && (
+            <div>
+              {label(t('product'), t('productHint'))}
+              <Select
+                ariaLabel={t('product')}
+                value={product?.id ?? ''}
+                onChange={(id) => {
+                  const chosen = products.find((p) => p.id === id);
+                  if (chosen) setDestination(chosen.url);
+                  if (error === 'destination') setError(null);
+                }}
+                placeholder={t('productPlaceholder')}
+                searchable
+                searchPlaceholder={t('productSearch')}
+                emptyText={t('productNone')}
+                options={products.map((p) => ({ value: p.id, label: p.title, hint: p.channel }))}
+              />
+            </div>
+          )}
           <label className="block">
             {label(t('destination'), t('destinationHint'))}
             <input
-              autoFocus
+              autoFocus={!initialDestination}
               type="url"
               inputMode="url"
               required
