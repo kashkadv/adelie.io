@@ -4,7 +4,7 @@ _Оновлено: 2026-11-13_
 
 ## Поточний етап
 
-**Adelie — власний інструмент власника** ([ADR-0025](decisions/0025-own-tool-first.md), запропоновано): будується під три
+**Adelie — власний інструмент власника** ([ADR-0025](decisions/0025-own-tool-first.md), прийнято): будується під три
 проєкти-експерименти з сигналами успіху й щомісячним переглядом — **Gushka** (вовняні вироби: Etsy, два сайти,
 Pinterest, Instagram), **мод для ETS2/ATS** (безкоштовний, канали з нуля) і **Product Factory** (цифрові продукти для
 Etsy, задум). Команда, біллінг і зовнішні клієнти — відкладено. Етапи MVP-1 1–2 закрито; план:
@@ -103,14 +103,14 @@ Cloudflare — [plans/link-builder.md](plans/link-builder.md).
 [integrations/tiktok.md](integrations/tiktok.md).
 
 Перед тим (2026-11-11): стратегія просування — чернетка [specs/promotion-strategy.md](specs/promotion-strategy.md) і
-[ADR-0024](decisions/0024-promotion-strategy-module.md) (запропоновано); [ADR-0025](decisions/0025-own-tool-first.md);
+[ADR-0024](decisions/0024-promotion-strategy-module.md) (прийнято 2026-11-13); [ADR-0025](decisions/0025-own-tool-first.md);
 задум Product Factory — [specs/product-factory.md](specs/product-factory.md); локальна LLM на ПК власника як GPU-воркер
 на вимогу — план [infra/local-llm.md](infra/local-llm.md).
 
 ## Наступні кроки
 
 1. **Календар:** перевірити на dev — запланувати тиждень, опублікувати з посиланням, огляд тижня
-   ([plans/content-calendar.md](plans/content-calendar.md)). Далі — поради AI (потрібні ключ OpenAI і ліміт, прийняття ADR-0024/0025).
+   ([plans/content-calendar.md](plans/content-calendar.md)). Далі — бриф проєкту й ідеї AI для календаря (ключ OpenAI на сервері, ліміт $5/міс в OpenAI).
 2. **Link Builder:** працює ([plans/link-builder.md](plans/link-builder.md)). 
 3. **Резервні копії бази dev** ([infra/backups.md](infra/backups.md)): скрипт з перевіркою відновлення і зашифрована копія
    в Cloudflare R2 працюють (2026-11-12). Щонічний таймер на VM встановлено. Розшифрування ключем власника перевірено. Третя копія —

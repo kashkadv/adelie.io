@@ -1,6 +1,6 @@
 # ADR-0025: Adelie — власний інструмент на цьому етапі
 
-- **Статус:** запропоновано (чекає підтвердження власника)
+- **Статус:** прийнято (2026-11-13)
 - **Дата:** 2026-11-11
 - **Пов'язані:** [specs/promotion-strategy.md](../specs/promotion-strategy.md), [specs/product-factory.md](../specs/product-factory.md),
   ADR-0019, ADR-0023, ADR-0024

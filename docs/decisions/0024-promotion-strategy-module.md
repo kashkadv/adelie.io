@@ -1,6 +1,6 @@
 # ADR-0024: Модуль «План просування»: AI-помічник за даними, постачальник OpenAI
 
-- **Статус:** запропоновано (чекає підтвердження власника)
+- **Статус:** прийнято (2026-11-13)
 - **Дата:** 2026-11-11
 - **Пов'язані:** [specs/promotion-strategy.md](../specs/promotion-strategy.md), ADR-0022 (Flipper, Link Builder), [specs/pebble.md](../specs/pebble.md)
 
