@@ -21,6 +21,7 @@
 | [infra/local-llm.md](infra/local-llm.md) | Локальна LLM на робочому ПК: що потягне залізо, GPU-воркер за потреби, перевірка якості (план) |
 | [infra/server-setup.md](infra/server-setup.md) | Сервер на Proxmox: створення VM, доступ, журнал налаштування |
 | [integrations/pinterest.md](integrations/pinterest.md) | Pinterest API: scopes, endpoints, метрики, обмеження, як створити застосунок |
+| [integrations/tiktok.md](integrations/tiktok.md) | TikTok (Login Kit + Display API): застосунок, sandbox, дозволи, реалізація, тексти й сценарій для App Review |
 | [integrations/instagram.md](integrations/instagram.md) | Instagram API (Instagram Login): доступ, дозволи, метрики, обмеження, кроки |
 
 ## Рішення (ADR)
