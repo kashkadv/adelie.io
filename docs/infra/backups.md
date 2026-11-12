@@ -5,7 +5,7 @@
 
 ## Що робиться
 
-**1. Щоночі на VM** (`infra/dev/backup/backup.sh`, таймер `adelie-backup.timer`, 02:30 UTC — до синхронізації о 04:00):
+**1. Щоночі на VM** (`infra/dev/backup/backup.sh`, таймер `adelie-backup.timer` — встановлено 2026-11-12; 02:30 UTC, до синхронізації о 04:00):
 - `pg_dump -Fc` бази `adelie_dev` з контейнера `adelie-dev-postgres-1` → `~/backups/daily/adelie_dev-YYYY-MM-DD.dump`;
 - **перевірка відновлення щоразу:** дамп відновлюється в тимчасову базу `adelie_dev_restore_check`, кількість рядків
   ключових таблиць (`social_account`, `social_post`, `post_metric_daily`, `account_metric_value`, `shop_order`,
@@ -71,7 +71,6 @@ ssh -t adelie@adelie 'read -rp "R2 account id: " A; read -rsp "R2 access key id:
 
 ## Відкрите
 
-- **Щонічний таймер на VM ще не встановлено** (потрібен `sudo`) — доти бекап лише вручну: `ssh adelie@adelie ~/adelie/backup/backup.sh`.
 - Копія на хост Proxmox (п. 2) — потребує доступу root на хості, чекає дозволу.
 - Перевірити розшифрування копії з R2 власним ключем (раз, на Mac) — див. «Відновлення з R2».
 - Скрипт пише в журнал systemd; сповіщення про невдалу копію — разом зі сповіщеннями застосунку.
