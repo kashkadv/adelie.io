@@ -83,7 +83,7 @@ Cloudflare — [plans/link-builder.md](plans/link-builder.md).
 
 **2026-11-13 — Link Builder** (ADR-0027): API, інтерфейс, Worker `infra/go` і `pnpm deploy:go` готові; перевірено на
 локальній базі (візити, цілі, кліки без ботів, архів). Cloudflare налаштовано: Worker `adelie-go` на
-`go.adelie.space`, KV `adelie-go-links`; перенаправлення перевірено. Лишилось перевірити клік на справжньому посиланні.
+`go.adelie.space`, KV `adelie-go-links`; перевірено наскрізно: коротке посилання → клік (UA, без бота) → візит на gushka.ua з мітками посилання.
 
 Перед тим, 2026-11-12 — Flipper: тип сайту, цілі й воронка ([ADR-0026](decisions/0026-flipper-site-goals.md)).
 
@@ -100,7 +100,7 @@ Cloudflare — [plans/link-builder.md](plans/link-builder.md).
 
 ## Наступні кроки
 
-1. **Link Builder:** створити перше справжнє посилання й перевірити клік ([plans/link-builder.md](plans/link-builder.md)). Далі: вибір товару з каталогу як адреси, зв'язок посилання з дописом.
+1. **Link Builder:** працює ([plans/link-builder.md](plans/link-builder.md)). Далі: вибір товару з каталогу як адреси, зв'язок посилання з дописом.
 2. **Резервні копії бази dev** ([infra/backups.md](infra/backups.md)): скрипт з перевіркою відновлення і зашифрована копія
    в Cloudflare R2 працюють (2026-11-12). Щонічний таймер на VM встановлено. Розшифрування ключем власника перевірено. Третя копія —
    на Mac власника: `pnpm backup:pull` (час від часу).
