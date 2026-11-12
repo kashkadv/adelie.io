@@ -66,11 +66,13 @@ docker exec -i adelie-dev-postgres-1 pg_restore -U adelie -d adelie_restored --n
 ssh -t adelie@adelie 'read -rp "R2 account id: " A; read -rsp "R2 access key id: " K; echo; read -rsp "R2 secret access key: " S; echo; read -rp "age public key (age1…): " P; umask 077; printf "RCLONE_CONFIG_R2_TYPE=s3\nRCLONE_CONFIG_R2_PROVIDER=Cloudflare\nRCLONE_CONFIG_R2_ACCESS_KEY_ID=%s\nRCLONE_CONFIG_R2_SECRET_ACCESS_KEY=%s\nRCLONE_CONFIG_R2_ENDPOINT=https://%s.r2.cloudflarestorage.com\nRCLONE_CONFIG_R2_NO_CHECK_BUCKET=true\nR2_BUCKET=adelie-backups\nAGE_RECIPIENT=%s\n" "$K" "$S" "$A" "$P" > ~/adelie/backup/r2.env; echo saved'
 ```
 
+**Розшифрування ключем власника перевірено** (2026-11-12, копія з R2 на Mac → дамп 7,3 МБ). Файл, завантажений
+з кабінету Cloudflare, має `_` замість `/` у назві; розшифрування: `age -d -i <файл з ключем> -o x.dump <файл>.age`.
+
 **Відновлення з R2:** `rclone copy r2:adelie-backups/daily/<файл>.age .` → `age -d -i adelie-backup.agekey -o x.dump
 <файл>.age` → `pg_restore` (див. вище).
 
 ## Відкрите
 
 - Копія на хост Proxmox (п. 2) — потребує доступу root на хості, чекає дозволу.
-- Перевірити розшифрування копії з R2 власним ключем (раз, на Mac) — див. «Відновлення з R2».
 - Скрипт пише в журнал systemd; сповіщення про невдалу копію — разом зі сповіщеннями застосунку.
