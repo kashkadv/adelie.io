@@ -19,6 +19,7 @@
     "env:pull": "bash scripts/env-pull.sh",
     "deploy:edge": "bash scripts/deploy-edge.sh",
     "deploy:dev": "bash scripts/deploy-app.sh dev",
+    "deploy:go": "bash scripts/deploy-go.sh",
     "backup:pull": "bash scripts/backup-pull.sh"
   },
   "devDependencies": {

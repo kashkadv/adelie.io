@@ -955,3 +955,47 @@ model WebsiteEvent {
   @@index([siteId, userKey])
   @@map("website_event")
 }
+
+/// A tracked link of a project (Link Builder, ADR-0027): where it leads and the campaign labels it
+/// carries. Two forms: the full address with the labels, and go.adelie.space/<code> that counts the
+/// click and redirects. Labels never change once created (they are in published addresses).
+model TrackedLink {
+  id            String      @id @default(uuid(7)) @db.Uuid
+  workspaceId   String      @db.Uuid
+  projectId     String      @db.Uuid
+  /// The short form's code: 7 characters a-z0-9, unique across all projects.
+  code          String      @unique
+  name          String?
+  /// Where the link leads, without the labels (they are added from the fields below).
+  destination   String
+  source        String
+  medium        String
+  campaign      String?
+  /// utm_content: the place of the link ("bio", "pin-123"), the code when none was given.
+  content       String
+  /// When the short form was last written to Workers KV; null = not (yet) there.
+  publishedAt   DateTime?
+  createdAt     DateTime    @default(now())
+  archivedAt    DateTime?
+
+  clicks LinkClick[]
+
+  @@index([projectId])
+  @@map("tracked_link")
+}
+
+/// One click on a short link, as the Worker saw it. Nothing that identifies the person: no address.
+model LinkClick {
+  id           String      @id @default(uuid(7)) @db.Uuid
+  linkId       String      @db.Uuid
+  link         TrackedLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  occurredAt   DateTime
+  referrerHost String?
+  country      String?
+  device       String?
+  /// Link previews (messengers, social networks) and crawlers.
+  isBot        Boolean     @default(false)
+
+  @@index([linkId, occurredAt])
+  @@map("link_click")
+}

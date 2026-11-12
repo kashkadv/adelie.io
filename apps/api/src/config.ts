@@ -48,6 +48,21 @@ export const config = {
           clientSecret: process.env['TIKTOK_CLIENT_SECRET'],
         }
       : undefined,
+  /**
+   * Short links (ADR-0027): the Worker on `baseUrl` reads them from Workers KV, written here with
+   * the Cloudflare API. Optional: without it links have only their full form. `clickSecret`: the
+   * Worker reports clicks with it.
+   */
+  shortLinks:
+    process.env['CF_ACCOUNT_ID'] && process.env['CF_API_TOKEN'] && process.env['GO_KV_NAMESPACE_ID']
+      ? {
+          accountId: process.env['CF_ACCOUNT_ID'],
+          apiToken: process.env['CF_API_TOKEN'],
+          namespaceId: process.env['GO_KV_NAMESPACE_ID'],
+          baseUrl: process.env['GO_BASE_URL'] || 'https://go.adelie.space',
+        }
+      : undefined,
+  goClickSecret: process.env['GO_CLICK_SECRET'] || undefined,
   auth: {
     secret: required('BETTER_AUTH_SECRET'),
     url: process.env['BETTER_AUTH_URL'] ?? 'http://localhost:4000',

@@ -15,6 +15,7 @@
 | [specs/product-factory.md](specs/product-factory.md) | Product Factory: цифрові продукти для Etsy — ніша → AI-продукт → Etsy → просування (задум) |
 | [specs/pebble.md](specs/pebble.md) | Pebble: пошук трендів і комерційних можливостей (ідея, формат не визначено) |
 | [plans/mvp-1.md](plans/mvp-1.md) | План MVP-1: Pinterest end-to-end (в роботі) |
+| [plans/link-builder.md](plans/link-builder.md) | Link Builder: кроки реалізації (в роботі) |
 | [plans/stage-2-data-model.md](plans/stage-2-data-model.md) | Етап 2: модель даних соцмереж і метрик (узгоджено) |
 | [plans/mvp-discussion.md](plans/mvp-discussion.md) | Обговорення обсягу MVP і стеку (завершено) |
 | [plans/infra-discussion.md](plans/infra-discussion.md) | Обговорення інфраструктури на домашньому Proxmox (в роботі) |
@@ -53,3 +54,4 @@
 - [ADR-0024](decisions/0024-promotion-strategy-module.md) — Модуль «План просування»: AI-помічник за даними, OpenAI (запропоновано)
 - [ADR-0025](decisions/0025-own-tool-first.md) — Adelie — власний інструмент на цьому етапі: що відкладаємо, критерії перевірки (запропоновано)
 - [ADR-0026](decisions/0026-flipper-site-goals.md) — Flipper: тип сайту, цілі й воронка як налаштування (прийнято)
+- [ADR-0027](decisions/0027-link-builder.md) — Link Builder: мічені й короткі посилання (`go.adelie.space`) (прийнято)

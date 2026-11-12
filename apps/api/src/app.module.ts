@@ -5,6 +5,8 @@ import { FlipperController } from './flipper/flipper.controller.js';
 import { FlipperIngestController } from './flipper/flipper-ingest.controller.js';
 import { ContentController } from './content/content.controller.js';
 import { HealthController } from './health.controller.js';
+import { GoClicksController } from './links/go-clicks.controller.js';
+import { LinksController } from './links/links.controller.js';
 import { OverviewController } from './overview/overview.controller.js';
 import { PreferencesController } from './preferences/preferences.controller.js';
 import { PrismaService } from './prisma.service.js';
@@ -25,8 +27,10 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
     ContentController,
     FlipperController,
     FlipperIngestController,
+    GoClicksController,
     HealthController,
     InvitationsController,
+    LinksController,
     OverviewController,
     PreferencesController,
     SalesController,

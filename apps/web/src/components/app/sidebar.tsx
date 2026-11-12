@@ -6,6 +6,7 @@ import {
   Images,
   ChartColumn,
   House,
+  Link2,
   Package,
   PanelLeftClose,
   PlugZap,
@@ -23,6 +24,7 @@ type NavKey =
   | 'home'
   | 'statistics'
   | 'content'
+  | 'links'
   | 'products'
   | 'orders'
   | 'flipper'
@@ -42,7 +44,14 @@ const NAV: { group?: 'promotion' | 'sales' | 'site'; items: NavItem[] }[] = [
       { key: 'statistics', href: '/statistics', icon: ChartColumn },
     ],
   },
-  { group: 'promotion', items: [{ key: 'content', href: '/content', icon: Images }] },
+  {
+    group: 'promotion',
+    items: [
+      { key: 'content', href: '/content', icon: Images },
+      // Tracked links (ADR-0027).
+      { key: 'links', href: '/links', icon: Link2 },
+    ],
+  },
   {
     group: 'sales',
     items: [
