@@ -16,6 +16,15 @@ import {
 import { Prisma } from '@adelie/db';
 import { periodOf } from './period.js';
 import { hashServerKey, newServerKey } from './server-purchase.js';
+import {
+  SITE_KINDS,
+  goalSql,
+  isSiteKind,
+  parseSettings,
+  settingsOf,
+  stepSql,
+  type Goal,
+} from './site-kinds.js';
 import { CONNECT_ROLES } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
 import { visibleProjectsWhere } from '../workspaces/project-visibility.js';
@@ -37,7 +46,6 @@ const hostOf = (url: string): string | null => {
   }
 };
 
-/** The funnel of a shop, in the order a customer goes through it. */
 /** What the sources report can be grouped by: a fixed list, so no column name comes from outside. */
 const GROUPS = {
   channel: Prisma.raw('"channel"'),
@@ -57,14 +65,6 @@ export const CHECKOUT_STEPS = [
   'DeliveryCitySelected',
   'DeliveryWarehouseSelected',
   'PaymentClicked',
-  'Purchase',
-] as const;
-
-export const FUNNEL = [
-  'ViewCategory',
-  'ProductView',
-  'AddToCart',
-  'BeginCheckout',
   'Purchase',
 ] as const;
 
@@ -90,10 +90,10 @@ export class FlipperController {
     const project = await this.visibleProject(ctx, projectId);
     const site = await this.prisma.client.trackedSite.findFirst({
       where: { accountId, projectId, workspaceId: ctx.workspaceId },
-      select: { id: true, publicId: true, accountId: true },
+      select: { id: true, publicId: true, accountId: true, kind: true, goals: true, funnel: true },
     });
     if (!site) throw new NotFoundException();
-    return { ...site, timeZone: project.timezone };
+    return { ...site, settings: settingsOf(site), timeZone: project.timezone };
   }
 
   /** The project's sites, and for those with a tracker: its id, and what arrived in a week. */
@@ -125,6 +125,9 @@ export class FlipperController {
             allowedHosts: true,
             consentMode: true,
             serverKeyHint: true,
+            kind: true,
+            goals: true,
+            funnel: true,
             createdAt: true,
           },
         },
@@ -152,6 +155,9 @@ export class FlipperController {
             allowedHosts: trackedSite.allowedHosts,
             consentMode: trackedSite.consentMode,
             serverKeyHint: trackedSite.serverKeyHint,
+            // What it measures (ADR-0026), with the kind's defaults filled in.
+            ...settingsOf(trackedSite),
+            customFunnel: trackedSite.funnel !== null,
             createdAt: trackedSite.createdAt,
             lastEventAt: last?.receivedAt ?? null,
             events7d,
@@ -167,8 +173,11 @@ export class FlipperController {
   async enable(
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Body() body: { kind?: unknown } | undefined,
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
+    const kind = body?.kind === undefined ? 'store' : body.kind;
+    if (!isSiteKind(kind)) throw new BadRequestException({ errors: { kind: 'invalid' } });
     await this.visibleProject(request.workspace, projectId);
     const db = this.prisma.client;
     const account = await db.socialAccount.findFirst({
@@ -190,6 +199,9 @@ export class FlipperController {
         accountId: account.id,
         publicId: newPublicId(),
         allowedHosts: host ? [host] : [],
+        // The kind's starting goals; the funnel follows the kind until it is changed.
+        kind,
+        goals: SITE_KINDS[kind].goals as unknown as Prisma.InputJsonValue,
       },
       select: { publicId: true },
     });
@@ -215,6 +227,38 @@ export class FlipperController {
       data: { consentMode: mode },
     });
     return { consentMode: mode };
+  }
+
+  /**
+   * What the site measures (ADR-0026): its kind, goals and funnel. `funnel: null` follows the
+   * kind's funnel. Nothing about stored events changes: the cabinet re-counts with the new rules.
+   */
+  @Patch(':accountId/settings')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async setSettings(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Body() body: { kind?: unknown; goals?: unknown; funnel?: unknown },
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const site = await this.siteOf(request.workspace, projectId, accountId);
+    const kind = body?.kind === undefined ? site.settings.kind : body.kind;
+    if (!isSiteKind(kind)) throw new BadRequestException({ errors: { kind: 'invalid' } });
+    const parsed = parseSettings(
+      body?.goals === undefined ? site.settings.goals : body.goals,
+      body?.funnel === undefined ? (site.funnel ?? null) : body.funnel,
+    );
+    if (!parsed.ok) throw new BadRequestException({ errors: { [parsed.error]: 'invalid' } });
+    const saved = await this.prisma.client.trackedSite.update({
+      where: { id: site.id },
+      data: {
+        kind,
+        goals: parsed.goals as unknown as Prisma.InputJsonValue,
+        funnel: parsed.funnel === null ? Prisma.DbNull : (parsed.funnel as Prisma.InputJsonValue),
+      },
+      select: { kind: true, goals: true, funnel: true },
+    });
+    return { ...settingsOf(saved), customFunnel: saved.funnel !== null };
   }
 
   /**
@@ -306,37 +350,61 @@ export class FlipperController {
     const { n, since } = periodOf(days, site.timeZone);
     const group = GROUPS[(by ?? 'channel') as keyof typeof GROUPS] ?? GROUPS.channel;
     const within = channel ? Prisma.sql`AND "channel" = ${channel}` : Prisma.empty;
-    const rows = await this.prisma.client.$queryRaw<
-      {
-        label: string;
-        visits: number;
-        visitors: number;
-        productViews: number;
-        addToCart: number;
-        checkouts: number;
-        purchases: number;
-        revenue: number | null;
-      }[]
-    >`
+    const { goals, funnel } = site.settings;
+    // The funnel's event steps after the first (visitors), and every goal (conversions and worth):
+    // the site's own columns (ADR-0026). A goal in the funnel is shown as a goal, not twice.
+    const steps = funnel.slice(1).filter((st): st is { event: string } => 'event' in st);
+    const columns = [
+      ...steps.map(
+        (st, i) =>
+          Prisma.sql`count(DISTINCT "visitorId") FILTER (WHERE ${stepSql(st, goals)})::int AS ${Prisma.raw(`"s${i}"`)}`,
+      ),
+      ...goals.flatMap((g, i) => goalColumns(g, i)),
+    ];
+    // Goals reached without a known source (a purchase reported by the shop's server) are a row
+    // of their own — unless one channel is looked at.
+    const anyGoal = goals.length
+      ? Prisma.join(
+          goals.map((g) => goalSql(g.rule)),
+          ' OR ',
+        )
+      : Prisma.sql`false`;
+    const rows = await this.prisma.client.$queryRaw<Record<string, number | string | null>[]>`
       SELECT coalesce(nullif(nullif(${group}, ''), ' / '), '(none)') AS label,
         (count(DISTINCT "sessionId") FILTER (WHERE consent AND name = 'PageView')
           + count(*) FILTER (WHERE NOT consent AND name = 'PageView'))::int AS visits,
-        count(DISTINCT "visitorId") FILTER (WHERE name = 'PageView')::int AS visitors,
-        count(DISTINCT "visitorId") FILTER (WHERE name = 'ProductView')::int AS "productViews",
-        count(DISTINCT "visitorId") FILTER (WHERE name = 'AddToCart')::int AS "addToCart",
-        count(DISTINCT "visitorId") FILTER (WHERE name = 'BeginCheckout')::int AS checkouts,
-        count(*) FILTER (WHERE name = 'Purchase')::int AS purchases,
-        sum(CASE WHEN name = 'Purchase' AND jsonb_typeof(properties->'value') = 'number'
-                 THEN (properties->>'value')::numeric END)::float8 AS revenue
+        count(DISTINCT "visitorId") FILTER (WHERE name = 'PageView')::int AS visitors
+        ${columns.length ? Prisma.sql`, ${Prisma.join(columns)}` : Prisma.empty}
       FROM website_event
       WHERE "siteId" = ${site.id}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
-        AND ("channel" IS NOT NULL OR (name = 'Purchase' AND ${channel ? Prisma.sql`false` : Prisma.sql`true`})) ${within}
-      GROUP BY 1 ORDER BY visits DESC, purchases DESC LIMIT 200`;
-    const currency = await this.prisma.client.$queryRaw<{ currency: string | null }[]>`
+        AND ("channel" IS NOT NULL OR ((${anyGoal}) AND ${channel ? Prisma.sql`false` : Prisma.sql`true`})) ${within}
+      GROUP BY 1 ORDER BY visits DESC LIMIT 200`;
+    return {
+      days: n,
+      currency: await this.currency(site.id),
+      steps,
+      goals: goals.map(({ id, name, valued }) => ({ id, name: name ?? null, valued: !!valued })),
+      rows: rows.map((r) => ({
+        label: r['label'] as string,
+        visits: r['visits'] as number,
+        visitors: r['visitors'] as number,
+        steps: steps.map((_, i) => r[`s${i}`] as number),
+        goals: goals.map((_, i) => ({
+          conversions: r[`g${i}c`] as number,
+          visitors: r[`g${i}v`] as number,
+          value: (r[`g${i}s`] as number | null) ?? null,
+        })),
+      })),
+    };
+  }
+
+  /** The site's currency: the latest one an event with a value reported. */
+  private async currency(siteId: string): Promise<string | null> {
+    const rows = await this.prisma.client.$queryRaw<{ currency: string | null }[]>`
       SELECT properties->>'currency' AS currency FROM website_event
-      WHERE "siteId" = ${site.id}::uuid AND name = 'Purchase' AND properties->>'currency' IS NOT NULL
+      WHERE "siteId" = ${siteId}::uuid AND properties->>'currency' IS NOT NULL
       ORDER BY "occurredAt" DESC LIMIT 1`;
-    return { days: n, currency: currency[0]?.currency ?? null, rows };
+    return rows[0]?.currency ?? null;
   }
 
   /**
@@ -410,7 +478,18 @@ export class FlipperController {
     const { n, since } = periodOf(days, site.timeZone);
     const db = this.prisma.client;
     const sid = site.id;
-    const [counts, daily, funnel, channels, products, consent] = await Promise.all([
+    const { goals, funnel: steps, tabs } = site.settings;
+    const stepColumns = steps.map(
+      (st, i) =>
+        Prisma.sql`count(DISTINCT "visitorId") FILTER (WHERE ${stepSql(st, goals)})::int AS ${Prisma.raw(`"s${i}"`)}`,
+    );
+    const goalStats = goals.length
+      ? db.$queryRaw<Record<string, number | null>[]>`
+          SELECT ${Prisma.join(goals.flatMap((g, i) => goalColumns(g, i)))}
+          FROM website_event
+          WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"`
+      : Promise.resolve([{}] as Record<string, number | null>[]);
+    const [counts, daily, funnel, channels, products, consent, reached] = await Promise.all([
       db.$queryRaw<{ name: string; events: number; visitors: number }[]>`
         SELECT name, count(*)::int AS events,
                count(DISTINCT coalesce("visitorId", "dailyId", "eventId"))::int AS visitors FROM website_event
@@ -423,11 +502,11 @@ export class FlipperController {
         FROM website_event
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot" AND name = 'PageView'
         GROUP BY 1 ORDER BY 1`,
-      db.$queryRaw<{ name: string; visitors: number }[]>`
-        SELECT name, count(DISTINCT "visitorId")::int AS visitors FROM website_event
+      // The site's funnel (ADR-0026): visitors who agreed, so a person is known across steps.
+      db.$queryRaw<Record<string, number>[]>`
+        SELECT ${Prisma.join(stepColumns)} FROM website_event
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
-          AND "visitorId" IS NOT NULL AND name IN (${Prisma.join([...FUNNEL])})
-        GROUP BY name`,
+          AND "visitorId" IS NOT NULL`,
       // A visit is a session of someone who agreed, or an arrival of someone who did not (their
       // page view of the landing is the only one that says where they came from): comparable.
       db.$queryRaw<{ channel: string; visits: number }[]>`
@@ -438,7 +517,10 @@ export class FlipperController {
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
           AND name = 'PageView' AND channel IS NOT NULL
         GROUP BY channel ORDER BY visits DESC LIMIT 10`,
-      db.$queryRaw<{ item: string; views: number; visitors: number }[]>`
+      // Products only where the kind has them (a shop).
+      !tabs.includes('products')
+        ? Promise.resolve([] as { item: string; views: number; visitors: number }[])
+        : db.$queryRaw<{ item: string; views: number; visitors: number }[]>`
         SELECT properties->>'item_id' AS item, count(*)::int AS views,
                count(DISTINCT coalesce("visitorId", "dailyId"))::int AS visitors
         FROM website_event
@@ -450,6 +532,7 @@ export class FlipperController {
                count(*) FILTER (WHERE NOT consent)::int AS anonymous
         FROM website_event
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"`,
+      goalStats,
     ]);
     // The viewed products by name, from the site's own catalogue (the article is the feed's g:id).
     const articles = products.map((p) => p.item);
@@ -466,15 +549,39 @@ export class FlipperController {
       const found = catalogue.find((c) => c.externalId === p.item || c.articles.includes(p.item));
       return { ...p, title: found?.title ?? null, url: found?.url ?? null };
     });
-    const byName = new Map(funnel.map((f) => [f.name, f.visitors]));
+    const f = funnel[0] ?? {};
+    const r = reached[0] ?? {};
     return {
       days: n,
+      kind: site.settings.kind,
+      tabs,
+      currency: goals.some((g) => g.valued) ? await this.currency(sid) : null,
       counts,
       daily,
-      funnel: FUNNEL.map((name) => ({ name, visitors: byName.get(name) ?? 0 })),
+      funnel: steps.map((step, i) => ({ ...step, visitors: f[`s${i}`] ?? 0 })),
+      goals: goals.map((g, i) => ({
+        id: g.id,
+        name: g.name ?? null,
+        valued: !!g.valued,
+        conversions: r[`g${i}c`] ?? 0,
+        visitors: r[`g${i}v`] ?? 0,
+        value: r[`g${i}s`] ?? null,
+      })),
       channels,
       products: named,
       consent: consent[0] ?? { consenting: 0, anonymous: 0 },
     };
   }
+}
+
+/** A goal's columns: conversions, people who reached it, and its worth (valued goals). */
+function goalColumns(goal: Goal, i: number): Prisma.Sql[] {
+  const when = goalSql(goal.rule);
+  return [
+    Prisma.sql`count(*) FILTER (WHERE ${when})::int AS ${Prisma.raw(`"g${i}c"`)}`,
+    Prisma.sql`count(DISTINCT coalesce("visitorId", "dailyId", "eventId")) FILTER (WHERE ${when})::int AS ${Prisma.raw(`"g${i}v"`)}`,
+    goal.valued
+      ? Prisma.sql`sum(CASE WHEN ${when} AND jsonb_typeof(properties->'value') = 'number' THEN (properties->>'value')::numeric END)::float8 AS ${Prisma.raw(`"g${i}s"`)}`
+      : Prisma.sql`NULL::float8 AS ${Prisma.raw(`"g${i}s"`)}`,
+  ];
 }

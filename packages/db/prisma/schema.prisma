@@ -901,6 +901,11 @@ model TrackedSite {
   /// itself is shown once. serverKeyHint is its last four characters, to tell keys apart.
   serverKeyHash String?      @unique
   serverKeyHint String?
+  /// What the site measures (ADR-0026): its kind ("store", "landing"), its goals and funnel steps.
+  /// Validated by the API; funnel null = the kind's funnel. Evaluated when reading.
+  kind         String        @default("store")
+  goals        Json          @default("[]")
+  funnel       Json?
   createdAt    DateTime      @default(now())
 
   events WebsiteEvent[]

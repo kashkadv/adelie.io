@@ -52,3 +52,4 @@
 - [ADR-0023](decisions/0023-tiktok-integration.md) — Інтеграція TikTok: статистика, публікація, редагування (запропоновано)
 - [ADR-0024](decisions/0024-promotion-strategy-module.md) — Модуль «План просування»: AI-помічник за даними, OpenAI (запропоновано)
 - [ADR-0025](decisions/0025-own-tool-first.md) — Adelie — власний інструмент на цьому етапі: що відкладаємо, критерії перевірки (запропоновано)
+- [ADR-0026](decisions/0026-flipper-site-goals.md) — Flipper: тип сайту, цілі й воронка як налаштування (прийнято)

@@ -1167,7 +1167,8 @@
       "ProductView": "Product views",
       "AddToCart": "Added to cart",
       "BeginCheckout": "Checkout started",
-      "Purchase": "Purchases"
+      "Purchase": "Purchases",
+      "OutboundClick": "Clicks to other sites"
     },
     "visitorsPerDay": "Unique visitors per day",
     "visitorsHint": "Each person is counted once a day: with consent by a persistent id, without it by an anonymous daily hash that does not link days. This is an estimate.",
@@ -1400,6 +1401,56 @@
     "visitorsCol": "Visitors",
     "pagePrev": "Previous page",
     "pageNext": "Next page",
-    "srcUnattributed": "Unattributed"
+    "srcUnattributed": "Unattributed",
+    "goalPresets": {
+      "purchase": "Purchases"
+    },
+    "srcValue": "{goal}: value",
+    "kind": "Site type",
+    "kindHint": "The type sets the starting goals, funnel and tabs: a shop has Checkout and products, a landing page does not. Changing it deletes no events.",
+    "kinds": {
+      "store": "Shop",
+      "landing": "Landing page"
+    },
+    "goalsTitle": "What we measure",
+    "goalsHint": "Goals are what counts as success for this site (a purchase, a download, a donation). They are counted from the events already collected, so a new or changed goal shows the past too.",
+    "goalsList": "Goals",
+    "goalsNone": "No goals yet. For a landing page add, e.g., “Download” — a click to the mod’s page.",
+    "goalsGoal": "goal",
+    "goalsRuleOutbound": "click to {target}",
+    "goalsRulePage": "page {pattern}",
+    "goalsRuleEvent": "event {event}",
+    "goalsValued": "with value",
+    "goalsAdd": "Add a goal",
+    "goalsEdit": "Edit goal",
+    "goalsRemove": "Remove",
+    "goalsRemoveConfirm": "Remove the goal “{goal}”? Events stay.",
+    "goalsCancel": "Cancel",
+    "goalsName": "Name",
+    "goalsNamePlaceholder": "Download",
+    "goalsType": "How to recognise it",
+    "goalsTypes": {
+      "outbound": "Click to another site",
+      "page": "Page",
+      "event": "Event"
+    },
+    "goalsHost": "Site",
+    "goalsHostHint": "The domain the link leads to: nexusmods.com, steamcommunity.com, ko-fi.com. Subdomains count too.",
+    "goalsPath": "Path start (optional)",
+    "goalsPathHint": "To count only a specific page: /ets2/mods/123. Empty — any click to that site.",
+    "goalsPattern": "Page path",
+    "goalsPatternHint": "A path on this site: /thanks. An asterisk matches anything: /download/* .",
+    "goalsEvent": "Event name",
+    "goalsEventHint": "A Flipper event: Purchase or the site’s own — flipper.track('Download').",
+    "goalsValuedLabel": "Count the value",
+    "goalsValuedHint": "Taken from the event’s value field (as in a purchase).",
+    "goalsError": "Check the fields: a name and a rule are needed (a site, a page starting with “/” or a latin event name).",
+    "goalsSave": "Save",
+    "goalsFunnelHint": "The steps a person takes towards the goal. Visitors who agreed to tracking are counted: only they can be followed from step to step.",
+    "goalsFunnelReset": "Back to the type’s funnel",
+    "goalsFunnelKind": "the site type’s funnel",
+    "goalsUp": "Up",
+    "goalsDown": "Down",
+    "goalsAddStep": "Add a step"
   }
 }

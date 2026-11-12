@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { apiUrl } from '@/lib/auth-client';
 import { InfoTip } from '../ui/info-tip';
 import { FlipperCheckout } from './flipper-checkout';
+import { FlipperGoals, type SiteKindId, type SiteSettings } from './flipper-goals';
 import { FlipperSources } from './flipper-sources';
 import { Segmented } from '../ui/segmented';
 import { CONNECT_ROLES } from './accounts-data';
@@ -21,22 +22,36 @@ type Site = {
   username: string | null;
   displayName: string | null;
   host: string | null;
-  site: {
-    publicId: string;
-    allowedHosts: string[];
-    consentMode: 'anonymous' | 'granted';
-    serverKeyHint: string | null;
-    createdAt: string;
-    lastEventAt: string | null;
-    events7d: number;
-  } | null;
+  site:
+    | ({
+        publicId: string;
+        allowedHosts: string[];
+        consentMode: 'anonymous' | 'granted';
+        serverKeyHint: string | null;
+        createdAt: string;
+        lastEventAt: string | null;
+        events7d: number;
+      } & SiteSettings)
+    | null;
 };
 
 type Summary = {
   days: number;
+  kind: SiteKindId;
+  tabs: string[];
+  currency: string | null;
   counts: { name: string; events: number; visitors: number }[];
   daily: { day: string; visitors: number; views: number }[];
-  funnel: { name: string; visitors: number }[];
+  /** The site's funnel (ADR-0026): event or goal steps. */
+  funnel: (({ event: string } | { goal: string }) & { visitors: number })[];
+  goals: {
+    id: string;
+    name: string | null;
+    valued: boolean;
+    conversions: number;
+    visitors: number;
+    value: number | null;
+  }[];
   channels: { channel: string; visits: number }[];
   products: {
     item: string;
@@ -85,14 +100,6 @@ function daily(summary: Summary | null) {
   });
 }
 
-const STANDARD = [
-  'PageView',
-  'ViewCategory',
-  'ProductView',
-  'AddToCart',
-  'BeginCheckout',
-  'Purchase',
-] as const;
 const PERIODS = ['today', '7', '30', '90'] as const;
 const PRODUCTS_PER_PAGE = 10;
 
@@ -148,7 +155,10 @@ export function Flipper() {
 
   const current = sites?.find((s) => s.id === chosen) ?? sites?.[0];
   const site = current?.site ?? null;
-  const tab: Tab = tabChoice ?? (site?.lastEventAt ? 'analytics' : 'settings');
+  const chosenTab: Tab = tabChoice ?? (site?.lastEventAt ? 'analytics' : 'settings');
+  // A tab the site's kind does not have (after switching sites or kinds) falls back to analytics.
+  const tab: Tab =
+    chosenTab === 'checkout' && !site?.tabs.includes('checkout') ? 'analytics' : chosenTab;
 
   // What arrived: the summary for the period, and the latest events — fresh every few seconds.
   useEffect(() => {
@@ -220,6 +230,25 @@ export function Flipper() {
     format.dateTime(new Date(iso), { dateStyle: 'medium', timeStyle: 'short' });
   const time = (iso: string) => format.dateTime(new Date(iso), { timeStyle: 'medium' });
   const count = (name: string) => summary?.counts.find((c) => c.name === name)?.events ?? 0;
+  const eventLabel = (e: string) =>
+    t.has(`events.${e}` as 'events.PageView') ? t(`events.${e}` as 'events.PageView') : e;
+  const goalLabel = (g: { id: string; name?: string | null }) =>
+    g.name ||
+    (t.has(`goalPresets.${g.id}` as 'goalPresets.purchase')
+      ? t(`goalPresets.${g.id}` as 'goalPresets.purchase')
+      : g.id);
+  const stepLabel = (step: { event: string } | { goal: string }) => {
+    if ('event' in step) return eventLabel(step.event);
+    const goal = site?.goals.find((g) => g.id === step.goal);
+    return goal ? goalLabel(goal) : step.goal;
+  };
+  // Tiles: page views and the funnel's events (each once), the goals come after them.
+  const tileEvents = [
+    'PageView',
+    ...(site?.funnel ?? []).flatMap((st) =>
+      'event' in st && st.event !== 'PageView' ? [st.event] : [],
+    ),
+  ];
   const people = (name: string) => summary?.counts.find((c) => c.name === name)?.visitors ?? 0;
 
   if (sites && sites.length === 0) {
@@ -309,7 +338,9 @@ export function Flipper() {
               options={[
                 { value: 'analytics', label: t('tabAnalytics') },
                 { value: 'sources', label: t('tabSources') },
-                { value: 'checkout', label: t('tabCheckout') },
+                ...(site.tabs.includes('checkout')
+                  ? [{ value: 'checkout' as const, label: t('tabCheckout') }]
+                  : []),
                 { value: 'live', label: t('live') },
                 { value: 'settings', label: t('tabSettings') },
               ]}
@@ -371,42 +402,54 @@ export function Flipper() {
                 />
               </section>
 
-              <section className="card animate-rise mb-6 rounded-[24px] p-5">
-                <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-                    {t('serverTitle')}
-                    <InfoTip text={t('serverHint')} />
-                  </h2>
-                  <span className="text-xs text-muted">
-                    {site.serverKeyHint
-                      ? t('serverKeySet', { hint: site.serverKeyHint })
-                      : t('serverKeyNone')}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      if (!site.serverKeyHint || window.confirm(t('serverRegenerate')))
-                        void makeKey();
-                    }}
-                    className="rounded-full border border-line px-3 py-1 text-xs hover:text-foreground"
-                  >
-                    {site.serverKeyHint ? t('serverNewKey') : t('serverMakeKey')}
-                  </button>
-                </div>
-                <p className="mb-2 text-xs text-muted">{t('serverUrl')}</p>
-                <CodeBlock code={`POST ${apiUrl}/collect/server`} label={t('serverUrl')} />
-                {newKey && (
-                  <>
-                    <div className="mt-2">
-                      <CodeBlock code={newKey} label={t('serverTitle')} />
-                    </div>
-                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                      {t('serverShownOnce')}
-                    </p>
-                  </>
-                )}
-              </section>
+              {base && (
+                <FlipperGoals
+                  base={base}
+                  accountId={current.id}
+                  settings={site}
+                  canManage={canManage}
+                  onSaved={() => setVersion((v) => v + 1)}
+                />
+              )}
+
+              {site.tabs.includes('checkout') && (
+                <section className="card animate-rise mb-6 rounded-[24px] p-5">
+                  <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                      {t('serverTitle')}
+                      <InfoTip text={t('serverHint')} />
+                    </h2>
+                    <span className="text-xs text-muted">
+                      {site.serverKeyHint
+                        ? t('serverKeySet', { hint: site.serverKeyHint })
+                        : t('serverKeyNone')}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        if (!site.serverKeyHint || window.confirm(t('serverRegenerate')))
+                          void makeKey();
+                      }}
+                      className="rounded-full border border-line px-3 py-1 text-xs hover:text-foreground"
+                    >
+                      {site.serverKeyHint ? t('serverNewKey') : t('serverMakeKey')}
+                    </button>
+                  </div>
+                  <p className="mb-2 text-xs text-muted">{t('serverUrl')}</p>
+                  <CodeBlock code={`POST ${apiUrl}/collect/server`} label={t('serverUrl')} />
+                  {newKey && (
+                    <>
+                      <div className="mt-2">
+                        <CodeBlock code={newKey} label={t('serverTitle')} />
+                      </div>
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                        {t('serverShownOnce')}
+                      </p>
+                    </>
+                  )}
+                </section>
+              )}
 
               <h2 className="mb-3 px-3.5 text-lg font-semibold">{t('guideTitle')}</h2>
               <FlipperGuide scriptUrl={`${apiUrl}/flipper.js`} siteId={site.publicId} />
@@ -512,10 +555,11 @@ export function Flipper() {
                 )}
               </div>
 
+              {/* Page views, the funnel's events, then the site's goals (ADR-0026). */}
               <dl className="animate-rise mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-                {STANDARD.map((n) => (
+                {tileEvents.map((n) => (
                   <div key={n} className="rounded-2xl bg-hover px-3 py-2.5">
-                    <dt className="text-xs text-muted">{t(`events.${n}`)}</dt>
+                    <dt className="text-xs text-muted">{eventLabel(n)}</dt>
                     <dd className="tabular mt-0.5 font-display text-lg font-semibold">
                       {summary ? format.number(count(n)) : '—'}
                     </dd>
@@ -526,6 +570,24 @@ export function Flipper() {
                     )}
                   </div>
                 ))}
+                {(summary?.goals ?? site.goals.map((g) => ({ ...g, name: g.name ?? null }))).map(
+                  (g) => {
+                    const reached = summary?.goals.find((x) => x.id === g.id);
+                    return (
+                      <div key={`goal-${g.id}`} className="rounded-2xl bg-hover px-3 py-2.5">
+                        <dt className="text-xs text-muted">{goalLabel(g)}</dt>
+                        <dd className="tabular mt-0.5 font-display text-lg font-semibold">
+                          {reached ? format.number(reached.conversions) : '—'}
+                        </dd>
+                        {reached && (
+                          <dd className="tabular text-xs text-muted">
+                            {t('tileVisitors', { count: reached.visitors })}
+                          </dd>
+                        )}
+                      </div>
+                    );
+                  },
+                )}
               </dl>
 
               {days !== 'today' && (
@@ -547,10 +609,11 @@ export function Flipper() {
                   <ul className="grid gap-3">
                     {(summary?.funnel ?? []).map((step, i, all) => {
                       const previous = i > 0 ? all[i - 1]!.visitors : 0;
+                      const key = 'event' in step ? step.event : `goal-${step.goal}`;
                       return (
-                        <li key={step.name}>
+                        <li key={key}>
                           <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
-                            <span>{t(`events.${step.name as 'ViewCategory'}`)}</span>
+                            <span>{stepLabel(step)}</span>
                             <span className="tabular">
                               {i > 0 && previous > 0 && (
                                 <span className="mr-2 text-xs text-muted">

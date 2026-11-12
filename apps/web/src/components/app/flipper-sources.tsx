@@ -20,11 +20,22 @@ type Row = {
   label: string;
   visits: number;
   visitors: number;
-  productViews: number;
-  addToCart: number;
-  checkouts: number;
-  purchases: number;
-  revenue: number | null;
+  /** Visitors at each event step of the site's funnel (after the first). */
+  steps: number[];
+  /** Per goal: conversions and their worth. */
+  goals: { conversions: number; visitors: number; value: number | null }[];
+};
+type Data = {
+  currency: string | null;
+  steps: { event: string }[];
+  goals: { id: string; name: string | null; valued: boolean }[];
+  rows: Row[];
+};
+/** The shop's columns keep their old names (ADR-0026: nothing changes for a shop). */
+const STEP_LABELS: Record<string, 'srcProductViews' | 'srcAddToCart' | 'srcCheckouts'> = {
+  ProductView: 'srcProductViews',
+  AddToCart: 'srcAddToCart',
+  BeginCheckout: 'srcCheckouts',
 };
 
 /** Where visitors came from, in detail: any dimension of the campaign labels, with what they did. */
@@ -41,31 +52,62 @@ export function FlipperSources({
   const format = useFormatter();
   const [by, setBy] = useState<Group>('channel');
   const [channel, setChannel] = useState<string | null>(null);
-  const [data, setData] = useState<{ currency: string | null; rows: Row[] } | null>(null);
+  const [data, setData] = useState<Data | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const query = new URLSearchParams({ days, by });
     if (channel) query.set('channel', channel);
-    void api<{ currency: string | null; rows: Row[] }>(
-      `${base}/${accountId}/sources?${query.toString()}`,
-    ).then(
+    void api<Data>(`${base}/${accountId}/sources?${query.toString()}`).then(
       (d) => !cancelled && setData(d),
-      () => !cancelled && setData({ currency: null, rows: [] }),
+      () => !cancelled && setData({ currency: null, steps: [], goals: [], rows: [] }),
     );
     return () => {
       cancelled = true;
     };
   }, [base, accountId, days, by, channel]);
 
-  const columns: { key: keyof Row; label: string }[] = [
-    { key: 'visits', label: t('srcVisits') },
-    { key: 'productViews', label: t('srcProductViews') },
-    { key: 'addToCart', label: t('srcAddToCart') },
-    { key: 'checkouts', label: t('srcCheckouts') },
-    { key: 'purchases', label: t('srcPurchases') },
-    { key: 'revenue', label: t('srcRevenue') },
-  ];
+  const eventLabel = (e: string) =>
+    STEP_LABELS[e]
+      ? t(STEP_LABELS[e])
+      : t.has(`events.${e}` as 'events.PageView')
+        ? t(`events.${e}` as 'events.PageView')
+        : e;
+  const goalLabel = (g: Data['goals'][number]) =>
+    g.name ??
+    (g.id === 'purchase'
+      ? t('srcPurchases')
+      : t.has(`goalPresets.${g.id}` as 'goalPresets.purchase')
+        ? t(`goalPresets.${g.id}` as 'goalPresets.purchase')
+        : g.id);
+  // The site's columns: visits, its funnel steps, then each goal (and its worth when valued).
+  const columns: { key: string; label: string; value: (r: Row) => string }[] = data
+    ? [
+        { key: 'visits', label: t('srcVisits'), value: (r) => format.number(r.visits) },
+        ...data.steps.map((st, i) => ({
+          key: `s${i}`,
+          label: eventLabel(st.event),
+          value: (r: Row) => format.number(r.steps[i] ?? 0),
+        })),
+        ...data.goals.flatMap((g, i) => [
+          {
+            key: `g${i}`,
+            label: goalLabel(g),
+            value: (r: Row) => format.number(r.goals[i]?.conversions ?? 0),
+          },
+          ...(g.valued
+            ? [
+                {
+                  key: `g${i}v`,
+                  label:
+                    g.id === 'purchase' ? t('srcRevenue') : t('srcValue', { goal: goalLabel(g) }),
+                  value: (r: Row) => money(r.goals[i]?.value ?? null),
+                },
+              ]
+            : []),
+        ]),
+      ]
+    : [];
   const money = (v: number | null) =>
     v === null || v === 0
       ? '—'
@@ -160,7 +202,7 @@ export function FlipperSources({
                   </td>
                   {columns.map((c) => (
                     <td key={c.key} className="tabular py-2 pl-3 text-right">
-                      {c.key === 'revenue' ? money(r.revenue) : format.number(r[c.key] as number)}
+                      {c.value(r)}
                     </td>
                   ))}
                 </tr>
