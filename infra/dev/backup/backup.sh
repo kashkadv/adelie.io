@@ -47,7 +47,29 @@ fi
 log "restore check ok ($(wc -l < "$DIR/last-check.txt") tables, $(du -h "$file" | cut -f1))"
 
 # A weekly copy on Sundays; then keep the newest N of each.
-if [ "$(date +%u)" = 7 ]; then cp "$file" "$DIR/weekly/"; fi
+weekly=0
+if [ "$(date +%u)" = 7 ]; then cp "$file" "$DIR/weekly/"; weekly=1; fi
+
+# Off-site copy (Cloudflare R2): encrypted with age to a public key — the private key is not on
+# this server, so neither the server nor the bucket can read old copies. Enabled by
+# ~/adelie/backup/r2.env (RCLONE_CONFIG_R2_* and AGE_RECIPIENT); retention — the bucket's lifecycle.
+R2_ENV=${R2_ENV:-$HOME/adelie/backup/r2.env}
+BIN=${BIN:-$HOME/adelie/bin}
+if [ -f "$R2_ENV" ]; then
+  # shellcheck disable=SC1090
+  set -a; . "$R2_ENV"; set +a
+  enc="$file.age"
+  "$BIN/age" -r "$AGE_RECIPIENT" -o "$enc" "$file"
+  "$BIN/rclone" copyto "$enc" "r2:$R2_BUCKET/daily/$(basename "$enc")"
+  if [ "$weekly" = 1 ]; then
+    "$BIN/rclone" copyto "$enc" "r2:$R2_BUCKET/weekly/$(basename "$enc")"
+  fi
+  rm -f "$enc"
+  log "off-site copy → r2:$R2_BUCKET"
+  date -Iseconds > "$DIR/last-offsite"
+else
+  log "off-site copy skipped (no $R2_ENV)"
+fi
 prune() { # keep the newest $2 dumps in $1 (names sort by date)
   local files=("$1"/*.dump)
   [ -e "${files[0]}" ] || return 0

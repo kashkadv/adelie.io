@@ -18,7 +18,11 @@
 читання цієї теки, `rrsync -ro`). Копії на хості не видаляються разом із VM-копіями: якщо щось станеться з VM, хост
 зберігає своє.
 
-**3. Копія поза домом** — ще не вирішено (див. «Відкрите»).
+**3. Копія поза домом — Cloudflare R2** (обрано 2026-11-12): той самий скрипт шифрує дамп `age` на **публічний** ключ
+(приватний — лише у власника, не на сервері) і відправляє `rclone` у бакет `adelie-backups`: `daily/…dump.age`, у
+неділю ще `weekly/…`. Термін зберігання в R2 — правило життєвого циклу бакета. Вмикається файлом
+`~/adelie/backup/r2.env` (права 600); програми — `~/adelie/bin/age` (v1.2.1) і `~/adelie/bin/rclone` (v1.69.1), без
+`sudo`. Час останньої копії поза домом — `~/backups/last-offsite`.
 
 Розмір (2026-11-12): база 46 МБ, дамп 7,3 МБ (перевірка відновлення — ~5 с).
 
@@ -48,8 +52,24 @@ docker exec -i adelie-dev-postgres-1 pg_restore -U adelie -d adelie_restored --n
 # … або замість робочої (зупинити api і worker, перейменувати бази, запустити знову)
 ```
 
+## Налаштування R2 (одноразово)
+
+1. Cloudflare → R2 → **Create bucket** `adelie-backups`. Settings → **Object lifecycle rules**: префікс `daily/` —
+   видаляти через 30 днів; `weekly/` — через 180 днів.
+2. R2 → **Manage R2 API Tokens** → Create: дозвіл **Object Read & Write**, лише бакет `adelie-backups`. Дає Access Key
+   ID, Secret Access Key; Account ID — у правій колонці R2.
+3. На Mac: `brew install age && age-keygen -o ~/adelie-backup.agekey` — **приватний ключ зберегти в менеджері паролів**
+   (без нього копії не відновити), файл видалити; публічний ключ (`age1…`) — не секрет.
+4. Записати налаштування на VM (секрети не потрапляють ні в чат, ні в історію терміналу):
+
+```bash
+ssh -t adelie@adelie 'read -rp "R2 account id: " A; read -rsp "R2 access key id: " K; echo; read -rsp "R2 secret access key: " S; echo; read -rp "age public key (age1…): " P; umask 077; printf "RCLONE_CONFIG_R2_TYPE=s3\nRCLONE_CONFIG_R2_PROVIDER=Cloudflare\nRCLONE_CONFIG_R2_ACCESS_KEY_ID=%s\nRCLONE_CONFIG_R2_SECRET_ACCESS_KEY=%s\nRCLONE_CONFIG_R2_ENDPOINT=https://%s.r2.cloudflarestorage.com\nRCLONE_CONFIG_R2_NO_CHECK_BUCKET=true\nR2_BUCKET=adelie-backups\nAGE_RECIPIENT=%s\n" "$K" "$S" "$A" "$P" > ~/adelie/backup/r2.env; echo saved'
+```
+
+**Відновлення з R2:** `rclone copy r2:adelie-backups/daily/<файл>.age .` → `age -d -i adelie-backup.agekey -o x.dump
+<файл>.age` → `pg_restore` (див. вище).
+
 ## Відкрите
 
-- **Копія поза домом** (пожежа, крадіжка, вихід з ладу диска хоста): кандидати — Cloudflare R2 (акаунт уже є, 10 ГБ
-  безкоштовно), Backblaze B2, Google Drive через rclone. Шифрувати перед відправкою (`age`), ключ — поза сервером.
+- Копія на хост Proxmox (п. 2) і щонічний таймер на VM — потребують `sudo` / доступу root на хості, чекають дозволу.
 - Скрипт пише в журнал systemd; сповіщення про невдалу копію — разом зі сповіщеннями застосунку.
