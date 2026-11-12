@@ -64,7 +64,8 @@ if [ -f "$R2_ENV" ]; then
   if [ "$weekly" = 1 ]; then
     "$BIN/rclone" -q copyto "$enc" "r2:$R2_BUCKET/weekly/$(basename "$enc")"
   fi
-  rm -f "$enc"
+  # The newest encrypted copy stays here too: `pnpm backup:pull` fetches it to the owner's Mac.
+  mv "$enc" "$DIR/latest.dump.age"
   log "off-site copy → r2:$R2_BUCKET"
   date -Iseconds > "$DIR/last-offsite"
 else

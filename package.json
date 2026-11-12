@@ -18,7 +18,8 @@
     "db:studio": "pnpm --filter @adelie/db studio",
     "env:pull": "bash scripts/env-pull.sh",
     "deploy:edge": "bash scripts/deploy-edge.sh",
-    "deploy:dev": "bash scripts/deploy-app.sh dev"
+    "deploy:dev": "bash scripts/deploy-app.sh dev",
+    "backup:pull": "bash scripts/backup-pull.sh"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
