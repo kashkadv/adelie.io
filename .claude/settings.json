@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm *)",
+      "Bash(pnpm exec *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(source ~/.nvm/nvm.sh *)",
+      "Bash(cd * && source ~/.nvm/nvm.sh *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git pull*)",
+      "Bash(git push)",
+      "Bash(git push origin main)",
+      "Bash(git stash *)",
+      "Bash(git clone *)",
+      "Bash(gh run *)",
+      "Bash(gh pr *)",
+      "Bash(docker compose *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(find *)",
+      "Bash(mkdir *)",
+      "Bash(curl -s *)",
+      "Bash(curl -sS *)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)"
+    ]
+  }
+}
