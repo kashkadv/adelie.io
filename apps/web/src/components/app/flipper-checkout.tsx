@@ -71,15 +71,15 @@ export function FlipperCheckout({
         <h2 className="mb-3 text-sm font-semibold">{t('chkSteps')}</h2>
         <ul className="grid gap-3">
           {(data?.steps ?? []).map((step, i, all) => {
-            const previous = i > 0 ? all[i - 1]!.visitors : 0;
+            const started = all[0]?.visitors ?? 0;
             return (
               <li key={step.name}>
                 <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
                   <span>{t(`chkStep.${step.name}` as 'chkStep.Purchase')}</span>
                   <span className="tabular">
-                    {i > 0 && previous > 0 && (
+                    {i > 0 && started > 0 && (
                       <span className="mr-2 text-xs text-muted">
-                        {Math.round((step.visitors / previous) * 100)}%
+                        {Math.round((step.visitors / started) * 100)}%
                       </span>
                     )}
                     {format.number(step.visitors)}
