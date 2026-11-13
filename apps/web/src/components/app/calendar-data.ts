@@ -30,6 +30,8 @@ export interface CalendarItem {
   /** An AI idea (ADR-0029): why it was proposed, and on what evidence. */
   why: string | null;
   evidence: 'hypothesis' | 'results' | null;
+  /** An AI proposal waiting for a decision (ADR-0030); null = part of the plan. */
+  suggestion: 'pending' | 'rejected' | null;
   link: {
     id: string;
     code: string;
@@ -79,6 +81,7 @@ export interface ReviewGroup {
 
 export interface WeekReview {
   weekStart: string;
+  focus: WeekFocus;
   dailyMinutes: number | null;
   plan: { items: number; minutes: number };
   fact: { items: number; minutes: number };
@@ -122,3 +125,12 @@ export function postNumbers(latest: NonNullable<CalendarItem['post']>['latest'])
 }
 const sum = (...v: (number | null)[]) =>
   v.some((x) => x !== null) ? v.reduce<number>((n, x) => n + (x ?? 0), 0) : null;
+
+/** The week's focus among the brief's directions (ADR-0030). */
+export interface WeekFocus {
+  directions: { id: string; name: string }[];
+  /** A direction id, or "all". */
+  value: string;
+  /** Not chosen for this week: alternating from the last choice. */
+  isDefault: boolean;
+}

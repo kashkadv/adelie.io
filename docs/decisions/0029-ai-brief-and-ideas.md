@@ -1,6 +1,6 @@
 # ADR-0029: Бриф проєкту й ідеї AI для календаря
 
-- **Статус:** прийнято
+- **Статус:** прийнято; пункти 1–2 замінено [ADR-0030](0030-brief-directions-week-focus.md)
 - **Дата:** 2026-11-13
 - **Пов'язані:** [ADR-0024](0024-promotion-strategy-module.md), [ADR-0028](0028-content-calendar.md),
   [specs/promotion-strategy.md](../specs/promotion-strategy.md) (п. 3–4, 7)

@@ -2,6 +2,7 @@
 
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -9,13 +10,15 @@ import {
   Link2,
   Plus,
   Sparkles,
+  X,
 } from 'lucide-react';
-import { useFormatter, useLocale, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useState, type DragEvent } from 'react';
+import { useFormatter, useLocale, useTranslations, type DateTimeFormatOptions } from 'next-intl';
+import { useCallback, useEffect, useState, type DragEvent, type ReactNode } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { InfoTip } from '../ui/info-tip';
 import { usePopover } from '../ui/popover';
 import { Segmented } from '../ui/segmented';
+import { Select } from '../ui/select';
 import { CONNECT_ROLES } from './accounts-data';
 import {
   addDays,
@@ -24,6 +27,7 @@ import {
   todayDay,
   weekStartOf,
   type CalendarItem,
+  type WeekFocus,
 } from './calendar-data';
 import { CalendarBrief } from './calendar-brief';
 import { CalendarItemDialog } from './calendar-item-dialog';
@@ -35,17 +39,27 @@ import { useWorkspace } from './workspace-context';
 type Tab = 'week' | 'review' | 'brief';
 type IdeasNotice =
   | { kind: 'created'; count: number; cost: number; spent: number; limit: number }
-  | { kind: 'brief' | 'limit' | 'off' | 'failed' };
-/** Where a dragged card lands: a day (null = ideas) and the card it goes before. */
+  | { kind: 'brief' | 'limit' | 'off' | 'failed' | 'past' };
+/** Where a dragged row lands: a day (null = ideas) and the row it goes before. */
 type Drop = { date: string | null; before: string | null };
+interface WeekData {
+  dailyMinutes: number | null;
+  today: string;
+  focus: WeekFocus;
+  items: CalendarItem[];
+  suggestions: CalendarItem[];
+}
 
 /**
- * Content calendar (ADR-0028): the week by days with the time planned against the project's daily
- * budget, ideas without a day, cards moved by dragging; and the review of a week.
+ * Content calendar (ADR-0028, ADR-0030): the AI's proposals for the week to accept or turn down,
+ * the week as a list of days (time planned against the daily budget, past days folded), ideas
+ * without a day, rows moved by dragging; the week's focus among the brief's directions; the review
+ * of a week and the brief.
  */
 export function Calendar() {
   const t = useTranslations('Calendar');
   const format = useFormatter();
+  const locale = useLocale();
   const { workspace, project } = useWorkspace();
   const canManage = !!workspace && CONNECT_ROLES.includes(workspace.role);
   const root = workspace && project ? `/workspaces/${workspace.id}/projects/${project.id}` : null;
@@ -54,21 +68,38 @@ export function Calendar() {
 
   const [tab, setTab] = useState<Tab>('week');
   const [week, setWeek] = useState(() => weekStartOf(todayDay()));
-  const [items, setItems] = useState<CalendarItem[] | null>(null);
-  const [budget, setBudget] = useState<number | null>(null);
+  const [data, setData] = useState<WeekData | null>(null);
   const [version, setVersion] = useState(0);
   const [dialog, setDialog] = useState<{ item: CalendarItem } | { date: string | null } | null>(
     null,
   );
-  const locale = useLocale();
   const [suggesting, setSuggesting] = useState(false);
   const [notice, setNotice] = useState<IdeasNotice | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<Drop | null>(null);
+  const [showPast, setShowPast] = useState(false);
+  const [showIdeas, setShowIdeas] = useState(true);
 
   const reload = useCallback(() => setVersion((v) => v + 1), []);
+  useEffect(() => {
+    if (!base) return;
+    let cancelled = false;
+    api<WeekData>(`${base}?from=${week}&to=${addDays(week, 6)}`).then(
+      (r) => !cancelled && setData(r),
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [base, week, version]);
 
-  /** Ideas for the shown week from the AI (ADR-0029): they land in Ideas, the page reloads. */
+  const goWeek = (w: string) => {
+    setWeek(w);
+    setData(null);
+    setShowPast(false);
+  };
+
+  /** Proposals for the rest of the shown week from the AI (ADR-0030). */
   async function suggest() {
     if (!base || suggesting) return;
     setSuggesting(true);
@@ -94,43 +125,67 @@ export function Calendar() {
       const kind =
         errors?.['brief'] === 'missing'
           ? 'brief'
-          : errors?.['ai'] === 'limit'
-            ? 'limit'
-            : errors?.['ai'] === 'off'
-              ? 'off'
-              : 'failed';
+          : errors?.['week'] === 'past'
+            ? 'past'
+            : errors?.['ai'] === 'limit'
+              ? 'limit'
+              : errors?.['ai'] === 'off'
+                ? 'off'
+                : 'failed';
       setNotice({ kind });
       if (kind === 'brief') setTab('brief');
     } finally {
       setSuggesting(false);
     }
   }
-  useEffect(() => {
-    if (!base || tab !== 'week') return;
-    let cancelled = false;
-    api<{ dailyMinutes: number | null; items: CalendarItem[] }>(
-      `${base}?from=${week}&to=${addDays(week, 6)}`,
-    ).then(
-      (r) => {
-        if (cancelled) return;
-        setItems(r.items);
-        setBudget(r.dailyMinutes);
-      },
-      () => !cancelled && setItems([]),
+
+  async function decide(item: CalendarItem, json: Record<string, unknown>) {
+    if (!base) return;
+    setData((d) =>
+      d
+        ? {
+            ...d,
+            suggestions:
+              'suggestion' in json
+                ? d.suggestions.filter((s) => s.id !== item.id)
+                : d.suggestions.map((s) => (s.id === item.id ? { ...s, ...json } : s)),
+          }
+        : d,
     );
-    return () => {
-      cancelled = true;
-    };
-  }, [base, week, tab, version]);
+    await api(`${base}/${item.id}`, { method: 'PATCH', json }).catch(() => undefined);
+    reload();
+  }
 
+  async function acceptAll() {
+    if (!base) return;
+    await api(`${base}/suggestions/accept`, { method: 'POST', json: { week } }).catch(
+      () => undefined,
+    );
+    reload();
+  }
+
+  async function setFocus(focus: string) {
+    if (!base) return;
+    const r = await api<WeekFocus>(`${base}/week`, { method: 'PUT', json: { week, focus } }).catch(
+      () => null,
+    );
+    if (r) setData((d) => (d ? { ...d, focus: r } : d));
+  }
+
+  const items = data?.items ?? [];
+  const today = data?.today ?? todayDay();
+  const budget = data?.dailyMinutes ?? null;
   const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
-  const today = todayDay();
+  const pastDays = days.filter((d) => d < today);
+  const comingDays = days.filter((d) => d >= today);
   const inDay = (date: string | null) =>
-    (items ?? []).filter((i) => i.date === date).sort((a, b) => a.position - b.position);
+    items.filter((i) => i.date === date).sort((a, b) => a.position - b.position);
+  const dayLabel = (date: string, opts: DateTimeFormatOptions) =>
+    format.dateTime(asDate(date), { ...opts, timeZone: 'UTC' });
 
-  /** Moves a card and renumbers its new day; only changed cards are saved. */
+  /** Moves a row and renumbers its new day; only changed rows are saved. */
   async function move(id: string, drop: Drop) {
-    if (!base || !items) return;
+    if (!base) return;
     const moved = items.find((i) => i.id === id);
     if (!moved) return;
     const target = inDay(drop.date).filter((i) => i.id !== id);
@@ -139,11 +194,16 @@ export function Calendar() {
     const changes = target
       .map((item, position) => ({ item, position }))
       .filter(({ item, position }) => item.id === id || item.position !== position);
-    setItems((all) =>
-      (all ?? []).map((i) => {
-        const c = changes.find((x) => x.item.id === i.id);
-        return c ? { ...i, date: drop.date, position: c.position } : i;
-      }),
+    setData((d) =>
+      d
+        ? {
+            ...d,
+            items: d.items.map((i) => {
+              const c = changes.find((x) => x.item.id === i.id);
+              return c ? { ...i, date: drop.date, position: c.position } : i;
+            }),
+          }
+        : d,
     );
     await Promise.all(
       changes.map(({ item, position }) =>
@@ -173,7 +233,8 @@ export function Calendar() {
     },
   });
 
-  const card = (item: CalendarItem) => (
+  /** One publication as a full-width row. */
+  const row = (item: CalendarItem) => (
     <li
       key={item.id}
       draggable={canManage}
@@ -190,104 +251,274 @@ export function Calendar() {
       className={`transition-opacity ${dragging === item.id ? 'opacity-40' : ''}`}
     >
       {over?.before === item.id && dragging !== item.id && (
-        <div className="mb-1.5 h-0.5 rounded-full bg-accent" />
+        <div className="mb-1 h-0.5 rounded-full bg-accent" />
       )}
       <button
         type="button"
         onClick={() => setDialog({ item })}
-        className="block w-full rounded-2xl border border-line bg-[var(--card)] p-2.5 text-left text-sm shadow-[0_6px_18px_-12px_var(--shadow)] transition-colors hover:bg-hover"
+        className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-sm transition-colors hover:bg-hover"
       >
-        <span className="flex items-center gap-1.5 text-xs text-muted">
-          <ChannelIcon channel={item.channel} />
-          <span className="truncate">{t(`formats.${item.format}`)}</span>
-          {item.link && <Link2 size={12} className="shrink-0" aria-label={t('hasLink')} />}
-          {item.why && <Sparkles size={12} className="ml-auto shrink-0" aria-label={t('fromAi')} />}
+        <ChannelIcon channel={item.channel} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate">{item.title}</span>
+          <span className="block truncate text-xs text-muted">{t(`formats.${item.format}`)}</span>
         </span>
-        <span className="mt-1 line-clamp-2 leading-snug">{item.title}</span>
-        <span className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted">
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${
-              isPublished(item.status)
-                ? 'bg-accent text-accent-foreground'
-                : item.status === 'ready'
-                  ? 'border border-accent text-foreground'
-                  : 'bg-hover'
-            }`}
-          >
-            {isPublished(item.status) && <Check size={11} aria-hidden="true" />}
-            {t(`statuses.${item.status}`)}
-          </span>
-          {item.minutes ? (
-            <span className="tabular">{t('minutesShort', { n: item.minutes })}</span>
-          ) : null}
+        {item.why && (
+          <Sparkles size={13} className="shrink-0 text-muted" aria-label={t('fromAi')} />
+        )}
+        {item.link && <Link2 size={13} className="shrink-0 text-muted" aria-label={t('hasLink')} />}
+        <span
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
+            isPublished(item.status)
+              ? 'bg-accent text-accent-foreground'
+              : item.status === 'ready'
+                ? 'border border-accent'
+                : 'bg-hover text-muted'
+          }`}
+        >
+          {isPublished(item.status) && <Check size={11} aria-hidden="true" />}
+          {t(`statuses.${item.status}`)}
+        </span>
+        <span className="tabular w-12 shrink-0 text-right text-xs text-muted">
+          {item.minutes ? t('minutesShort', { n: item.minutes }) : ''}
         </span>
       </button>
     </li>
   );
 
-  const column = (date: string | null) => {
+  /** A day: its label and minutes on the left, its publications on the right. */
+  const dayRow = (date: string) => {
     const list = inDay(date);
     const planned = list.reduce((n, i) => n + (i.minutes ?? 0), 0);
-    const overBudget = date !== null && budget !== null && planned > budget;
+    const overBudget = budget !== null && planned > budget;
     const isToday = date === today;
+    const past = date < today;
     return (
-      <section
-        key={date ?? 'ideas'}
+      <div
+        key={date}
         {...dropZone(date, null)}
-        className={`flex min-h-40 flex-col rounded-[22px] p-2.5 transition-colors ${
-          date === null ? 'bg-hover' : 'card'
-        } ${over && over.date === date && over.before === null ? 'ring-2 ring-accent' : ''}`}
+        className={`grid gap-1 px-2 py-2 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3 ${
+          over && over.date === date && over.before === null ? 'rounded-2xl ring-2 ring-accent' : ''
+        } ${past ? 'opacity-60' : ''}`}
       >
-        <header className="mb-2 flex items-start justify-between gap-2 px-1">
-          {date === null ? (
-            <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-              <Lightbulb size={15} aria-hidden="true" />
-              {t('ideas')}
-              <InfoTip text={t('ideasHint')} />
-            </h3>
-          ) : (
-            <h3 className={`text-sm ${isToday ? 'font-semibold' : 'font-medium'}`}>
-              <span className="text-muted first-letter:uppercase">
-                {format.dateTime(asDate(date), { weekday: 'short', timeZone: 'UTC' })}
-              </span>{' '}
-              <span
-                className={`tabular ${isToday ? 'rounded-full bg-accent px-1.5 text-accent-foreground' : ''}`}
-              >
-                {format.dateTime(asDate(date), { day: 'numeric', timeZone: 'UTC' })}
+        <div className="flex items-baseline justify-between gap-2 px-1 pt-2 sm:block">
+          <p className={`text-sm first-letter:uppercase ${isToday ? 'font-semibold' : ''}`}>
+            {dayLabel(date, { weekday: 'short', day: 'numeric', month: 'short' })}
+            {isToday && (
+              <span className="ml-1.5 rounded-full bg-accent px-1.5 py-0.5 text-[11px] text-accent-foreground">
+                {t('today')}
               </span>
-            </h3>
-          )}
-          {date !== null && (planned > 0 || budget !== null) && (
-            <span
+            )}
+          </p>
+          {(planned > 0 || (budget !== null && !past)) && (
+            <p
               className={`tabular text-xs ${overBudget ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-muted'}`}
               title={overBudget ? t('overBudget') : undefined}
             >
               {budget !== null
                 ? t('minutesOf', { n: planned, budget })
                 : t('minutesShort', { n: planned })}
-            </span>
+            </p>
           )}
-        </header>
-        <ul className="flex flex-1 flex-col gap-1.5">{list.map(card)}</ul>
-        {canManage && (
-          <button
-            type="button"
-            onClick={() => setDialog({ date })}
-            aria-label={date === null ? t('newIdea') : t('newOn')}
-            className="mt-1.5 flex h-8 items-center justify-center gap-1 rounded-xl text-xs text-muted hover:bg-hover hover:text-foreground"
-          >
-            <Plus size={14} aria-hidden="true" />
-            {date === null ? t('newIdea') : t('add')}
-          </button>
-        )}
-      </section>
+        </div>
+        <ul className="flex flex-col gap-0.5">
+          {list.map(row)}
+          {canManage && !past && (
+            <li>
+              <button
+                type="button"
+                onClick={() => setDialog({ date })}
+                className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs text-muted hover:bg-hover hover:text-foreground"
+              >
+                <Plus size={13} aria-hidden="true" />
+                {t('add')}
+              </button>
+            </li>
+          )}
+        </ul>
+      </div>
     );
   };
 
-  const weekLabel = `${format.dateTime(asDate(week), { day: 'numeric', month: 'short', timeZone: 'UTC' })} – ${format.dateTime(
-    asDate(addDays(week, 6)),
-    { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' },
+  const focus = data?.focus;
+  const weekLabel = `${dayLabel(week, { day: 'numeric', month: 'short' })} – ${dayLabel(
+    addDays(week, 6),
+    { day: 'numeric', month: 'short', year: 'numeric' },
   )}`;
+  const pastCount = pastDays.reduce((n, d) => n + inDay(d).length, 0);
+  const ideas = inDay(null);
+  const suggestions = data?.suggestions ?? [];
+
+  let body: ReactNode;
+  if (tab === 'brief' && base) {
+    body = (
+      <CalendarBrief
+        base={base}
+        canManage={canManage}
+        onSaved={() => {
+          setNotice(null);
+          reload();
+        }}
+      />
+    );
+  } else if (tab === 'review' && base) {
+    body = (
+      <CalendarReview
+        key={week}
+        base={base}
+        week={week}
+        canManage={canManage}
+        onOpen={(item) => setDialog({ item })}
+        version={version}
+      />
+    );
+  } else if (!data) {
+    body = <p className="py-10 text-center text-sm text-muted">…</p>;
+  } else {
+    body = (
+      <div className="animate-rise grid gap-4">
+        {suggestions.length > 0 && (
+          <section className="card rounded-[24px] p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+                <Sparkles size={15} aria-hidden="true" />
+                {t('suggestionsTitle', { count: suggestions.length })}
+                <InfoTip text={t('suggestionsHint')} />
+              </h3>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => void acceptAll()}
+                  className="btn-primary flex w-auto items-center gap-1.5 px-4 py-1.5 text-sm"
+                >
+                  <Check size={14} aria-hidden="true" />
+                  {t('acceptAll')}
+                </button>
+              )}
+            </div>
+            <ul className="divide-y divide-line">
+              {suggestions.map((s) => (
+                <li key={s.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 px-1 py-3">
+                  <span className="pt-0.5">
+                    <ChannelIcon channel={s.channel} />
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDialog({ item: s })}
+                    className="min-w-0 flex-1 basis-64 text-left"
+                  >
+                    <span className="block text-sm font-medium hover:underline">{s.title}</span>
+                    <span className="mt-0.5 block text-xs text-muted">
+                      {t(`formats.${s.format}`)}
+                      {s.minutes ? ` · ${t('minutesShort', { n: s.minutes })}` : ''} ·{' '}
+                      {t(`evidence.${s.evidence ?? 'hypothesis'}`)}
+                    </span>
+                    {s.why && (
+                      <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-muted">
+                        {s.why}
+                      </span>
+                    )}
+                  </button>
+                  {canManage && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-40">
+                        <Select
+                          ariaLabel={t('date')}
+                          value={s.date ?? ''}
+                          onChange={(d) => void decide(s, { date: d })}
+                          options={comingDays.map((d) => ({
+                            value: d,
+                            label: dayLabel(d, {
+                              weekday: 'short',
+                              day: 'numeric',
+                              month: 'short',
+                            }),
+                          }))}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void decide(s, { suggestion: null })}
+                        title={t('accept')}
+                        aria-label={t('accept')}
+                        className="icon-btn h-9 w-9 border border-line"
+                      >
+                        <Check size={15} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void decide(s, { suggestion: 'rejected' })}
+                        title={t('reject')}
+                        aria-label={t('reject')}
+                        className="icon-btn h-9 w-9"
+                      >
+                        <X size={15} aria-hidden="true" />
+                      </button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section className="card rounded-[24px] p-2">
+          {pastDays.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowPast(!showPast)}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs text-muted hover:bg-hover"
+            >
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${showPast ? '' : '-rotate-90'}`}
+                aria-hidden="true"
+              />
+              {t('pastDays', { days: pastDays.length, count: pastCount })}
+            </button>
+          )}
+          <div className="divide-y divide-line">{(showPast ? days : comingDays).map(dayRow)}</div>
+        </section>
+
+        <section
+          {...dropZone(null, null)}
+          className={`rounded-[24px] bg-hover p-2 ${over && over.date === null && over.before === null ? 'ring-2 ring-accent' : ''}`}
+        >
+          <div className="flex items-center justify-between gap-2 px-1">
+            <button
+              type="button"
+              onClick={() => setShowIdeas(!showIdeas)}
+              className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold"
+            >
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${showIdeas ? '' : '-rotate-90'}`}
+                aria-hidden="true"
+              />
+              <Lightbulb size={15} aria-hidden="true" />
+              {t('ideasCount', { count: ideas.length })}
+            </button>
+            <span className="flex items-center gap-1">
+              <InfoTip text={t('ideasHint')} />
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setDialog({ date: null })}
+                  className="flex h-8 items-center gap-1 rounded-xl px-2.5 text-xs text-muted hover:bg-[var(--card)] hover:text-foreground"
+                >
+                  <Plus size={13} aria-hidden="true" />
+                  {t('newIdea')}
+                </button>
+              )}
+            </span>
+          </div>
+          {showIdeas && ideas.length > 0 && (
+            <ul className="mt-1 flex flex-col gap-0.5">{ideas.map(row)}</ul>
+          )}
+        </section>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -313,7 +544,7 @@ export function Calendar() {
               </button>
               <button
                 type="button"
-                onClick={() => setDialog({ date: null })}
+                onClick={() => setDialog({ date: comingDays[0] ?? null })}
                 className="btn-primary flex w-auto items-center gap-2 px-4"
               >
                 <Plus size={16} aria-hidden="true" />
@@ -339,10 +570,7 @@ export function Calendar() {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => {
-                setWeek(addDays(week, -7));
-                setItems(null);
-              }}
+              onClick={() => goWeek(addDays(week, -7))}
               className="icon-btn h-9 w-9"
               aria-label={t('previousWeek')}
             >
@@ -351,10 +579,7 @@ export function Calendar() {
             <span className="tabular min-w-44 text-center text-sm">{weekLabel}</span>
             <button
               type="button"
-              onClick={() => {
-                setWeek(addDays(week, 7));
-                setItems(null);
-              }}
+              onClick={() => goWeek(addDays(week, 7))}
               className="icon-btn h-9 w-9"
               aria-label={t('nextWeek')}
             >
@@ -363,15 +588,27 @@ export function Calendar() {
             {week !== weekStartOf(today) && (
               <button
                 type="button"
-                onClick={() => {
-                  setWeek(weekStartOf(today));
-                  setItems(null);
-                }}
+                onClick={() => goWeek(weekStartOf(today))}
                 className="rounded-xl px-2.5 py-1.5 text-sm text-muted hover:bg-hover hover:text-foreground"
               >
                 {t('thisWeek')}
               </button>
             )}
+          </div>
+        )}
+        {tab !== 'brief' && focus && focus.directions.length > 1 && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-muted">{t('focus')}</span>
+            <Segmented
+              ariaLabel={t('focus')}
+              value={focus.value}
+              onChange={(v) => canManage && void setFocus(v)}
+              options={[
+                ...focus.directions.map((d) => ({ value: d.id, label: d.name || t('unnamed') })),
+                { value: 'all', label: t('focusAll') },
+              ]}
+            />
+            <InfoTip text={focus.isDefault ? t('focusAuto') : t('focusChosen')} />
           </div>
         )}
         {tab === 'week' && base && (
@@ -380,7 +617,7 @@ export function Calendar() {
             canManage={canManage}
             onSave={async (v) => {
               await api(base, { method: 'PATCH', json: { dailyMinutes: v } });
-              setBudget(v);
+              setData((d) => (d ? { ...d, dailyMinutes: v } : d));
             }}
           />
         )}
@@ -411,30 +648,12 @@ export function Calendar() {
             className="text-muted hover:text-foreground"
             aria-label={t('close')}
           >
-            ✕
+            <X size={14} aria-hidden="true" />
           </button>
         </div>
       )}
 
-      {tab === 'brief' && base ? (
-        <CalendarBrief base={base} canManage={canManage} onSaved={() => setNotice(null)} />
-      ) : tab === 'review' && base ? (
-        <CalendarReview
-          key={week}
-          base={base}
-          week={week}
-          canManage={canManage}
-          onOpen={(item) => setDialog({ item })}
-          version={version}
-        />
-      ) : !items ? (
-        <p className="py-10 text-center text-sm text-muted">…</p>
-      ) : (
-        <div className="animate-rise grid gap-3 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
-          {days.map(column)}
-          {column(null)}
-        </div>
-      )}
+      {body}
 
       {dialog && base && linksBase && (
         <CalendarItemDialog

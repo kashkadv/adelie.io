@@ -44,10 +44,12 @@ import {
 } from './calendar.js';
 import {
   IDEAS_INSTRUCTIONS,
-  IDEAS_SCHEMA,
   ideasInput,
+  ideasSchema,
   parseBrief,
   parseIdeas,
+  resolveFocus,
+  todayIn,
   type IdeasContext,
 } from './ideas.js';
 
@@ -99,6 +101,7 @@ const ITEM_SELECT = {
   status: true,
   why: true,
   evidence: true,
+  suggestion: true,
   link: LINK,
   post: POST,
 } as const;
@@ -137,7 +140,7 @@ export class CalendarController {
   private async visibleProject(ctx: WorkspaceRequestContext, projectId: string) {
     const project = await this.prisma.client.project.findFirst({
       where: { id: projectId, ...visibleProjectsWhere(ctx) },
-      select: { id: true, dailyMinutes: true },
+      select: { id: true, name: true, dailyMinutes: true, timezone: true, brief: true },
     });
     if (!project) throw new NotFoundException();
     return project;
@@ -147,7 +150,7 @@ export class CalendarController {
     await this.visibleProject(ctx, projectId);
     const item = await this.prisma.client.calendarItem.findFirst({
       where: { id, projectId, workspaceId: ctx.workspaceId },
-      select: { id: true, date: true, status: true, linkId: true },
+      select: { id: true, date: true, status: true, linkId: true, suggestion: true },
     });
     if (!item) throw new NotFoundException();
     return item;
@@ -178,6 +181,7 @@ export class CalendarController {
         projectId,
         workspaceId,
         postId: null,
+        suggestion: null,
         linkId: { not: null },
         status: { in: ['idea', 'draft', 'ready'] },
       },
@@ -235,16 +239,36 @@ export class CalendarController {
     const ctx = request.workspace;
     const project = await this.visibleProject(ctx, projectId);
     await this.matchPublished(projectId, ctx.workspaceId);
-    const items = await this.prisma.client.calendarItem.findMany({
-      where: {
-        projectId,
-        workspaceId: ctx.workspaceId,
-        OR: [{ date: { gte: asDate(from), lte: asDate(to) } }, { date: null }],
-      },
-      orderBy: [{ date: 'asc' }, { position: 'asc' }, { createdAt: 'asc' }],
-      select: ITEM_SELECT,
-    });
-    return { dailyMinutes: project.dailyMinutes, items: items.map(present) };
+    const db = this.prisma.client;
+    const [items, suggestions] = await Promise.all([
+      db.calendarItem.findMany({
+        where: {
+          projectId,
+          workspaceId: ctx.workspaceId,
+          suggestion: null,
+          OR: [{ date: { gte: asDate(from), lte: asDate(to) } }, { date: null }],
+        },
+        orderBy: [{ date: 'asc' }, { position: 'asc' }, { createdAt: 'asc' }],
+        select: ITEM_SELECT,
+      }),
+      db.calendarItem.findMany({
+        where: {
+          projectId,
+          workspaceId: ctx.workspaceId,
+          suggestion: 'pending',
+          date: { gte: asDate(from), lte: asDate(to) },
+        },
+        orderBy: [{ date: 'asc' }, { position: 'asc' }],
+        select: ITEM_SELECT,
+      }),
+    ]);
+    return {
+      dailyMinutes: project.dailyMinutes,
+      today: todayIn(project.timezone),
+      focus: await this.focusOf(projectId, project.brief, weekStartOf(from)),
+      items: items.map(present),
+      suggestions: suggestions.map(present),
+    };
   }
 
   @Post()
@@ -296,12 +320,29 @@ export class CalendarController {
   ) {
     const ctx = request.workspace;
     const current = await this.itemOf(ctx, projectId, id);
-    const parsed = parseItem(body ?? {}, false);
+    // An AI proposal is accepted (null) or turned down ("rejected"); nothing else is set by hand.
+    const { suggestion, ...fields } = body ?? {};
+    if (suggestion !== undefined && suggestion !== null && suggestion !== 'rejected') {
+      throw new BadRequestException({ errors: { suggestion: 'invalid' } });
+    }
+    const parsed = parseItem(fields, false);
     if (!parsed.ok) throw new BadRequestException({ errors: { [parsed.error]: 'invalid' } });
     const { date, linkId, ...rest } = parsed.item;
     await this.checkLink(projectId, ctx.workspaceId, linkId);
     const data: Prisma.CalendarItemUncheckedUpdateInput = { ...rest };
     if (date !== undefined) data.date = date ? asDate(date) : null;
+    if (suggestion !== undefined && current.suggestion) {
+      data.suggestion = suggestion as string | null;
+      // Accepted: last in its day among the plan.
+      if (suggestion === null && rest.position === undefined) {
+        const day = date !== undefined ? date : current.date ? dayOf(current.date) : null;
+        const last = await this.prisma.client.calendarItem.aggregate({
+          where: { projectId, suggestion: null, date: day ? asDate(day) : null },
+          _max: { position: true },
+        });
+        data.position = (last._max.position ?? -1) + 1;
+      }
+    }
     if (linkId !== undefined) {
       data.linkId = linkId;
       // Another link: the post found by the old one is not this item's any more.
@@ -367,6 +408,7 @@ export class CalendarController {
         where: {
           projectId,
           workspaceId: ctx.workspaceId,
+          suggestion: null,
           date: { gte: asDate(start), lte: asDate(addDays(start, 6)) },
         },
         orderBy: [{ date: 'asc' }, { position: 'asc' }],
@@ -419,6 +461,7 @@ export class CalendarController {
     };
     return {
       weekStart: start,
+      focus: await this.focusOf(projectId, project.brief, start),
       dailyMinutes: project.dailyMinutes,
       plan: { items: rows.length, minutes: minutes(rows) },
       fact: { items: published.length, minutes: minutes(published) },
@@ -515,9 +558,93 @@ export class CalendarController {
     return { brief };
   }
 
+  /** The brief's directions and the week's focus (chosen, or alternating — ADR-0030). */
+  private async focusOf(projectId: string, rawBrief: unknown, weekStart: string) {
+    const brief = parseBrief(rawBrief);
+    const directions = (brief?.directions ?? []).map((d) => ({ id: d.id, name: d.name }));
+    const chosen = await this.prisma.client.calendarWeek.findMany({
+      where: { projectId, weekStart: { lte: asDate(weekStart) } },
+      orderBy: { weekStart: 'desc' },
+      take: 60,
+      select: { weekStart: true, focus: true },
+    });
+    const focus = resolveFocus(
+      directions,
+      chosen.map((c) => ({ weekStart: dayOf(c.weekStart), focus: c.focus })),
+      weekStart,
+    );
+    return { directions, ...focus };
+  }
+
+  /** Chooses the week's focus: a direction of the brief, or "all". */
+  @Put('week')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async setFocus(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body() body: { week?: unknown; focus?: unknown } | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    if (!isDay(body?.week)) throw new BadRequestException({ errors: { week: 'invalid' } });
+    const ctx = request.workspace;
+    const project = await this.visibleProject(ctx, projectId);
+    const brief = parseBrief(project.brief);
+    const focus = body?.focus;
+    if (
+      typeof focus !== 'string' ||
+      (focus !== 'all' && !brief?.directions.some((d) => d.id === focus))
+    ) {
+      throw new BadRequestException({ errors: { focus: 'invalid' } });
+    }
+    const weekStart = asDate(weekStartOf(body.week));
+    await this.prisma.client.calendarWeek.upsert({
+      where: { projectId_weekStart: { projectId, weekStart } },
+      create: { workspaceId: ctx.workspaceId, projectId, weekStart, focus },
+      update: { focus },
+    });
+    return this.focusOf(projectId, project.brief, weekStartOf(body.week));
+  }
+
+  /** Accepts every AI proposal of the week: they join the plan on their days. */
+  @Post('suggestions/accept')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async acceptAll(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body() body: { week?: unknown } | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    if (!isDay(body?.week)) throw new BadRequestException({ errors: { week: 'invalid' } });
+    const ctx = request.workspace;
+    await this.visibleProject(ctx, projectId);
+    const start = weekStartOf(body.week);
+    const db = this.prisma.client;
+    const pending = await db.calendarItem.findMany({
+      where: {
+        projectId,
+        workspaceId: ctx.workspaceId,
+        suggestion: 'pending',
+        date: { gte: asDate(start), lte: asDate(addDays(start, 6)) },
+      },
+      orderBy: [{ date: 'asc' }, { position: 'asc' }],
+      select: { id: true, date: true },
+    });
+    for (const item of pending) {
+      const last = await db.calendarItem.aggregate({
+        where: { projectId, suggestion: null, date: item.date },
+        _max: { position: true },
+      });
+      await db.calendarItem.update({
+        where: { id: item.id },
+        data: { suggestion: null, position: (last._max.position ?? -1) + 1 },
+      });
+    }
+    return { accepted: pending.length };
+  }
+
   /**
-   * Ideas for the week from the AI (ADR-0029): from the brief, the budget, the last four weeks'
-   * results and the best posts; saved as ideas (no day) with why and on what evidence.
+   * Proposals for the rest of the week from the AI (ADR-0029, ADR-0030): for the directions in
+   * the week's focus, each on a day within the budget, from the brief, the last four weeks' results
+   * and the best posts. They wait as proposals (accept / another day / reject); a new request
+   * replaces the week's undecided ones.
    */
   @Post('ideas')
   @WorkspaceRoles(...CONNECT_ROLES)
@@ -531,23 +658,30 @@ export class CalendarController {
     if (!ai) throw new HttpException({ errors: { ai: 'off' } }, 503);
     if (!isDay(body?.week)) throw new BadRequestException({ errors: { week: 'invalid' } });
     const ctx = request.workspace;
-    await this.visibleProject(ctx, projectId);
+    const project = await this.visibleProject(ctx, projectId);
     const db = this.prisma.client;
-    const project = (await db.project.findUnique({
-      where: { id: projectId },
-      select: { name: true, brief: true, dailyMinutes: true },
-    }))!;
     const brief = parseBrief(project.brief);
-    if (!brief) throw new BadRequestException({ errors: { brief: 'missing' } });
+    if (!brief || !brief.directions.length) {
+      throw new BadRequestException({ errors: { brief: 'missing' } });
+    }
+    const start = weekStartOf(body.week);
+    const today = todayIn(project.timezone);
+    const dates = Array.from({ length: 7 }, (_, i) => addDays(start, i)).filter((d) => d >= today);
+    if (!dates.length) throw new BadRequestException({ errors: { week: 'past' } });
     if ((await this.spentMicros(projectId)) >= ai.monthlyLimitUsd * 1e6) {
       throw new HttpException({ errors: { ai: 'limit' } }, 429);
     }
     await this.matchPublished(projectId, ctx.workspaceId);
 
-    const start = weekStartOf(body.week);
+    const focus = await this.focusOf(projectId, project.brief, start);
+    const inFocus =
+      focus.value === 'all'
+        ? brief.directions
+        : brief.directions.filter((d) => d.id === focus.value);
+    const channels = [...new Set(inFocus.flatMap((d) => d.channels))];
     const since = addDays(start, -28);
     const where = { projectId, workspaceId: ctx.workspaceId };
-    const [accounts, planned, past, posts] = await Promise.all([
+    const [accounts, planned, waiting, rejected, past, posts] = await Promise.all([
       db.socialAccount.findMany({
         where: { ...where, hiddenAt: null, connection: { status: { not: 'REVOKED' } } },
         select: { platform: true },
@@ -555,12 +689,27 @@ export class CalendarController {
       db.calendarItem.findMany({
         where: {
           ...where,
-          OR: [{ date: null }, { date: { gte: asDate(start), lte: asDate(addDays(start, 6)) } }],
+          suggestion: null,
+          date: { gte: asDate(dates[0]!), lte: asDate(addDays(start, 6)) },
         },
-        select: { date: true, title: true, channel: true, format: true, minutes: true },
+        select: { date: true, title: true, minutes: true },
       }),
       db.calendarItem.findMany({
-        where: { ...where, date: { gte: asDate(since), lt: asDate(start) } },
+        where: { ...where, suggestion: null, date: null },
+        select: { title: true },
+        take: 50,
+      }),
+      db.calendarItem.findMany({
+        where: {
+          ...where,
+          suggestion: 'rejected',
+          updatedAt: { gte: new Date(Date.now() - 60 * 86_400_000) },
+        },
+        select: { title: true },
+        take: 50,
+      }),
+      db.calendarItem.findMany({
+        where: { ...where, suggestion: null, date: { gte: asDate(since), lt: asDate(start) } },
         orderBy: { date: 'asc' },
         select: ITEM_SELECT,
       }),
@@ -587,11 +736,21 @@ export class CalendarController {
       Object.fromEntries(Object.entries(l ?? {}).filter(([, v]) => typeof v === 'number'));
     const context: IdeasContext = {
       project: project.name,
-      brief,
+      about: brief.about,
+      assets: brief.assets,
+      focus: inFocus,
       dailyMinutes: project.dailyMinutes,
       connected: [...new Set(accounts.map((a) => a.platform))],
-      weekStart: start,
-      planned: planned.map((p) => ({ ...p, date: p.date ? dayOf(p.date) : null })),
+      days: dates.map((date) => {
+        const on = planned.filter((p) => p.date && dayOf(p.date) === date);
+        return {
+          date,
+          plannedMinutes: on.reduce((n, p) => n + (p.minutes ?? 0), 0),
+          planned: on.map((p) => p.title),
+        };
+      }),
+      waiting: waiting.map((w) => w.title),
+      rejected: rejected.map((r) => r.title),
       history: past.map((i) => {
         const r = i.link ? results.get(i.link.id) : undefined;
         return {
@@ -627,10 +786,10 @@ export class CalendarController {
     const answer = await provider.structured({
       instructions: IDEAS_INSTRUCTIONS,
       input: ideasInput(context),
-      schema: IDEAS_SCHEMA as unknown as Record<string, unknown>,
+      schema: ideasSchema(dates, channels),
       schemaName: 'calendar_ideas',
     });
-    const ideas = answer.ok ? parseIdeas(answer.data) : [];
+    const ideas = answer.ok ? parseIdeas(answer.data, dates) : [];
     const run = await db.aiRun.create({
       data: {
         workspaceId: ctx.workspaceId,
@@ -652,28 +811,34 @@ export class CalendarController {
     });
     if (!ideas.length) throw new HttpException({ errors: { ai: 'failed' } }, 502);
 
-    const last = await db.calendarItem.aggregate({
-      where: { projectId, date: null },
-      _max: { position: true },
-    });
-    const first = (last._max.position ?? -1) + 1;
-    await db.calendarItem.createMany({
-      data: ideas.map((idea, i) => ({
-        workspaceId: ctx.workspaceId,
-        projectId,
-        date: null,
-        position: first + i,
-        channel: idea.channel,
-        format: idea.format,
-        title: idea.title,
-        notes: idea.notes || null,
-        minutes: idea.minutes,
-        status: 'idea',
-        why: idea.why || null,
-        evidence: idea.evidence,
-        aiRunId: run.id,
-      })),
-    });
+    await db.$transaction([
+      // The week's undecided proposals give way to the new ones.
+      db.calendarItem.deleteMany({
+        where: {
+          ...where,
+          suggestion: 'pending',
+          date: { gte: asDate(start), lte: asDate(addDays(start, 6)) },
+        },
+      }),
+      db.calendarItem.createMany({
+        data: ideas.map((idea, i) => ({
+          workspaceId: ctx.workspaceId,
+          projectId,
+          date: asDate(idea.day),
+          position: i,
+          channel: idea.channel,
+          format: idea.format,
+          title: idea.title,
+          notes: idea.notes || null,
+          minutes: idea.minutes,
+          status: 'idea',
+          why: idea.why || null,
+          evidence: idea.evidence,
+          aiRunId: run.id,
+          suggestion: 'pending',
+        })),
+      }),
+    ]);
     return {
       created: ideas.length,
       costUsd: run.costMicros / 1e6,

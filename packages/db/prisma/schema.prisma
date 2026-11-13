@@ -1032,6 +1032,8 @@ model CalendarItem {
   why         String?
   evidence    String?
   aiRunId     String?      @db.Uuid
+  /// An AI proposal not yet decided (ADR-0030): pending | rejected; null = part of the plan.
+  suggestion  String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -1079,4 +1081,20 @@ model AiRun {
 
   @@index([projectId, createdAt])
   @@map("ai_run")
+}
+
+/// A week of the calendar (ADR-0030): which direction of the brief it focuses on. No row = the
+/// directions alternate from the last chosen one.
+model CalendarWeek {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  workspaceId String   @db.Uuid
+  projectId   String   @db.Uuid
+  /// The Monday the week starts on.
+  weekStart   DateTime @db.Date
+  /// A direction id of the brief, or "all".
+  focus       String
+  updatedAt   DateTime @updatedAt
+
+  @@unique([projectId, weekStart])
+  @@map("calendar_week")
 }

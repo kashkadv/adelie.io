@@ -1,53 +1,123 @@
 import { describe, expect, it } from 'vitest';
 import { OpenAiProvider, costMicros, readResponse } from '../ai/provider.js';
-import { IDEAS_SCHEMA, parseBrief, parseIdeas } from './ideas.js';
+import { ideasSchema, parseBrief, parseIdeas, resolveFocus, todayIn } from './ideas.js';
 
 describe('brief', () => {
-  it('needs what the project is; keeps known channels only', () => {
-    expect(parseBrief({ audience: 'x' })).toBeNull();
+  it('needs what the project is', () => {
+    expect(parseBrief({ directions: [{ name: 'x' }] })).toBeNull();
+  });
+
+  it('keeps directions with known channels; ids stay unique', () => {
     expect(
-      parseBrief({ about: ' Wool rugs ', channels: ['pinterest', 'myspace', 'pinterest'] }),
+      parseBrief({
+        about: ' Wool rugs ',
+        directions: [
+          { id: 'world', name: 'World', channels: ['pinterest', 'myspace', 'pinterest'] },
+          { id: 'world', name: 'Duplicate' },
+          { id: 'Bad Id', name: 'Ukraine', language: 'українська', channels: ['instagram'] },
+          {},
+        ],
+      }),
     ).toEqual({
       about: 'Wool rugs',
-      audience: '',
-      language: '',
-      channels: ['pinterest'],
       assets: '',
-      goal: '',
+      directions: [
+        {
+          id: 'world',
+          name: 'World',
+          goal: '',
+          audience: '',
+          language: '',
+          channels: ['pinterest'],
+        },
+        {
+          id: 'd3',
+          name: 'Ukraine',
+          goal: '',
+          audience: '',
+          language: 'українська',
+          channels: ['instagram'],
+        },
+      ],
+    });
+  });
+
+  it('a brief saved before directions reads as one direction', () => {
+    expect(
+      parseBrief({
+        about: 'Rugs',
+        goal: 'Etsy sales',
+        language: 'English',
+        channels: ['pinterest'],
+      }),
+    ).toMatchObject({
+      directions: [{ id: 'd1', goal: 'Etsy sales', language: 'English', channels: ['pinterest'] }],
+    });
+  });
+});
+
+describe('week focus', () => {
+  const dirs = [{ id: 'world' }, { id: 'ua' }];
+  it('the week’s own choice wins', () => {
+    expect(resolveFocus(dirs, [{ weekStart: '2026-11-16', focus: 'ua' }], '2026-11-16')).toEqual({
+      value: 'ua',
+      isDefault: false,
+    });
+  });
+  it('alternates from the last choice', () => {
+    const chosen = [{ weekStart: '2026-11-09', focus: 'world' }];
+    expect(resolveFocus(dirs, chosen, '2026-11-16')).toEqual({ value: 'ua', isDefault: true });
+    expect(resolveFocus(dirs, chosen, '2026-11-23').value).toBe('world');
+    expect(
+      resolveFocus(dirs, [{ weekStart: '2026-11-09', focus: 'all' }], '2026-11-16').value,
+    ).toBe('all');
+  });
+  it('without any choice: by the week’s number; one direction: it', () => {
+    const a = resolveFocus(dirs, [], '2026-11-16').value;
+    const b = resolveFocus(dirs, [], '2026-11-23').value;
+    expect(a).not.toBe(b);
+    expect(resolveFocus([{ id: 'only' }], [], '2026-11-16')).toEqual({
+      value: 'only',
+      isDefault: true,
     });
   });
 });
 
 describe('ideas', () => {
-  it('keeps valid ideas and evens out the rest', () => {
+  const days = ['2026-11-14', '2026-11-15'];
+  it('keeps valid ideas on one of the given days', () => {
     expect(
-      parseIdeas({
-        ideas: [
-          {
-            title: 'Rug care tips',
-            channel: 'pinterest',
-            format: 'pin',
-            minutes: 2.4,
-            notes: 'n',
-            why: 'w',
-            evidence: 'results',
-          },
-          { title: 'x', channel: 'myspace', format: 'pin' },
-          { title: '', channel: 'pinterest', format: 'pin' },
-          {
-            title: 'Reel',
-            channel: 'instagram',
-            format: 'short',
-            minutes: 'a',
-            evidence: 'market',
-          },
-        ],
-      }),
+      parseIdeas(
+        {
+          ideas: [
+            {
+              title: 'Rug care tips',
+              channel: 'pinterest',
+              format: 'pin',
+              day: '2026-11-15',
+              minutes: 2.4,
+              notes: 'n',
+              why: 'w',
+              evidence: 'results',
+            },
+            { title: 'x', channel: 'myspace', format: 'pin' },
+            {
+              title: 'Reel',
+              channel: 'instagram',
+              format: 'short',
+              day: '2026-11-10',
+              minutes: 'a',
+            },
+          ],
+        },
+        days,
+      ),
     ).toEqual([
       {
         title: 'Rug care tips',
         channel: 'pinterest',
         format: 'pin',
+        day: '2026-11-15',
         minutes: 5,
         notes: 'n',
         why: 'w',
@@ -57,19 +127,28 @@ describe('ideas', () => {
         title: 'Reel',
         channel: 'instagram',
         format: 'short',
+        day: '2026-11-14',
         minutes: 30,
         notes: '',
         why: '',
         evidence: 'hypothesis',
       },
     ]);
-    expect(parseIdeas(null)).toEqual([]);
+    expect(parseIdeas(null, days)).toEqual([]);
   });
 
-  it('the schema is strict: every property required', () => {
-    const item = IDEAS_SCHEMA.properties.ideas.items;
+  it('the schema is strict and limited to the days and channels given', () => {
+    const schema = ideasSchema(days, ['pinterest']);
+    const item = schema.properties.ideas.items;
     expect([...item.required].sort()).toEqual(Object.keys(item.properties).sort());
-    expect(item.additionalProperties).toBe(false);
+    expect(item.properties.day.enum).toEqual(days);
+    expect(item.properties.channel.enum).toEqual(['pinterest']);
+  });
+
+  it('today is the project’s day', () => {
+    const late = new Date('2026-11-13T23:30:00Z');
+    expect(todayIn('Europe/Kyiv', late)).toBe('2026-11-14');
+    expect(todayIn('America/New_York', late)).toBe('2026-11-13');
   });
 });
 

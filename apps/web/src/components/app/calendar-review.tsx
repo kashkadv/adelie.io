@@ -119,6 +119,17 @@ export function CalendarReview({
 
   return (
     <div className="animate-rise grid gap-4">
+      {data.focus.directions.length > 1 && (
+        <p className="px-1 text-sm text-muted">
+          {t('focus')}:{' '}
+          <span className="font-medium text-foreground">
+            {data.focus.value === 'all'
+              ? t('focusAll')
+              : (data.focus.directions.find((d) => d.id === data.focus.value)?.name ??
+                t('unnamed'))}
+          </span>
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {tile(t('planned'), num(data.plan.items))}
         {tile(t('published'), num(data.fact.items))}
