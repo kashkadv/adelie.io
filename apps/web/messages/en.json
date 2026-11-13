@@ -1143,6 +1143,36 @@
         "TOO_LARGE": "the page is too large",
         "BAD_STATUS": "unexpected answer"
       }
+    },
+    "research": {
+      "from": "From the research “{name}”",
+      "open": "Open the research",
+      "noResearch": "This product is not in any research, so its tags are not rated.",
+      "openResearches": "Researches",
+      "betterTags": "Better tags it lacks",
+      "noData": "The research has no rated tags yet: press “Update data” in it.",
+      "advice": "AI advice",
+      "notAsked": "not asked yet",
+      "openInEditor": "Open in the editor with these",
+      "asking": "Asking…",
+      "ask": "Ask the AI",
+      "askAgain": "Ask again",
+      "askHint": "Titles, 13 tags and the start of the description from the research’s context and rated tags. It spends the project’s AI budget; nothing is changed until you review and save it in the editor.",
+      "error": {
+        "limit": "The month’s AI limit is used up.",
+        "off": "AI is not set up.",
+        "failed": "Could not get advice. Try again."
+      },
+      "competition": "competition",
+      "editor": {
+        "title": "Research hints",
+        "hint": "Tags are rated against the research’s niche and rechecked as you edit them. Click a better tag to add it (with 13 tags it takes the place of the weakest). Titles and the opening only fill the fields: the “was → will be” review stays before saving.",
+        "replaceWeak": "Replace weak ones ({count})",
+        "replaceWeakHint": "Swaps every weak or unfitting tag for the next better one the product lacks",
+        "addTag": "Better tags — click to add",
+        "opening": "Opening of the description",
+        "insertOpening": "Put at the start of the description"
+      }
     }
   },
   "Flipper": {

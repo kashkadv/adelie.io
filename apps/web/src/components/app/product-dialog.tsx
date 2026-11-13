@@ -23,6 +23,7 @@ import { InfoTip } from '../ui/info-tip';
 import { PanelSheet } from '../ui/panel-sheet';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
 import { LinksSection } from './links-section';
+import { ProductResearchPanel, useProductResearch, VerdictChip } from './product-research';
 import { ISSUE_STYLE, sortIssues, type ProductIssue } from './product-issues';
 import { minorDigits, useMoney } from './sales-data';
 import { seoChanges, seoFindings, type SeoCheck, type SeoLevel } from './seo-rules';
@@ -632,7 +633,7 @@ export function ProductDialog({
   onPrevious?: () => void;
   onNext?: () => void;
   /** Absent for products that cannot be edited (e.g. removed from the shop). */
-  onEdit?: () => void;
+  onEdit?: (proposed?: { title?: string; tags?: string[] }) => void;
 }) {
   const t = useTranslations('Sales.card');
   const ts = useTranslations('Sales');
@@ -644,6 +645,7 @@ export function ProductDialog({
   const [loaded, setLoaded] = useState<{ id: string; detail: Detail | null } | null>(null);
   const detail = loaded?.id === productId ? loaded.detail : null;
   const failed = loaded?.id === productId && loaded.detail === null;
+  const research = useProductResearch(productId, detail?.account.platform === 'ETSY');
   /** Bumped after a change (twins), to read the card again. */
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -806,7 +808,7 @@ export function ProductDialog({
                     {onEdit && (
                       <button
                         type="button"
-                        onClick={onEdit}
+                        onClick={() => onEdit()}
                         className="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-1.5 text-sm hover:bg-hover"
                       >
                         <PenLine size={15} aria-hidden="true" />
@@ -854,11 +856,23 @@ export function ProductDialog({
                       </p>
                       {detail.tags.length ? (
                         <div className="flex flex-wrap gap-1.5">
-                          {detail.tags.map((tag) => (
-                            <span key={tag} className="rounded-full bg-hover px-2 py-0.5 text-xs">
-                              {tag}
-                            </span>
-                          ))}
+                          {detail.tags.map((tag) => {
+                            // Rated by the research that studies the product (ADR-0035).
+                            const rated = research.data?.audit?.tags.find((x) => x.tag === tag);
+                            return rated ? (
+                              <VerdictChip
+                                key={tag}
+                                tag={tag}
+                                verdict={rated.verdict}
+                                score={rated.score}
+                                detail={research.data?.details?.[tag]}
+                              />
+                            ) : (
+                              <span key={tag} className="rounded-full bg-hover px-2 py-0.5 text-xs">
+                                {tag}
+                              </span>
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400">
@@ -866,6 +880,11 @@ export function ProductDialog({
                           {t('noTags')}
                         </p>
                       )}
+                      <ProductResearchPanel
+                        productId={productId}
+                        research={research}
+                        onEdit={onEdit}
+                      />
                     </div>
                   )}
                 </div>

@@ -10,6 +10,15 @@ import { InfoTip } from '../ui/info-tip';
 import { PanelSheet } from '../ui/panel-sheet';
 import { Segmented } from '../ui/segmented';
 import { Switch } from '../ui/switch';
+import {
+  EditorResearchPanel,
+  useLiveAudit,
+  useProductResearch,
+  useTagTitle,
+  type TagDetail,
+} from './product-research';
+import type { TagVerdict } from './research-data';
+import { VERDICT_STYLE } from './research-tags';
 import { minorDigits, useMoney } from './sales-data';
 
 type Editable = {
@@ -139,11 +148,17 @@ function TagInput({
   tags,
   onChange,
   label,
+  rated,
+  details,
 }: {
   tags: string[];
   onChange: (tags: string[]) => void;
   label: string;
+  /** What the research says of each tag (ADR-0035): colours the chips. */
+  rated?: Map<string, { verdict: TagVerdict; score: number | null }>;
+  details?: Record<string, TagDetail>;
 }) {
+  const tagTitle = useTagTitle();
   const t = useTranslations('Sales.editor');
   const [draft, setDraft] = useState('');
   const add = () => {
@@ -168,14 +183,21 @@ function TagInput({
     <div className="field flex min-h-11 flex-wrap items-center gap-1.5 py-2">
       {tags.map((tag) => {
         const bad = tag.length > LIMITS.tag || !TAG.test(tag);
+        const verdict = rated?.get(tag);
         return (
           <span
             key={tag}
+            title={verdict ? tagTitle(tag, verdict.score, details?.[tag]) : undefined}
             className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
-              bad ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300' : 'bg-hover'
+              bad
+                ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                : verdict
+                  ? `border ${VERDICT_STYLE[verdict.verdict]}`
+                  : 'bg-hover'
             }`}
           >
             {tag}
+            {verdict?.score != null && <span className="opacity-70">{verdict.score}</span>}
             <button
               type="button"
               onClick={() => onChange(tags.filter((x) => x !== tag))}
@@ -231,6 +253,18 @@ export function ProductEditor({
   /** Per-variation price as typed, by variation id. */
   const [varPrices, setVarPrices] = useState<Record<string, string>>({});
   const [step, setStep] = useState<'edit' | 'review'>('edit');
+  // What the research that studies the product says of its tags, rechecked as they change (ADR-0035).
+  const research = useProductResearch(productId);
+  const live = useLiveAudit(
+    research.base,
+    research.data?.research?.id,
+    productId,
+    values?.tags ?? [],
+    values !== null,
+  );
+  const liveAudit = live?.audit ?? research.data?.audit ?? null;
+  const liveDetails = live?.details ?? research.data?.details ?? {};
+  const ratedTags = new Map(liveAudit?.tags.map((x) => [x.tag, x]) ?? []);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
 
@@ -740,8 +774,29 @@ export function ProductEditor({
                   tags={values.tags}
                   onChange={(tags) => setValues({ ...values, tags })}
                   label={t('fields.tags')}
+                  rated={ratedTags}
+                  details={liveDetails}
                 />
                 {fieldError('tags')}
+                {research.data?.research && (
+                  <EditorResearchPanel
+                    data={research.data}
+                    audit={liveAudit}
+                    details={liveDetails}
+                    tags={values.tags}
+                    onTags={(tags) => setValues({ ...values, tags })}
+                    title={values.title}
+                    onTitle={(title) => setValues({ ...values, title })}
+                    onOpening={(opening) =>
+                      setValues({
+                        ...values,
+                        description: values.description.includes(opening)
+                          ? values.description
+                          : `${opening}\n\n${values.description}`.trim(),
+                      })
+                    }
+                  />
+                )}
               </div>
               {data.current?.hasVariations ? (
                 <div>

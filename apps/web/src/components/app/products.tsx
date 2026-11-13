@@ -143,6 +143,8 @@ export function Products() {
   const [search, setSearch] = useState('');
   const [data, setData] = useState<{ key: string; value: Response } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  /** Values the editor starts from instead of the live ones (a research's advice, ADR-0035). */
+  const [proposed, setProposed] = useState<{ title?: string; tags?: string[] } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   /**
    * The row of the product a dialog is open for stays lit; after the dialog closes the light holds
@@ -756,8 +758,9 @@ export function Products() {
           }
           onEdit={
             editable
-              ? () => {
+              ? (values) => {
                   // The row it was opened from stays lit through the editing, too.
+                  setProposed(values ?? null);
                   setEditing(openId);
                   setOpenId(null);
                 }
@@ -770,8 +773,10 @@ export function Products() {
         <ProductEditor
           base={base}
           productId={editing}
+          proposed={proposed ?? undefined}
           onClose={() => {
             setEditing(null);
+            setProposed(null);
             setOpenedFrom(null);
           }}
           onSaved={() => {

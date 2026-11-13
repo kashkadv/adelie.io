@@ -22,7 +22,7 @@ const COMPETITION_STYLE: Record<Competition, string> = {
   high: 'bg-amber-500/15 text-amber-800 dark:text-amber-300',
   very_high: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
 };
-const VERDICT_STYLE: Record<TagVerdict, string> = {
+export const VERDICT_STYLE: Record<TagVerdict, string> = {
   strong: 'border-accent bg-accent text-accent-foreground',
   ok: 'border-line',
   weak: 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300',

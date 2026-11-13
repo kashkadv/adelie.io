@@ -20,7 +20,7 @@ import { OpenAiProvider, costMicros } from '../ai/provider.js';
 import { parseBrief, todayIn } from '../calendar/ideas.js';
 import { config } from '../config.js';
 import { createTrackedLink } from '../links/create-link.js';
-import { auditTags } from './tag-audit.js';
+import { auditTags, OK, STRONG } from './tag-audit.js';
 import { CONNECT_ROLES, ConnectService } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
 import { countsAsSale } from '../sales/sales.js';
@@ -142,6 +142,143 @@ export class ResearchController {
       ),
       suggested: true,
     };
+  }
+
+  /**
+   * A research's rated tags for one version (the latest unless named): the pool as the AI and the
+   * owner left it, the tags rated against the niche (ADR-0034). Shared by what a product shows.
+   */
+  private async ratingOf(
+    research: { id: string; productIds: string[]; salesAccountId: string; context: unknown },
+    versionId?: string,
+  ) {
+    const db = this.prisma.client;
+    const [version, studiedData] = await Promise.all([
+      db.researchVersion.findFirst({
+        where: { researchId: research.id, ...(versionId ? { id: versionId } : {}) },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.studied(research),
+    ]);
+    const { products, studied } = studiedData;
+    const trends = ((version?.trends ?? {}) as { keywords?: TrendKeyword[] }).keywords ?? [];
+    const etsy = ((version?.market ?? {}) as { markets?: EtsyMarket[] }).markets ?? [];
+    const tagStats = ((version?.tags ?? {}) as { tags?: TagStat[] }).tags ?? [];
+    const ownTexts = studied.map((p) => `${p.title} ${p.tags.join(' ')}`);
+    const pool = keywordPool(trends, etsy, ownTexts);
+    const review = ((version?.review as { review?: PoolReview } | null)?.review ??
+      {}) as PoolReview;
+    const overrides = parseOverrides((research.context as { phrases?: unknown } | null)?.phrases);
+    const isVisible = (phrase: string) => phraseVisible(phrase, review, overrides);
+    const prices = products
+      .filter((p) => p.price !== null && (p.currency ?? 'USD') === 'USD')
+      .map((p) => p.price! / 100)
+      .sort((a, b) => a - b);
+    const ownPrice = prices.length ? prices[Math.floor(prices.length / 2)]! : null;
+    const rated = rateTags(tagStats, pool, ownTexts, ownPrice).filter((t) => isVisible(t.tag));
+    const ratedOf = new Map(rated.map((t) => [phraseKey(t.tag), t]));
+    return { version, rated, ratedOf, isVisible };
+  }
+
+  /** A product's tags audited, with the figures behind each (for the tooltips). */
+  private auditOf(tags: string[], rating: Awaited<ReturnType<ResearchController['ratingOf']>>) {
+    const audit = auditTags(tags, rating.ratedOf, rating.rated, rating.isVisible);
+    const details: Record<string, unknown> = {};
+    for (const tag of [...tags, ...audit.replacements.map((r) => r.tag)]) {
+      const r = rating.ratedOf.get(phraseKey(tag));
+      if (r) {
+        details[tag] = {
+          competition: r.competition,
+          count: r.count,
+          avgFavorers: r.avgFavorers,
+          pinterestMom: r.pinterestMom,
+          priceVsOwn: r.priceVsOwn,
+        };
+      }
+    }
+    return { audit, details };
+  }
+
+  /**
+   * What the research says about one product (the product card and the editor, ADR-0035): its tags
+   * audited against the latest rated tags, replacements, and the last advice of the AI. The research
+   * is the freshest one that studies the product, unless another is named.
+   */
+  @Get('for-product/:productId')
+  async forProduct(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+    @Query('researchId') researchId?: string,
+  ) {
+    const ctx = request.workspace;
+    await this.visibleProject(ctx, projectId);
+    const db = this.prisma.client;
+    const product = await db.shopProduct.findFirst({
+      where: { id: productId, projectId, workspaceId: ctx.workspaceId },
+      select: { tags: true },
+    });
+    if (!product) throw new NotFoundException();
+    const researches = await db.research.findMany({
+      where: { projectId, workspaceId: ctx.workspaceId, productIds: { has: productId } },
+      orderBy: [{ refreshedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
+      select: { id: true, name: true, refreshedAt: true },
+    });
+    const chosen = researches.find((r) => r.id === researchId) ?? researches[0];
+    if (!chosen) return { researches: [], research: null };
+    const research = await db.research.findUniqueOrThrow({ where: { id: chosen.id } });
+    const rating = await this.ratingOf(research);
+    const snapshot = await db.researchSnapshot.findUnique({
+      where: { researchId_source: { researchId: research.id, source: `advice:${productId}` } },
+      select: { data: true, fetchedAt: true },
+    });
+    return {
+      researches,
+      research: {
+        id: research.id,
+        name: research.name,
+        refreshedAt: research.refreshedAt,
+        version: rating.version
+          ? { id: rating.version.id, createdAt: rating.version.createdAt }
+          : null,
+      },
+      thresholds: { strong: STRONG, ok: OK },
+      ...(rating.version ? this.auditOf(product.tags, rating) : { audit: null, details: {} }),
+      advice: snapshot ? { ...(snapshot.data as object), createdAt: snapshot.fetchedAt } : null,
+    };
+  }
+
+  /** The audit of tags as the editor holds them now (they are not saved yet). */
+  @Post('for-product/:productId/check')
+  async checkTags(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Body() body: { researchId?: unknown; tags?: unknown } | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const ctx = request.workspace;
+    await this.visibleProject(ctx, projectId);
+    const tags = body?.tags;
+    if (
+      !Array.isArray(tags) ||
+      tags.length > 30 ||
+      tags.some((t) => typeof t !== 'string' || t.length > 60)
+    ) {
+      throw new BadRequestException({ errors: { tags: 'invalid' } });
+    }
+    const db = this.prisma.client;
+    const research = await db.research.findFirst({
+      where: {
+        id: typeof body?.researchId === 'string' ? body.researchId : '',
+        projectId,
+        workspaceId: ctx.workspaceId,
+        productIds: { has: productId },
+      },
+    });
+    if (!research) throw new NotFoundException();
+    const rating = await this.ratingOf(research);
+    if (!rating.version) return { audit: null, details: {} };
+    return this.auditOf(tags as string[], rating);
   }
 
   /** The project's markets (stored or suggested from orders) and delivery days. */
