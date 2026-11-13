@@ -1699,7 +1699,7 @@
     "reject": "Відхилити",
     "today": "сьогодні",
     "pastDays": "Минулі дні: {days} · публікацій: {count}",
-    "ideasCount": "Ідеї без дня ({count})",
+    "ideasCount": "Ідеї ({count})",
     "focus": "Фокус",
     "focusAll": "Усі",
     "unnamed": "Без назви",

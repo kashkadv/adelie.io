@@ -1699,7 +1699,7 @@
     "reject": "Reject",
     "today": "today",
     "pastDays": "Past days: {days} · publications: {count}",
-    "ideasCount": "Ideas without a day ({count})",
+    "ideasCount": "Ideas ({count})",
     "focus": "Focus",
     "focusAll": "All",
     "unnamed": "Unnamed",
