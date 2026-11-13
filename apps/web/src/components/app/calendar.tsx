@@ -29,7 +29,7 @@ import {
   type CalendarItem,
   type WeekFocus,
 } from './calendar-data';
-import { CalendarBrief } from './calendar-brief';
+import { CalendarBrief, type AiState } from './calendar-brief';
 import { CalendarItemDialog } from './calendar-item-dialog';
 import { CalendarReview } from './calendar-review';
 import { ChannelIcon } from './link-ui';
@@ -46,6 +46,7 @@ interface WeekData {
   dailyMinutes: number | null;
   today: string;
   focus: WeekFocus;
+  ai: AiState;
   items: CalendarItem[];
   suggestions: CalendarItem[];
 }
@@ -109,6 +110,7 @@ export function Calendar() {
         `${base}/ideas`,
         { method: 'POST', json: { week, locale } },
       );
+      setData((d) => (d && d.ai.enabled ? { ...d, ai: { ...d.ai, spentUsd: r.spentUsd } } : d));
       setNotice({
         kind: 'created',
         count: r.created,
@@ -610,6 +612,18 @@ export function Calendar() {
             />
             <InfoTip text={focus.isDefault ? t('focusAuto') : t('focusChosen')} />
           </div>
+        )}
+        {data?.ai.enabled && (
+          <span className="ml-auto inline-flex items-center gap-1.5 text-sm text-muted">
+            <Sparkles size={14} aria-hidden="true" />
+            <span className="tabular">
+              {t('aiChip', {
+                spent: data.ai.spentUsd.toFixed(2),
+                limit: data.ai.limitUsd.toFixed(2),
+              })}
+            </span>
+            <InfoTip text={t('aiChipHint', { model: data.ai.model })} />
+          </span>
         )}
         {tab === 'week' && base && (
           <Budget

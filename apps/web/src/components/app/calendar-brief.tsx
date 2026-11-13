@@ -39,8 +39,7 @@ const emptyBrief = (): Brief => ({ about: '', assets: '', directions: [newDirect
 
 /**
  * The project's brief (ADR-0029, ADR-0030): what it is and what exists, and its directions — each
- * with a goal, audience, language and channels; the week's focus picks among them. Plus this
- * month's AI spending.
+ * with a goal, audience, language and channels; the week's focus picks among them.
  */
 export function CalendarBrief({
   base,
@@ -54,12 +53,11 @@ export function CalendarBrief({
   const t = useTranslations('Calendar.brief');
   const tl = useTranslations('Links');
   const [brief, setBrief] = useState<Brief | null>(null);
-  const [ai, setAi] = useState<AiState | null>(null);
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
 
   useEffect(() => {
     let cancelled = false;
-    api<{ brief: Brief | null; ai: AiState }>(`${base}/brief`).then(
+    api<{ brief: Brief | null }>(`${base}/brief`).then(
       (r) => {
         if (cancelled) return;
         setBrief(
@@ -70,7 +68,6 @@ export function CalendarBrief({
               }
             : emptyBrief(),
         );
-        setAi(r.ai);
       },
       () => !cancelled && setBrief(emptyBrief()),
     );
@@ -131,7 +128,7 @@ export function CalendarBrief({
   );
 
   return (
-    <div className="animate-rise grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+    <div className="animate-rise grid gap-4">
       <div className="grid gap-4">
         <section className="card grid gap-4 rounded-[24px] p-5">
           <h3 className="text-sm font-semibold">{t('common')}</h3>
@@ -242,29 +239,6 @@ export function CalendarBrief({
           </div>
         )}
       </div>
-
-      <section className="card h-fit rounded-[24px] p-5 text-sm">
-        <h3 className="mb-2 flex items-center gap-1.5 font-semibold">
-          {t('aiTitle')}
-          <InfoTip text={t('aiHint')} />
-        </h3>
-        {!ai ? null : ai.enabled ? (
-          <dl className="grid gap-1.5">
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted">{t('aiSpent')}</dt>
-              <dd className="tabular">
-                ${ai.spentUsd.toFixed(2)} / ${ai.limitUsd.toFixed(2)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted">{t('aiModel')}</dt>
-              <dd className="truncate">{ai.model}</dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="text-muted">{t('aiOff')}</p>
-        )}
-      </section>
     </div>
   );
 }

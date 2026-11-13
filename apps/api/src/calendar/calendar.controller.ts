@@ -266,6 +266,7 @@ export class CalendarController {
       dailyMinutes: project.dailyMinutes,
       today: todayIn(project.timezone),
       focus: await this.focusOf(projectId, project.brief, weekStartOf(from)),
+      ai: await this.aiState(projectId),
       items: items.map(present),
       suggestions: suggestions.map(present),
     };
@@ -517,6 +518,18 @@ export class CalendarController {
     return sum._sum.costMicros ?? 0;
   }
 
+  /** Whether AI is available, its model, and this month's spending against the limit. */
+  private async aiState(projectId: string) {
+    return config.ai
+      ? {
+          enabled: true as const,
+          model: config.ai.model,
+          spentUsd: (await this.spentMicros(projectId)) / 1e6,
+          limitUsd: config.ai.monthlyLimitUsd,
+        }
+      : { enabled: false as const };
+  }
+
   /** The project's brief, and whether AI is available and how much of the month's limit is used. */
   @Get('brief')
   async brief(
@@ -528,17 +541,7 @@ export class CalendarController {
       where: { id: projectId },
       select: { brief: true },
     });
-    return {
-      brief: parseBrief(row?.brief),
-      ai: config.ai
-        ? {
-            enabled: true,
-            model: config.ai.model,
-            spentUsd: (await this.spentMicros(projectId)) / 1e6,
-            limitUsd: config.ai.monthlyLimitUsd,
-          }
-        : { enabled: false },
-    };
+    return { brief: parseBrief(row?.brief), ai: await this.aiState(projectId) };
   }
 
   @Put('brief')

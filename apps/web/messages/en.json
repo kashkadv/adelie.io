@@ -1683,11 +1683,6 @@
       "save": "Save brief",
       "saved": "Saved",
       "failed": "Could not save. Please try again.",
-      "aiTitle": "AI this month",
-      "aiHint": "How much this project's AI requests cost this month, and the monthly limit. The limit in the OpenAI dashboard applies separately.",
-      "aiSpent": "Spent",
-      "aiModel": "Model",
-      "aiOff": "AI is not set up on the server.",
       "common": "Shared",
       "direction": "Direction {n}",
       "directionsHint": "A direction is a separate goal with its own audience, language and channels, e.g. “World” and “Ukraine”. The week's focus picks which direction the AI proposes ideas for.",
@@ -1709,6 +1704,8 @@
     "focusAll": "All",
     "unnamed": "Unnamed",
     "focusAuto": "The week's focus alternates after the last one chosen. Pick a direction to fix it for this week; AI ideas will be for it.",
-    "focusChosen": "The focus is fixed for this week. AI ideas are for this direction."
+    "focusChosen": "The focus is fixed for this week. AI ideas are for this direction.",
+    "aiChip": "AI ${spent} / ${limit}",
+    "aiChipHint": "This project's AI request costs this month and the monthly limit. The limit in the OpenAI dashboard applies separately. Model: {model}."
   }
 }
