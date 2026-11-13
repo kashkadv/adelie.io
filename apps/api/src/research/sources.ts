@@ -73,37 +73,44 @@ export async function fetchEtsyMarket(keywords: string[]): Promise<EtsyMarket[]>
 
 /**
  * Etsy's numbers for each candidate tag: how many active listings carry the phrase, and over its top
- * 50 the median USD price and average favourites — one request per tag, under Etsy's 5 per second.
+ * 25 the median USD price and average favourites — one request per tag, five workers each keeping to
+ * one request a second (Etsy allows 5 per second).
  */
 export async function fetchTagStats(tags: string[]): Promise<TagStat[]> {
   const etsy = config.etsy;
   if (!etsy) throw new Error('Etsy is not configured');
   const http = new HttpClient({ baseUrl: 'https://api.etsy.com' });
-  const out: TagStat[] = [];
-  for (const tag of tags.slice(0, 80)) {
-    const res = await http.request<{ count?: number; results?: EtsyListingLite[] }>({
-      path: '/v3/application/listings/active',
-      query: { keywords: tag, limit: 50, sort_on: 'score' },
-      headers: { 'x-api-key': `${etsy.keystring}:${etsy.sharedSecret}` },
-      bucket: 'etsy',
-    });
-    const m = etsyMarket(
-      tag,
-      res.body?.count ?? 0,
-      (res.body?.results ?? []).map((l) => ({
-        title: l.title ?? '',
-        tags: [],
-        price: l.price ?? null,
-        num_favorers: l.num_favorers ?? 0,
-      })),
-    );
-    out.push({
-      tag,
-      count: m.count,
-      priceMedian: m.priceUsd?.median ?? null,
-      avgFavorers: m.avgFavorers,
-    });
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  return out;
+  const queue = tags.slice(0, 80);
+  const out = new Map<string, TagStat>();
+  const worker = async () => {
+    for (let tag = queue.shift(); tag !== undefined; tag = queue.shift()) {
+      const started = Date.now();
+      const res = await http.request<{ count?: number; results?: EtsyListingLite[] }>({
+        path: '/v3/application/listings/active',
+        query: { keywords: tag, limit: 25, sort_on: 'score' },
+        headers: { 'x-api-key': `${etsy.keystring}:${etsy.sharedSecret}` },
+        bucket: 'etsy',
+      });
+      const m = etsyMarket(
+        tag,
+        res.body?.count ?? 0,
+        (res.body?.results ?? []).map((l) => ({
+          title: l.title ?? '',
+          tags: [],
+          price: l.price ?? null,
+          num_favorers: l.num_favorers ?? 0,
+        })),
+      );
+      out.set(tag, {
+        tag,
+        count: m.count,
+        priceMedian: m.priceUsd?.median ?? null,
+        avgFavorers: m.avgFavorers,
+      });
+      const wait = 1000 - (Date.now() - started);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    }
+  };
+  await Promise.all(Array.from({ length: 5 }, worker));
+  return tags.flatMap((t) => (out.has(t) ? [out.get(t)!] : []));
 }

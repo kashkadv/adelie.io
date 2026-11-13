@@ -103,6 +103,8 @@ export interface Research {
   endsOn: string | null;
   directionId: string | null;
   refreshedAt: string | null;
+  refreshing: boolean;
+  refreshError: string | null;
   sources: {
     pinterest: {
       fetchedAt: string;

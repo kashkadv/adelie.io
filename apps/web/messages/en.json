@@ -1798,7 +1798,7 @@
     "back": "All research",
     "notFound": "Research not found.",
     "refresh": "Update data",
-    "refreshing": "Collecting data from Pinterest and Etsy…",
+    "refreshing": "Collecting data from Pinterest and Etsy (up to a minute)…",
     "sourcePinterest": "Pinterest trends",
     "sourcePinterestHint": "Top and fastest-growing Pinterest searches with the niche's words in your main markets. Values are relative; narrow phrases may not make the top.",
     "sourcePinterestOk": "{count} searches · {regions} · {date}",
@@ -1976,6 +1976,7 @@
         "consider": "Instead of the weak ones",
         "unknownHint": "Etsy numbers for this tag are not collected yet"
       }
-    }
+    },
+    "refreshFailed": "The last update failed: {error}"
   }
 }

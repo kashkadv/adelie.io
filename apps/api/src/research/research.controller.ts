@@ -353,6 +353,31 @@ export class ResearchController {
     @Req() request: { workspace: WorkspaceRequestContext },
     @Session() session: UserSession,
   ) {
+    await this.researchOf(request.workspace, projectId, id);
+    // It takes a while (dozens of Etsy requests): it runs on in the background, the page asks again.
+    if (!this.running.has(id)) {
+      this.running.set(
+        id,
+        this.collect(projectId, id, request, session)
+          .then(() => this.failed.delete(id))
+          .catch((e: unknown) => this.failed.set(id, e instanceof Error ? e.message : String(e)))
+          .finally(() => this.running.delete(id)),
+      );
+    }
+    return { running: true };
+  }
+
+  /** Researches being refreshed now, and the last refresh that failed (by research id). */
+  private readonly running = new Map<string, Promise<unknown>>();
+  private readonly failed = new Map<string, string>();
+
+  /** One refresh: sources, the pool's review, the tags' numbers — saved as a new version. */
+  private async collect(
+    projectId: string,
+    id: string,
+    request: { workspace: WorkspaceRequestContext },
+    session: UserSession,
+  ) {
     const ctx = request.workspace;
     const research = await this.researchOf(ctx, projectId, id);
     const project = await this.visibleProject(ctx, projectId);
@@ -386,13 +411,20 @@ export class ResearchController {
       marketList,
       studied.map((p) => `${p.title} ${p.tags.join(' ')}`),
     );
-    const review = await this.reviewPhrases(
-      ctx,
-      session.user.id,
-      project,
-      research,
-      pool.map((p) => p.phrase),
-    ).catch(() => null);
+    // Phrases reviewed in an earlier version keep their verdict; only new ones go to the AI.
+    const previous = await db.researchVersion.findFirst({
+      where: { researchId: id, review: { not: Prisma.DbNull } },
+      orderBy: { createdAt: 'desc' },
+      select: { review: true },
+    });
+    const known = ((previous?.review as { review?: PoolReview } | null)?.review ??
+      {}) as PoolReview;
+    const fresh = pool.map((p) => p.phrase).filter((p) => !known[phraseKey(p)]);
+    const added = fresh.length
+      ? await this.reviewPhrases(ctx, session.user.id, project, research, fresh).catch(() => null)
+      : {};
+    const review: PoolReview | null =
+      added || Object.keys(known).length ? { ...known, ...added } : null;
     const overrides = parseOverrides((research.context as { phrases?: unknown } | null)?.phrases);
     const visible = pool.filter((p) => phraseVisible(p.phrase, review ?? {}, overrides));
 
@@ -424,7 +456,6 @@ export class ResearchController {
       },
     });
     await db.research.update({ where: { id }, data: { refreshedAt: new Date() } });
-    return this.get(projectId, id, request);
   }
 
   /** The context blocks the AI gets for this research (automatic and the owner's). */
@@ -999,6 +1030,8 @@ export class ResearchController {
       endsOn: research.endsOn ? research.endsOn.toISOString().slice(0, 10) : null,
       directionId: research.directionId,
       refreshedAt: research.refreshedAt,
+      refreshing: this.running.has(id),
+      refreshError: this.failed.get(id) ?? null,
       versions: versions.map((v) => ({ id: v.id, createdAt: v.createdAt, keywords: v.keywords })),
       version: version
         ? { id: version.id, createdAt: version.createdAt, keywords: version.keywords }

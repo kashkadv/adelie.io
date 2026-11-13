@@ -100,11 +100,23 @@ export function ResearchDetail({
     }
   }
 
+  /**
+   * Starts an update (it runs on the server for up to a minute or two) and asks again every few
+   * seconds until the new version is there.
+   */
   async function refresh() {
     setRefreshing(true);
+    setVersionId(null);
     try {
-      setVersionId(null);
-      setData(await api<Research>(`${base}/${id}/refresh`, { method: 'POST' }));
+      await api(`${base}/${id}/refresh`, { method: 'POST' });
+      for (let i = 0; i < 100; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const r = await api<Research>(`${base}/${id}`);
+        if (!r.refreshing) {
+          setData(r);
+          break;
+        }
+      }
     } catch {
       setFailed(true);
     } finally {
@@ -197,6 +209,15 @@ export function ResearchDetail({
           </span>
         )}
       </header>
+
+      {data.refreshError && !refreshing && (
+        <p
+          role="alert"
+          className="animate-rise mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300"
+        >
+          {t('refreshFailed', { error: data.refreshError })}
+        </p>
+      )}
 
       {data.versions.length > 1 && (
         <div className="animate-rise mb-4 flex flex-wrap items-center gap-2 text-sm">

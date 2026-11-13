@@ -1798,7 +1798,7 @@
     "back": "Усі дослідження",
     "notFound": "Дослідження не знайдено.",
     "refresh": "Оновити дані",
-    "refreshing": "Збираю дані з Pinterest і Etsy…",
+    "refreshing": "Збираю дані з Pinterest і Etsy (до хвилини)…",
     "sourcePinterest": "Тренди Pinterest",
     "sourcePinterestHint": "Найпопулярніші й ті, що найшвидше ростуть, запити Pinterest зі словами ніші у ваших головних ринках. Значення відносні; вузькі фрази можуть не потрапити в топ.",
     "sourcePinterestOk": "{count} запитів · {regions} · {date}",
@@ -1976,6 +1976,7 @@
         "consider": "Замість слабких",
         "unknownHint": "Etsy-статистику для цього тегу ще не зібрано"
       }
-    }
+    },
+    "refreshFailed": "Останнє оновлення не вдалося: {error}"
   }
 }
