@@ -59,3 +59,4 @@
 - [ADR-0028](decisions/0028-content-calendar.md) — Календар публікацій і огляд тижня (прийнято)
 - [ADR-0029](decisions/0029-ai-brief-and-ideas.md) — Бриф проєкту й ідеї AI для календаря (прийнято; п. 1–2 замінено ADR-0030)
 - [ADR-0030](decisions/0030-brief-directions-week-focus.md) — Напрями брифу, фокус тижня, пропозиції AI з днем (прийнято)
+- [ADR-0031](decisions/0031-project-facts.md) — «Дані проєкту»: підсумок з підключень для брифу й AI (прийнято)

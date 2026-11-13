@@ -170,6 +170,8 @@ export interface IdeasContext {
   history: Record<string, unknown>[];
   /** The project's best posts of the last 90 days, by their platform's numbers. */
   topPosts: Record<string, unknown>[];
+  /** What Adelie knows about the project from its connections (ADR-0031). */
+  projectData: unknown;
   /** The owner's interface language (for `why`). */
   ownerLanguage: string;
 }
@@ -179,6 +181,7 @@ Propose publications for the remaining days of the week, each on a day. Rules:
 - Work only for the directions in focus: their goal, audience, language and channels. Use only their channels; never invent accounts.
 - Fit the time budget per day: on each day, already planned minutes plus your ideas should not exceed the daily minutes (when set). Spread ideas over the days; leave a day empty rather than overload it. Be realistic about preparation time.
 - Do not repeat topics already planned, waiting as ideas, or rejected by the owner; vary formats.
+- "projectData" is counted from the connected platforms (followers, content, sales, site visits): treat it as reliable facts.
 - Base ideas on the project's own results when they exist: what got clicks, visits, goals or engagement. Cite those numbers in "why" and mark evidence "results". When there are no relevant results, say so and mark evidence "hypothesis". Never invent numbers or claim market data you were not given.
 - "title" and "notes" are in the audience language of the idea's direction; "why" is in the owner language.
 - "notes" is practical: a hook for the first line, a short caption draft, a few tags or hashtags fitting the channel, a call to action pointing to the direction's goal.
@@ -193,6 +196,7 @@ export function ideasInput(ctx: IdeasContext): string {
       project: ctx.project,
       about: ctx.about,
       whatExists: ctx.assets,
+      projectData: ctx.projectData,
       directionsInFocus: ctx.focus.map(({ id: _id, ...d }) => d),
       dailyMinutes: ctx.dailyMinutes,
       connectedPlatforms: ctx.connected,

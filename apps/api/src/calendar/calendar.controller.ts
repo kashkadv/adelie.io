@@ -52,6 +52,7 @@ import {
   todayIn,
   type IdeasContext,
 } from './ideas.js';
+import { projectFacts } from './facts.js';
 
 const LINK = {
   select: {
@@ -544,6 +545,16 @@ export class CalendarController {
     return { brief: parseBrief(row?.brief), ai: await this.aiState(projectId) };
   }
 
+  /** What Adelie knows about the project from its connections (ADR-0031). */
+  @Get('facts')
+  async facts(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    await this.visibleProject(request.workspace, projectId);
+    return projectFacts(this.prisma.client, projectId, request.workspace.workspaceId);
+  }
+
   @Put('brief')
   @WorkspaceRoles(...CONNECT_ROLES)
   async saveBrief(
@@ -782,6 +793,7 @@ export class CalendarController {
           published: p.publishedAt ? dayOf(p.publishedAt) : null,
           ...numbers(p.latest),
         })),
+      projectData: await projectFacts(db, projectId, ctx.workspaceId),
       ownerLanguage: body?.locale === 'uk' ? 'Ukrainian' : 'English',
     };
 

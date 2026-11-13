@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { Checkbox } from '../ui/checkbox';
 import { InfoTip } from '../ui/info-tip';
 import { ChannelIcon } from './link-ui';
+import { ProjectFacts } from './project-facts';
 import { LINK_CHANNELS, type LinkChannel } from './links-data';
 
 /** One direction of the project (ADR-0030): its own goal, audience, language and channels. */
@@ -129,6 +130,7 @@ export function CalendarBrief({
 
   return (
     <div className="animate-rise grid gap-4">
+      <ProjectFacts base={base} />
       <div className="grid gap-4">
         <section className="card grid gap-4 rounded-[24px] p-5">
           <h3 className="text-sm font-semibold">{t('common')}</h3>
