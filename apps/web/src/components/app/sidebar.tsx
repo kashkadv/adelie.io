@@ -11,6 +11,7 @@ import {
   Package,
   PanelLeftClose,
   PlugZap,
+  Telescope,
   ReceiptText,
   Settings,
   type LucideIcon,
@@ -27,6 +28,7 @@ type NavKey =
   | 'content'
   | 'links'
   | 'calendar'
+  | 'research'
   | 'products'
   | 'orders'
   | 'flipper'
@@ -54,6 +56,8 @@ const NAV: { group?: 'promotion' | 'sales' | 'site'; items: NavItem[] }[] = [
       { key: 'links', href: '/links', icon: Link2 },
       // Content calendar and weekly review (ADR-0028).
       { key: 'calendar', href: '/calendar', icon: CalendarDays },
+      // Niche research: what to promote and how to write it (ADR-0032).
+      { key: 'research', href: '/research', icon: Telescope },
     ],
   },
   {

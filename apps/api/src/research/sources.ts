@@ -1,0 +1,78 @@
+// The sources of a niche research (ADR-0032): Pinterest Trends through the project's Pinterest
+// connection, the Etsy market through the app's key. Each returns our own computations only.
+import { HttpClient } from '@adelie/platforms';
+import { config } from '../config.js';
+import type { ConnectService } from '../social/connect.service.js';
+import {
+  etsyMarket,
+  readTrends,
+  words,
+  type EtsyListingLite,
+  type EtsyMarket,
+  type TrendKeyword,
+} from './research.js';
+
+/**
+ * The words Trends filters by: the last word of each seed phrase ("wool pillow" → "pillow"), the
+ * thing itself — Trends lists only top keywords, so a narrow phrase would often find nothing.
+ */
+export function trendFilters(keywords: string[]): string[] {
+  return [...new Set(keywords.map((k) => words(k).at(-1)).filter((w): w is string => !!w))].slice(
+    0,
+    5,
+  );
+}
+
+/** Growing and monthly-top keywords containing the niche's words, in each region. */
+export async function fetchTrends(
+  connect: ConnectService,
+  accountId: string,
+  regions: string[],
+  keywords: string[],
+): Promise<TrendKeyword[]> {
+  const filters = trendFilters(keywords);
+  return connect.withAccount(accountId, async (_adapter, ctx) => {
+    const out: TrendKeyword[] = [];
+    for (const region of regions) {
+      for (const filter of filters) {
+        for (const type of ['growing', 'monthly'] as const) {
+          const res = await ctx.http.request<unknown>({
+            path: `/v5/trends/keywords/${encodeURIComponent(region)}/top/${type}`,
+            query: { include_keywords: filter, limit: 50 },
+            headers: { Authorization: `Bearer ${ctx.accessToken}` },
+            bucket: 'trends',
+          });
+          out.push(...readTrends(region, res.body));
+        }
+      }
+    }
+    // The same keyword from "growing" and "monthly" in one region is one entry.
+    const seen = new Map<string, TrendKeyword>();
+    for (const t of out) seen.set(`${t.region}\u0000${t.keyword}`, t);
+    return [...seen.values()];
+  });
+}
+
+/** The top 100 active Etsy listings for each seed phrase, reduced to what they have in common. */
+export async function fetchEtsyMarket(keywords: string[]): Promise<EtsyMarket[]> {
+  const etsy = config.etsy;
+  if (!etsy) throw new Error('Etsy is not configured');
+  const http = new HttpClient({ baseUrl: 'https://api.etsy.com' });
+  const out: EtsyMarket[] = [];
+  for (const keyword of keywords.slice(0, 5)) {
+    const res = await http.request<{ count?: number; results?: EtsyListingLite[] }>({
+      path: '/v3/application/listings/active',
+      query: { keywords: keyword, limit: 100, sort_on: 'score' },
+      headers: { 'x-api-key': `${etsy.keystring}:${etsy.sharedSecret}` },
+      bucket: 'etsy',
+    });
+    const listings = (res.body?.results ?? []).map((l) => ({
+      title: l.title ?? '',
+      tags: Array.isArray(l.tags) ? l.tags : [],
+      price: l.price ?? null,
+      num_favorers: l.num_favorers ?? 0,
+    }));
+    out.push(etsyMarket(keyword, res.body?.count ?? 0, listings));
+  }
+  return out;
+}

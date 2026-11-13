@@ -190,6 +190,10 @@ model Project {
   dailyMinutes Int?
   /// What the project is, for whom, in which language and channels (ADR-0029); the AI's starting point.
   brief        Json?
+  /// Where the project sells (ADR-0032): [{ code: "US", share: 72 }], from the shop's orders by default.
+  markets      Json?
+  /// Days a parcel takes to the buyer, for "order by" deadlines before holidays.
+  deliveryDays Int?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -1097,4 +1101,52 @@ model CalendarWeek {
 
   @@unique([projectId, weekStart])
   @@map("calendar_week")
+}
+
+/// A niche research (ADR-0032): a niche, where its products are sold and the channel that promotes
+/// them — "Wool pillows · Etsy · via Pinterest". Several run side by side.
+model Research {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  workspaceId    String    @db.Uuid
+  projectId      String    @db.Uuid
+  name           String
+  /// Seed phrases of the niche, in the market's language.
+  keywords       String[]
+  /// The shop or site the products are sold in (a connected account).
+  salesAccountId String    @db.Uuid
+  /// The promotion channel: pinterest (more later).
+  channel        String
+  /// The products studied (shop_product ids), chosen from the suggestion and by hand.
+  productIds     String[]  @default([])
+  /// A direction of the brief its ideas belong to (ADR-0030), if any.
+  directionId    String?
+  /// When the season it is for ends (e.g. the last day to order before Christmas).
+  endsOn         DateTime? @db.Date
+  /// The owner's own context blocks for the AI (stage 2).
+  context        Json?
+  refreshedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  archivedAt     DateTime?
+
+  snapshots ResearchSnapshot[]
+
+  @@index([projectId])
+  @@map("research")
+}
+
+/// What a source gave a research at its last refresh: our own computations only (counts, shares,
+/// frequencies) — never other sellers' listings (Etsy terms).
+model ResearchSnapshot {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  researchId String   @db.Uuid
+  research   Research @relation(fields: [researchId], references: [id], onDelete: Cascade)
+  /// pinterest_trends | etsy_market
+  source     String
+  data       Json
+  error      String?
+  fetchedAt  DateTime @default(now())
+
+  @@unique([researchId, source])
+  @@map("research_snapshot")
 }

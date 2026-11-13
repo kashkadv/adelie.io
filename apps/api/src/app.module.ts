@@ -11,6 +11,7 @@ import { LinksController } from './links/links.controller.js';
 import { OverviewController } from './overview/overview.controller.js';
 import { PreferencesController } from './preferences/preferences.controller.js';
 import { PrismaService } from './prisma.service.js';
+import { ResearchController } from './research/research.controller.js';
 import { SalesController } from './sales/sales.controller.js';
 import { ProfileController } from './profile/profile.controller.js';
 import { ConnectService } from './social/connect.service.js';
@@ -35,6 +36,7 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
     LinksController,
     OverviewController,
     PreferencesController,
+    ResearchController,
     SalesController,
     ProfileController,
     SocialController,

@@ -17,6 +17,7 @@
 | [plans/mvp-1.md](plans/mvp-1.md) | План MVP-1: Pinterest end-to-end (в роботі) |
 | [plans/link-builder.md](plans/link-builder.md) | Link Builder: кроки реалізації (готово) |
 | [plans/content-calendar.md](plans/content-calendar.md) | Календар публікацій і огляд тижня (в роботі) |
+| [plans/niche-research.md](plans/niche-research.md) | Дослідження ніш: що просувати й як писати (в роботі) |
 | [plans/stage-2-data-model.md](plans/stage-2-data-model.md) | Етап 2: модель даних соцмереж і метрик (узгоджено) |
 | [plans/mvp-discussion.md](plans/mvp-discussion.md) | Обговорення обсягу MVP і стеку (завершено) |
 | [plans/infra-discussion.md](plans/infra-discussion.md) | Обговорення інфраструктури на домашньому Proxmox (в роботі) |
@@ -60,3 +61,4 @@
 - [ADR-0029](decisions/0029-ai-brief-and-ideas.md) — Бриф проєкту й ідеї AI для календаря (прийнято; п. 1–2 замінено ADR-0030)
 - [ADR-0030](decisions/0030-brief-directions-week-focus.md) — Напрями брифу, фокус тижня, пропозиції AI з днем (прийнято)
 - [ADR-0031](decisions/0031-project-facts.md) — «Дані проєкту»: підсумок з підключень для брифу й AI (прийнято)
+- [ADR-0032](decisions/0032-niche-research.md) — Дослідження: ніша · точка продажу · канал (прийнято)
