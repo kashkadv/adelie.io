@@ -184,7 +184,7 @@ export function TagAuditLine({ audit }: { audit: TagAudit }) {
     .filter((v) => audit.counts[v] > 0)
     .map((v) => t(`audit.${v}`, { count: audit.counts[v] }));
   return (
-    <div className="mt-1.5 text-xs">
+    <div className="mt-3 border-t border-line pt-3 text-xs">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -200,7 +200,7 @@ export function TagAuditLine({ audit }: { audit: TagAudit }) {
           ` · ${t('audit.better', { count: audit.replacements.length })}`}
       </button>
       {open && (
-        <div className="mt-1.5 grid gap-1.5">
+        <div className="mt-2.5 grid gap-3">
           <div className="flex flex-wrap gap-1">
             {audit.tags.map((x) => (
               <span

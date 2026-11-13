@@ -329,7 +329,7 @@ export function ResearchDetail({
                   >
                     {p.title}
                   </a>
-                  <p className="mt-0.5 text-xs text-muted">
+                  <p className="mt-1 text-xs text-muted">
                     {t('productStats', {
                       sold: n(p.sold12m),
                       favorers: n(p.favorers),
@@ -337,7 +337,7 @@ export function ResearchDetail({
                       tags: p.tags,
                     })}
                   </p>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
+                  <div className="mt-3 flex flex-wrap gap-1">
                     {p.reasons.map((r) => (
                       <span
                         key={r}
@@ -352,7 +352,7 @@ export function ResearchDetail({
                     ))}
                   </div>
                   {(p.matched.length > 0 || p.missing.length > 0) && (
-                    <p className="mt-1.5 text-xs leading-relaxed">
+                    <p className="mt-3 grid gap-1 text-xs leading-relaxed">
                       {p.matched.length > 0 && (
                         <span className="text-muted">
                           {t('matched')}: {p.matched.slice(0, 6).join(', ')}
