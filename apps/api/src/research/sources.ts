@@ -10,6 +10,7 @@ import {
   trendFilters,
   type EtsyListingLite,
   type EtsyMarket,
+  type TagStat,
   type TrendKeyword,
 } from './research.js';
 
@@ -66,6 +67,43 @@ export async function fetchEtsyMarket(keywords: string[]): Promise<EtsyMarket[]>
       num_favorers: l.num_favorers ?? 0,
     }));
     out.push(etsyMarket(keyword, res.body?.count ?? 0, listings));
+  }
+  return out;
+}
+
+/**
+ * Etsy's numbers for each candidate tag: how many active listings carry the phrase, and over its top
+ * 50 the median USD price and average favourites — one request per tag, under Etsy's 5 per second.
+ */
+export async function fetchTagStats(tags: string[]): Promise<TagStat[]> {
+  const etsy = config.etsy;
+  if (!etsy) throw new Error('Etsy is not configured');
+  const http = new HttpClient({ baseUrl: 'https://api.etsy.com' });
+  const out: TagStat[] = [];
+  for (const tag of tags.slice(0, 80)) {
+    const res = await http.request<{ count?: number; results?: EtsyListingLite[] }>({
+      path: '/v3/application/listings/active',
+      query: { keywords: tag, limit: 50, sort_on: 'score' },
+      headers: { 'x-api-key': `${etsy.keystring}:${etsy.sharedSecret}` },
+      bucket: 'etsy',
+    });
+    const m = etsyMarket(
+      tag,
+      res.body?.count ?? 0,
+      (res.body?.results ?? []).map((l) => ({
+        title: l.title ?? '',
+        tags: [],
+        price: l.price ?? null,
+        num_favorers: l.num_favorers ?? 0,
+      })),
+    );
+    out.push({
+      tag,
+      count: m.count,
+      priceMedian: m.priceUsd?.median ?? null,
+      avgFavorers: m.avgFavorers,
+    });
+    await new Promise((r) => setTimeout(r, 250));
   }
   return out;
 }

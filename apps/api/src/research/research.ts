@@ -396,3 +396,79 @@ export function relevantTrends(trends: TrendKeyword[], keywords: string[]): Tren
   const niche = nicheWords(keywords);
   return trends.filter((t) => words(t.keyword).some((w) => niche.has(w)));
 }
+
+// --- Tags ---------------------------------------------------------------------------------------
+
+/** What Etsy says about one candidate tag: our counts over its top listings. */
+export interface TagStat {
+  tag: string;
+  count: number;
+  priceMedian: number | null;
+  avgFavorers: number;
+}
+
+export type Competition = 'low' | 'medium' | 'high' | 'very_high';
+export const competitionOf = (count: number): Competition =>
+  count < 1_000 ? 'low' : count < 20_000 ? 'medium' : count < 100_000 ? 'high' : 'very_high';
+
+export interface RatedTag extends TagStat {
+  competition: Competition;
+  /** How many of the top listings for the niche's phrases use it (tags and titles). */
+  competitors: number;
+  pinterestMom: number | null;
+  /** Your studied products that already use it. */
+  own: number;
+  /** The median price against yours: below, near (±20 %) or above. */
+  priceVsOwn: 'below' | 'near' | 'above' | null;
+  /** 0–100: demand and trend against competition. */
+  score: number;
+}
+
+/** Candidate tags: the pool's fitting phrases that Etsy accepts as a tag (≤ 20 characters). */
+export function tagCandidates(pool: { phrase: string; score: number }[], max = 40): string[] {
+  return pool
+    .filter((p) => p.phrase.length <= 20 && p.phrase.includes(' '))
+    .slice(0, max)
+    .map((p) => p.phrase);
+}
+
+/**
+ * Rates candidate tags: demand (favourites of the top listings), use by competitors, Pinterest
+ * growth, against competition (how many listings) — a high score is a tag worth having.
+ */
+export function rateTags(
+  stats: TagStat[],
+  pool: PoolPhrase[],
+  ownTexts: string[],
+  ownPrice: number | null,
+): RatedTag[] {
+  const byPhrase = new Map(pool.map((p) => [phraseKey(p.phrase), p]));
+  return stats
+    .map((s) => {
+      const p = byPhrase.get(phraseKey(s.tag));
+      const competitors = p?.etsy ?? 0;
+      const mom = p?.pinterest?.mom ?? null;
+      const demand = Math.min(1, Math.log10(s.avgFavorers + 1) / 2);
+      const usage = Math.min(1, competitors / 30);
+      const trend = mom === null ? 0 : mom >= 10000 ? 1 : Math.max(0, Math.min(1, mom / 300));
+      const crowd = Math.min(1, Math.log10(Math.max(1, s.count)) / 6);
+      const ratio = ownPrice && s.priceMedian ? s.priceMedian / ownPrice : null;
+      return {
+        ...s,
+        competition: competitionOf(s.count),
+        competitors,
+        pinterestMom: mom,
+        own: ownTexts.filter((t) => mentions(t, s.tag)).length,
+        priceVsOwn:
+          ratio === null
+            ? null
+            : ratio < 0.8
+              ? ('below' as const)
+              : ratio > 1.2
+                ? ('above' as const)
+                : ('near' as const),
+        score: Math.round((0.35 * demand + 0.25 * usage + 0.2 * trend + 0.2 * (1 - crowd)) * 100),
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+}

@@ -69,6 +69,28 @@ export interface RankedProduct {
   sold12m: number;
   price: number | null;
   currency: string | null;
+  tagAudit: TagAudit;
+}
+
+export type TagVerdict = 'strong' | 'ok' | 'weak' | 'off' | 'unknown';
+export interface TagAudit {
+  tags: { tag: string; verdict: TagVerdict; score: number | null }[];
+  counts: Record<TagVerdict, number>;
+  replacements: { tag: string; score: number }[];
+}
+
+export type Competition = 'low' | 'medium' | 'high' | 'very_high';
+export interface RatedTag {
+  tag: string;
+  count: number;
+  priceMedian: number | null;
+  avgFavorers: number;
+  competition: Competition;
+  competitors: number;
+  pinterestMom: number | null;
+  own: number;
+  priceVsOwn: 'below' | 'near' | 'above' | null;
+  score: number;
 }
 
 export interface Research {
@@ -92,6 +114,11 @@ export interface Research {
   };
   pool: PoolPhrase[];
   reviewedAt: string | null;
+  versions: { id: string; createdAt: string; keywords: string[] }[];
+  version: { id: string; createdAt: string; keywords: string[] } | null;
+  tags: RatedTag[];
+  tagsError: string | null;
+  ownPrice: number | null;
   products: RankedProduct[];
 }
 

@@ -3,7 +3,7 @@
 // the brand, the research's data, the product) and the owner's own — the answer's schema, and the
 // deterministic checks of Etsy's and Pinterest's limits. Pure and unit-tested.
 import { eventsIn } from './events.js';
-import type { EtsyMarket, Market, PoolPhrase } from './research.js';
+import type { EtsyMarket, Market, PoolPhrase, RatedTag } from './research.js';
 
 export interface ContextBlock {
   key: string;
@@ -58,6 +58,8 @@ export interface ContextInput {
   brand: { about: string; audience: string; goal: string } | null;
   pool: PoolPhrase[];
   etsy: EtsyMarket[];
+  /** Rated candidate tags (ADR-0034), best first. */
+  tags?: RatedTag[];
   context: { own: OwnBlock[]; off: string[] };
 }
 
@@ -135,6 +137,17 @@ export function contextBlocks(input: ContextInput): ContextBlock[] {
             (p) =>
               `- ${p.phrase} | ${p.pinterest ? `${p.pinterest.mom ?? '?'}% / ${p.pinterest.yoy ?? '?'}%` : '—'} | ${p.etsy || '—'} | ${p.own || '—'}`,
           ),
+        ...(input.tags?.length
+          ? [
+              'Rated tags — tag | active Etsy listings (competition) | average favourites of its top listings | score 0–100 (prefer high scores; very high competition alone is a weak tag):',
+              ...input.tags
+                .slice(0, 30)
+                .map(
+                  (t) =>
+                    `- ${t.tag} | ${t.count} (${t.competition}) | ${t.avgFavorers} | ${t.score}`,
+                ),
+            ]
+          : []),
         ...input.etsy.map(
           (m) =>
             `Etsy “${m.keyword}”: ${m.count} active listings` +

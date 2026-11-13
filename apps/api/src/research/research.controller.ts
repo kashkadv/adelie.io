@@ -1,4 +1,5 @@
 import {
+  Query,
   BadRequestException,
   Body,
   Controller,
@@ -19,6 +20,7 @@ import { OpenAiProvider, costMicros } from '../ai/provider.js';
 import { parseBrief, todayIn } from '../calendar/ideas.js';
 import { config } from '../config.js';
 import { createTrackedLink } from '../links/create-link.js';
+import { auditTags } from './tag-audit.js';
 import { CONNECT_ROLES, ConnectService } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
 import { countsAsSale } from '../sales/sales.js';
@@ -35,11 +37,14 @@ import {
   pinterestRegions,
   phraseKey,
   rankProducts,
+  rateTags,
   suggestProducts,
+  tagCandidates,
+  type TagStat,
   type EtsyMarket,
   type TrendKeyword,
 } from './research.js';
-import { fetchEtsyMarket, fetchTrends } from './sources.js';
+import { fetchEtsyMarket, fetchTagStats, fetchTrends } from './sources.js';
 import {
   POOL_INSTRUCTIONS,
   POOL_SCHEMA,
@@ -354,17 +359,6 @@ export class ResearchController {
     const { markets } = await this.marketsOf(project);
     const regions = pinterestRegions(markets).map((r) => r.region);
     const db = this.prisma.client;
-    const save = (source: string, data: unknown, error: string | null) =>
-      db.researchSnapshot.upsert({
-        where: { researchId_source: { researchId: id, source } },
-        create: { researchId: id, source, data: data as Prisma.InputJsonValue, error },
-        update: {
-          ...(error ? {} : { data: data as Prisma.InputJsonValue }),
-          error,
-          fetchedAt: new Date(),
-        },
-      });
-
     const pinterest = await db.socialAccount.findFirst({
       where: {
         projectId,
@@ -382,19 +376,54 @@ export class ResearchController {
         : Promise.reject(new Error('no_pinterest')),
       fetchEtsyMarket(research.keywords),
     ]);
-    await save(
-      'pinterest_trends',
-      trends.status === 'fulfilled' ? { regions, keywords: trends.value } : {},
-      trends.status === 'rejected' ? errorOf(trends.reason) : null,
+    const trendList = trends.status === 'fulfilled' ? trends.value : [];
+    const marketList = market.status === 'fulfilled' ? market.value : [];
+
+    // The pool of this version, reviewed by the AI at once (when available and within the limit).
+    const { studied } = await this.studied(research);
+    const pool = keywordPool(
+      trendList,
+      marketList,
+      studied.map((p) => `${p.title} ${p.tags.join(' ')}`),
     );
-    await save(
-      'etsy_market',
-      market.status === 'fulfilled' ? { markets: market.value } : {},
-      market.status === 'rejected' ? errorOf(market.reason) : null,
+    const review = await this.reviewPhrases(
+      ctx,
+      session.user.id,
+      project,
+      research,
+      pool.map((p) => p.phrase),
+    ).catch(() => null);
+    const overrides = parseOverrides((research.context as { phrases?: unknown } | null)?.phrases);
+    const visible = pool.filter((p) => phraseVisible(p.phrase, review ?? {}, overrides));
+
+    // Etsy's numbers for the candidate tags: the pool's best and the tags the products already use.
+    const productTags = studied.flatMap((p) => p.tags.map((t) => t.toLowerCase().trim()));
+    const candidates = [
+      ...new Set([
+        ...tagCandidates(visible, 30),
+        ...productTags.filter((t) => t && t.length <= 20),
+      ]),
+    ].slice(0, 80);
+    const tagStats = await fetchTagStats(candidates).then(
+      (tags) => ({ tags }),
+      (e: unknown) => ({ error: errorOf(e) }),
     );
+
+    await db.researchVersion.create({
+      data: {
+        researchId: id,
+        keywords: research.keywords,
+        trends: (trends.status === 'fulfilled'
+          ? { regions, keywords: trendList }
+          : { error: errorOf(trends.reason) }) as Prisma.InputJsonValue,
+        market: (market.status === 'fulfilled'
+          ? { markets: marketList }
+          : { error: errorOf(market.reason) }) as Prisma.InputJsonValue,
+        tags: tagStats as Prisma.InputJsonValue,
+        review: review ? ({ review } as Prisma.InputJsonValue) : Prisma.DbNull,
+      },
+    });
     await db.research.update({ where: { id }, data: { refreshedAt: new Date() } });
-    // The new pool is reviewed by the AI at once, when it is available and within the limit.
-    await this.reviewPool(projectId, id, request, session).catch(() => undefined);
     return this.get(projectId, id, request);
   }
 
@@ -419,6 +448,7 @@ export class ResearchController {
         : null,
       pool: view.pool.filter((p) => p.visible),
       etsy: view.sources.etsy?.markets ?? [],
+      tags: view.tags,
       context: parseContext(research.context),
     });
     return { research, view, blocks };
@@ -843,16 +873,43 @@ export class ResearchController {
     const ctx = request.workspace;
     const research = await this.researchOf(ctx, projectId, id);
     const project = await this.visibleProject(ctx, projectId);
-    const view = await this.get(projectId, id, request);
-    const phrases = view.pool.map((p) => p.phrase);
-    if (!phrases.length) return { reviewed: 0 };
+    const latest = await this.prisma.client.researchVersion.findFirst({
+      where: { researchId: id },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (!latest) return { reviewed: 0 };
+    const view = await this.get(projectId, id, request, latest.id);
+    const review = await this.reviewPhrases(
+      ctx,
+      session.user.id,
+      project,
+      research,
+      view.pool.map((p) => p.phrase),
+    );
+    await this.prisma.client.researchVersion.update({
+      where: { id: latest.id },
+      data: { review: { review } as Prisma.InputJsonValue },
+    });
+    return { reviewed: Object.keys(review).length };
+  }
+
+  /** The AI's verdict on each phrase (relevant, generic, another product, another intent). */
+  private async reviewPhrases(
+    ctx: WorkspaceRequestContext,
+    userId: string,
+    project: { brief: unknown; markets: unknown; id: string },
+    research: { name: string; keywords: string[]; salesAccountId: string; productIds: string[] },
+    phrases: string[],
+  ): Promise<PoolReview> {
+    if (!phrases.length) return {};
     const niche = await this.nicheInput(
       project,
       research.salesAccountId,
       research.keywords,
       research.productIds,
     );
-    const result = await this.ai(ctx, projectId, session.user.id, 'research_pool_review', {
+    const result = await this.ai(ctx, project.id, userId, 'research_pool_review', {
       instructions: POOL_INSTRUCTIONS,
       input: JSON.stringify({
         research: research.name,
@@ -864,28 +921,140 @@ export class ResearchController {
       name: 'pool_review',
     });
     if (!result.ok) this.aiError(result.error);
-    const review = parsePoolReview(result.data, phrases);
-    await this.prisma.client.researchSnapshot.upsert({
-      where: { researchId_source: { researchId: id, source: 'pool_review' } },
-      create: { researchId: id, source: 'pool_review', data: { review } as Prisma.InputJsonValue },
-      update: { data: { review } as Prisma.InputJsonValue, error: null, fetchedAt: new Date() },
-    });
-    return { reviewed: Object.keys(review).length, costUsd: result.costUsd };
+    return parsePoolReview(result.data, phrases);
   }
 
-  /** A research with its sources, keyword pool and the ranking of its products. */
+  /**
+   * A research as of one version (the latest unless `version` names another): its sources, the
+   * keyword pool with the AI's review, rated tags, the ranking of its products with their tags'
+   * audit; and the list of versions.
+   */
   @Get(':id')
   async get(
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Req() request: { workspace: WorkspaceRequestContext },
+    @Query('version') versionId?: string,
   ) {
     const ctx = request.workspace;
     const research = await this.researchOf(ctx, projectId, id);
     const db = this.prisma.client;
+    const [versions, studiedData, account] = await Promise.all([
+      db.researchVersion.findMany({
+        where: { researchId: id },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, createdAt: true, keywords: true },
+        take: 100,
+      }),
+      this.studied(research),
+      db.socialAccount.findUnique({
+        where: { id: research.salesAccountId },
+        select: { platform: true, displayName: true, username: true },
+      }),
+    ]);
+    const chosen = versions.find((v) => v.id === versionId) ?? versions[0];
+    const version = chosen
+      ? await db.researchVersion.findUniqueOrThrow({ where: { id: chosen.id } })
+      : null;
+    const { products, studied, soldOf } = studiedData;
+    const trendsData = (version?.trends ?? {}) as {
+      regions?: string[];
+      keywords?: TrendKeyword[];
+      error?: string;
+    };
+    const marketData = (version?.market ?? {}) as { markets?: EtsyMarket[]; error?: string };
+    const tagsData = (version?.tags ?? {}) as { tags?: TagStat[]; error?: string };
+    const trends = trendsData.keywords ?? [];
+    const etsy = marketData.markets ?? [];
+    const ownTexts = studied.map((p) => `${p.title} ${p.tags.join(' ')}`);
+    const pool = keywordPool(trends, etsy, ownTexts);
+    // The AI's review of the pool and the owner's word decide what is shown (ADR-0033).
+    const review = ((version?.review as { review?: PoolReview } | null)?.review ??
+      {}) as PoolReview;
+    const overrides = parseOverrides((research.context as { phrases?: unknown } | null)?.phrases);
+    const isVisible = (phrase: string) => phraseVisible(phrase, review, overrides);
+    const visible = pool.filter((p) => isVisible(p.phrase));
+    const ranking = rankProducts(studied, visible);
+    const prices = products
+      .filter((p) => p.price !== null && (p.currency ?? 'USD') === 'USD')
+      .map((p) => p.price! / 100)
+      .sort((a, b) => a - b);
+    const ownPrice = prices.length ? prices[Math.floor(prices.length / 2)]! : null;
+    const rated = rateTags(tagsData.tags ?? [], pool, ownTexts, ownPrice).filter((t) =>
+      isVisible(t.tag),
+    );
+    const ratedOf = new Map(rated.map((t) => [phraseKey(t.tag), t]));
+    const byId = new Map(products.map((p) => [p.id, p]));
+    return {
+      id: research.id,
+      name: research.name,
+      keywords: research.keywords,
+      channel: research.channel,
+      salesAccount: {
+        id: research.salesAccountId,
+        platform: account?.platform ?? null,
+        name: account?.displayName ?? account?.username ?? '',
+      },
+      productIds: research.productIds,
+      endsOn: research.endsOn ? research.endsOn.toISOString().slice(0, 10) : null,
+      directionId: research.directionId,
+      refreshedAt: research.refreshedAt,
+      versions: versions.map((v) => ({ id: v.id, createdAt: v.createdAt, keywords: v.keywords })),
+      version: version
+        ? { id: version.id, createdAt: version.createdAt, keywords: version.keywords }
+        : null,
+      sources: {
+        pinterest: version
+          ? {
+              fetchedAt: version.createdAt,
+              error: trendsData.error ?? null,
+              regions: trendsData.regions ?? [],
+              keywords: trends.length,
+            }
+          : null,
+        etsy: version
+          ? { fetchedAt: version.createdAt, error: marketData.error ?? null, markets: etsy }
+          : null,
+      },
+      pool: pool.map((p) => ({
+        ...p,
+        verdict: review[phraseKey(p.phrase)]?.verdict ?? null,
+        why: review[phraseKey(p.phrase)]?.why ?? null,
+        visible: isVisible(p.phrase),
+        byOwner: overrides.hidden.includes(p.phrase)
+          ? 'hidden'
+          : overrides.kept.includes(p.phrase)
+            ? 'kept'
+            : null,
+      })),
+      reviewedAt: version?.review ? version.createdAt : null,
+      tags: rated,
+      tagsError: tagsData.error ?? null,
+      ownPrice,
+      products: ranking.map((r) => {
+        const p = byId.get(r.id)!;
+        return {
+          ...r,
+          title: p.title,
+          url: p.url,
+          imageUrl: p.imageUrl,
+          tags: p.tags.length,
+          views: p.views,
+          favorers: p.favorers,
+          sold12m: soldOf.get(p.id) ?? 0,
+          price: p.price,
+          currency: p.currency,
+          tagAudit: auditTags(p.tags, ratedOf, rated, (t) => isVisible(t)),
+        };
+      }),
+    };
+  }
+
+  /** The research's products with their sales of the last year. */
+  private async studied(research: { productIds: string[]; salesAccountId: string }) {
+    const db = this.prisma.client;
     const since = new Date(Date.now() - 365 * DAY);
-    const [snapshots, products, sold, account] = await Promise.all([
-      db.researchSnapshot.findMany({ where: { researchId: id } }),
+    const [products, sold] = await Promise.all([
       db.shopProduct.findMany({
         where: { id: { in: research.productIds }, accountId: research.salesAccountId },
         select: {
@@ -909,16 +1078,7 @@ export class ResearchController {
               AND (o.status IS NULL OR lower(o.status) NOT IN ('canceled', 'cancelled', 'fully refunded'))
             GROUP BY 1`
         : Promise.resolve([] as { productId: string; sold: number }[]),
-      db.socialAccount.findUnique({
-        where: { id: research.salesAccountId },
-        select: { platform: true, displayName: true, username: true },
-      }),
     ]);
-    const snapshot = (source: string) => snapshots.find((s) => s.source === source);
-    const trendSnap = snapshot('pinterest_trends');
-    const marketSnap = snapshot('etsy_market');
-    const trends = (trendSnap?.data as { keywords?: TrendKeyword[] } | undefined)?.keywords ?? [];
-    const etsy = (marketSnap?.data as { markets?: EtsyMarket[] } | undefined)?.markets ?? [];
     const soldOf = new Map(sold.map((s) => [s.productId, s.sold]));
     const studied = products.map((p) => ({
       id: p.id,
@@ -928,72 +1088,6 @@ export class ResearchController {
       favorers: p.favorers,
       sold12m: soldOf.get(p.id) ?? 0,
     }));
-    const pool = keywordPool(
-      trends,
-      etsy,
-      studied.map((p) => `${p.title} ${p.tags.join(' ')}`),
-    );
-    // The AI's review of the pool and the owner's word decide what is shown (ADR-0033).
-    const review = ((snapshot('pool_review')?.data as { review?: PoolReview } | undefined)
-      ?.review ?? {}) as PoolReview;
-    const overrides = parseOverrides((research.context as { phrases?: unknown } | null)?.phrases);
-    const visible = pool.filter((p) => phraseVisible(p.phrase, review, overrides));
-    const ranking = rankProducts(studied, visible);
-    const byId = new Map(products.map((p) => [p.id, p]));
-    return {
-      id: research.id,
-      name: research.name,
-      keywords: research.keywords,
-      channel: research.channel,
-      salesAccount: {
-        id: research.salesAccountId,
-        platform: account?.platform ?? null,
-        name: account?.displayName ?? account?.username ?? '',
-      },
-      productIds: research.productIds,
-      endsOn: research.endsOn ? research.endsOn.toISOString().slice(0, 10) : null,
-      directionId: research.directionId,
-      refreshedAt: research.refreshedAt,
-      sources: {
-        pinterest: trendSnap
-          ? {
-              fetchedAt: trendSnap.fetchedAt,
-              error: trendSnap.error,
-              regions: (trendSnap.data as { regions?: string[] }).regions ?? [],
-              keywords: trends.length,
-            }
-          : null,
-        etsy: marketSnap
-          ? { fetchedAt: marketSnap.fetchedAt, error: marketSnap.error, markets: etsy }
-          : null,
-      },
-      pool: pool.map((p) => ({
-        ...p,
-        verdict: review[phraseKey(p.phrase)]?.verdict ?? null,
-        why: review[phraseKey(p.phrase)]?.why ?? null,
-        visible: phraseVisible(p.phrase, review, overrides),
-        byOwner: overrides.hidden.includes(p.phrase)
-          ? 'hidden'
-          : overrides.kept.includes(p.phrase)
-            ? 'kept'
-            : null,
-      })),
-      reviewedAt: snapshot('pool_review')?.fetchedAt ?? null,
-      products: ranking.map((r) => {
-        const p = byId.get(r.id)!;
-        return {
-          ...r,
-          title: p.title,
-          url: p.url,
-          imageUrl: p.imageUrl,
-          tags: p.tags.length,
-          views: p.views,
-          favorers: p.favorers,
-          sold12m: soldOf.get(p.id) ?? 0,
-          price: p.price,
-          currency: p.currency,
-        };
-      }),
-    };
+    return { products, studied, soldOf };
   }
 }

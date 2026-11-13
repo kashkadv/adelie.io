@@ -1928,6 +1928,54 @@
         "off": "AI is not set up on the server.",
         "failed": "Could not suggest phrases. Please try again."
       }
+    },
+    "versions": "Version",
+    "versionsHint": "Every “Update data” keeps a version: phrases, trends, the Etsy market, the review and the tag ratings. Open an earlier one to compare.",
+    "latest": "latest",
+    "toLatest": "Back to the latest version",
+    "tags": {
+      "title": "Tag ratings ({count})",
+      "hint": "Each candidate tag (fitting pool phrases up to 20 characters and your products' tags) checked on Etsy on its own: how many listings, the prices and favourites of its top. The 0–100 score is higher with demand and trend and moderate competition.",
+      "empty": "Press “Update data” to rate the tags.",
+      "error": "Could not rate the tags: {error}",
+      "more": "Show all ({count})",
+      "less": "Collapse",
+      "colTag": "Tag",
+      "colCount": "Listings",
+      "colCountHint": "Active Etsy listings with the phrase — competition: low < 1k, medium < 20k, high < 100k, very high above.",
+      "colPrice": "Median price",
+      "colPriceHint": "Median USD price of the top 50 for the tag, compared with the median of your research's products (${price}).",
+      "colFavorers": "Favourites",
+      "colFavorersHint": "Average favourites of the tag's top 50 listings — an indirect sign of demand.",
+      "colCompetitors": "Competitors",
+      "colCompetitorsHint": "How many top listings for your niche's phrases use this phrase in tags or titles.",
+      "colPinterest": "Pinterest, month",
+      "colOwn": "Yours",
+      "colScore": "Score",
+      "colScoreHint": "35% demand (favourites), 25% use by competitors, 20% Pinterest trend, 20% how little competition.",
+      "competition": {
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "very_high": "very high"
+      },
+      "price": {
+        "below": "below yours",
+        "near": "like yours",
+        "above": "above yours"
+      },
+      "auditTitle": "Product tags",
+      "audit": {
+        "strong": "strong: {count}",
+        "ok": "fine: {count}",
+        "weak": "weak: {count}",
+        "off": "don't fit: {count}",
+        "unknown": "not checked: {count}",
+        "none": "none",
+        "better": "better ones: {count}",
+        "consider": "Instead of the weak ones",
+        "unknownHint": "Etsy numbers for this tag are not collected yet"
+      }
     }
   }
 }

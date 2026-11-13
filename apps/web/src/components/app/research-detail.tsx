@@ -20,6 +20,8 @@ import { Checkbox } from '../ui/checkbox';
 import { InfoTip } from '../ui/info-tip';
 import { PlatformIcon } from '../ui/platform-icon';
 import { AdviceDialog, ResearchContext, type Advice } from './research-ai';
+import { RatedTags, TagAuditLine } from './research-tags';
+import { Select } from '../ui/select';
 import type { PoolPhrase, Research, Seeds } from './research-data';
 import { SeedSuggest } from './seed-suggest';
 
@@ -53,17 +55,19 @@ export function ResearchDetail({
   const [editingPhrases, setEditingPhrases] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  /** A version other than the latest, when the owner looks back. */
+  const [versionId, setVersionId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    api<Research>(`${base}/${id}`).then(
+    api<Research>(`${base}/${id}${versionId ? `?version=${versionId}` : ''}`).then(
       (r) => !cancelled && setData(r),
       () => !cancelled && setFailed(true),
     );
     return () => {
       cancelled = true;
     };
-  }, [base, id, version]);
+  }, [base, id, version, versionId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +103,7 @@ export function ResearchDetail({
   async function refresh() {
     setRefreshing(true);
     try {
+      setVersionId(null);
       setData(await api<Research>(`${base}/${id}/refresh`, { method: 'POST' }));
     } catch {
       setFailed(true);
@@ -192,6 +197,36 @@ export function ResearchDetail({
           </span>
         )}
       </header>
+
+      {data.versions.length > 1 && (
+        <div className="animate-rise mb-4 flex flex-wrap items-center gap-2 text-sm">
+          <span className="flex items-center gap-1.5 text-muted">
+            {t('versions')}
+            <InfoTip text={t('versionsHint')} />
+          </span>
+          <div className="w-72">
+            <Select
+              ariaLabel={t('versions')}
+              value={data.version?.id ?? ''}
+              onChange={(v) => setVersionId(v === data.versions[0]?.id ? null : v)}
+              options={data.versions.map((v, i) => ({
+                value: v.id,
+                label: `${when(v.createdAt)}${i === 0 ? ` · ${t('latest')}` : ''}`,
+                hint: v.keywords.join(', ').slice(0, 40),
+              }))}
+            />
+          </div>
+          {data.version && data.version.id !== data.versions[0]?.id && (
+            <button
+              type="button"
+              onClick={() => setVersionId(null)}
+              className="rounded-xl px-2.5 py-1 text-xs text-muted hover:bg-hover hover:text-foreground"
+            >
+              {t('toLatest')}
+            </button>
+          )}
+        </div>
+      )}
 
       <section className="card animate-rise mb-4 grid gap-1.5 rounded-[24px] px-5 py-3.5 text-sm">
         <p className="flex flex-wrap items-center gap-1.5">
@@ -310,6 +345,7 @@ export function ResearchDetail({
                       )}
                     </p>
                   )}
+                  <TagAuditLine audit={p.tagAudit} />
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   <span className="tabular pt-1 text-sm font-semibold" title={t('score')}>
@@ -331,6 +367,8 @@ export function ResearchDetail({
           </ol>
         )}
       </section>
+
+      <RatedTags tags={data.tags} ownPrice={data.ownPrice} error={data.tagsError} />
 
       {/* The keyword pool: what fits (the AI's review and the owner's word), the rest on request. */}
       <section className="card animate-rise mb-4 rounded-[24px] p-5">

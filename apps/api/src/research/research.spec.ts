@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  competitionOf,
   etsyMarket,
   keywordPool,
   marketsFromOrders,
@@ -8,9 +9,11 @@ import {
   phraseKey,
   pinterestRegions,
   rankProducts,
+  rateTags,
   readTrends,
   relevantTrends,
   suggestProducts,
+  tagCandidates,
   trendFilters,
 } from './research.js';
 
@@ -194,5 +197,54 @@ describe('pool and ranking', () => {
       'Shaggy wool pillow',
       'Cushion',
     ]);
+  });
+});
+
+describe('tags', () => {
+  it('candidates are fitting pool phrases Etsy takes as a tag', () => {
+    expect(
+      tagCandidates([
+        { phrase: 'shaggy pillow', score: 3 },
+        { phrase: 'pillow', score: 2 },
+        { phrase: 'christmas throw pillow cover', score: 2 },
+      ]),
+    ).toEqual(['shaggy pillow']);
+  });
+
+  it('are rated by demand, use and trend against competition', () => {
+    const pool = keywordPool(
+      readTrends('US', {
+        trends: [{ keyword: 'christmas pillow', pct_growth_mom: 300, time_series: {} }],
+      }),
+      [
+        etsyMarket('x', 1, [
+          ...Array(20).fill({ title: '', tags: ['shaggy pillow'], price: null, num_favorers: 0 }),
+        ]),
+      ],
+      ['Shaggy Pillow'],
+    );
+    const rated = rateTags(
+      [
+        { tag: 'shaggy pillow', count: 500, priceMedian: 140, avgFavorers: 56 },
+        { tag: 'christmas pillow', count: 200_000, priceMedian: 30, avgFavorers: 10 },
+      ],
+      pool,
+      ['Shaggy Pillow 18x18'],
+      120,
+    );
+    expect(rated[0]).toMatchObject({
+      tag: 'shaggy pillow',
+      competition: 'low',
+      competitors: 20,
+      own: 1,
+      priceVsOwn: 'near',
+    });
+    expect(rated[1]).toMatchObject({
+      competition: 'very_high',
+      pinterestMom: 300,
+      priceVsOwn: 'below',
+    });
+    expect(rated[0]!.score).toBeGreaterThan(rated[1]!.score);
+    expect(competitionOf(999)).toBe('low');
   });
 });

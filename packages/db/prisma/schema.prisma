@@ -1130,6 +1130,7 @@ model Research {
   archivedAt     DateTime?
 
   snapshots ResearchSnapshot[]
+  versions  ResearchVersion[]
 
   @@index([projectId])
   @@map("research")
@@ -1149,4 +1150,25 @@ model ResearchSnapshot {
 
   @@unique([researchId, source])
   @@map("research_snapshot")
+}
+
+/// One refresh of a research (ADR-0034): the phrases it was made for and what each source gave —
+/// our own computations only (counts, shares, frequencies; never other sellers' listings).
+model ResearchVersion {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  researchId String   @db.Uuid
+  research   Research @relation(fields: [researchId], references: [id], onDelete: Cascade)
+  keywords   String[]
+  /// Pinterest Trends: { regions, keywords } or { error }.
+  trends     Json
+  /// The Etsy market per phrase: { markets } or { error }.
+  market     Json
+  /// Etsy statistics per candidate tag: { tags } or { error }.
+  tags       Json?
+  /// The AI's review of the pool: { review }.
+  review     Json?
+  createdAt  DateTime @default(now())
+
+  @@index([researchId, createdAt])
+  @@map("research_version")
 }
