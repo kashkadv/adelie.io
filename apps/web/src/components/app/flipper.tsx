@@ -60,6 +60,14 @@ type Summary = {
     title: string | null;
     url: string | null;
   }[];
+  /** Products added to the cart in the period. */
+  cart: {
+    item: string;
+    adds: number;
+    visitors: number;
+    title: string | null;
+    url: string | null;
+  }[];
   consent: { consenting: number; anonymous: number };
 };
 
@@ -129,7 +137,6 @@ export function Flipper() {
   const [events, setEvents] = useState<LiveEvent[] | null>(null);
   const [eventsTotal, setEventsTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [productPage, setProductPage] = useState(1);
   const [tabChoice, setTabChoice] = useState<Tab | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -289,7 +296,6 @@ export function Flipper() {
                 setSummary(null);
                 setEvents(null);
                 setPage(1);
-                setProductPage(1);
                 setTabChoice(null);
               }}
               options={sites.map((s) => ({
@@ -352,7 +358,6 @@ export function Flipper() {
                 onChange={(d) => {
                   setDays(d);
                   setPage(1);
-                  setProductPage(1);
                   setSummary(null);
                 }}
                 options={PERIODS.map((p) => ({
@@ -668,95 +673,131 @@ export function Flipper() {
                 </section>
               </div>
 
-              {summary && summary.products.length > 0 && (
-                <section className="card animate-rise mb-6 overflow-hidden rounded-[24px]">
-                  <h2 className="px-5 pt-5 pb-3 text-sm font-semibold">{t('topProducts')}</h2>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-line text-left text-xs text-muted">
-                        <th className="px-5 pb-2 font-normal">{t('productCol')}</th>
-                        <th className="px-3 pb-2 text-right font-normal">{t('viewsCol')}</th>
-                        <th className="px-5 pb-2 text-right font-normal">{t('visitorsCol')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line">
-                      {summary.products
-                        .slice(
-                          (productPage - 1) * PRODUCTS_PER_PAGE,
-                          productPage * PRODUCTS_PER_PAGE,
-                        )
-                        .map((p) => (
-                          <tr key={p.item}>
-                            <td className="max-w-0 px-5 py-2.5">
-                              <div className="flex items-baseline">
-                                {p.url ? (
-                                  <a
-                                    href={p.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="min-w-0 truncate hover:underline"
-                                    title={p.title ?? p.item}
-                                  >
-                                    {p.title ?? p.item}
-                                  </a>
-                                ) : (
-                                  <span className="min-w-0 truncate">{p.title ?? p.item}</span>
-                                )}
-                                {p.title && (
-                                  <span className="tabular ml-2 shrink-0 text-xs text-muted">
-                                    {p.item}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="tabular px-3 py-2.5 text-right">
-                              {format.number(p.views)}
-                            </td>
-                            <td className="tabular px-5 py-2.5 text-right">
-                              {format.number(p.visitors)}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                  {summary.products.length > PRODUCTS_PER_PAGE && (
-                    <nav
-                      aria-label={t('topProducts')}
-                      className="flex items-center justify-end gap-3 border-t border-line px-5 py-3 text-xs text-muted"
-                    >
-                      <span className="tabular">
-                        {t('liveRange', {
-                          from: (productPage - 1) * PRODUCTS_PER_PAGE + 1,
-                          to: Math.min(productPage * PRODUCTS_PER_PAGE, summary.products.length),
-                          total: summary.products.length,
-                        })}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={productPage <= 1}
-                        onClick={() => setProductPage((n) => n - 1)}
-                        aria-label={t('pagePrev')}
-                        className="rounded-lg border border-line p-1.5 hover:text-foreground"
-                      >
-                        <ChevronLeft size={14} aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={productPage * PRODUCTS_PER_PAGE >= summary.products.length}
-                        onClick={() => setProductPage((n) => n + 1)}
-                        aria-label={t('pageNext')}
-                        className="rounded-lg border border-line p-1.5 hover:text-foreground"
-                      >
-                        <ChevronRight size={14} aria-hidden="true" />
-                      </button>
-                    </nav>
-                  )}
-                </section>
+              {summary && (
+                <ProductTable
+                  key={`cart-${current.id}-${days}`}
+                  title={t('cartProducts')}
+                  hint={t('cartProductsHint')}
+                  countLabel={t('addsCol')}
+                  rows={summary.cart.map((p) => ({ ...p, count: p.adds }))}
+                />
+              )}
+              {summary && (
+                <ProductTable
+                  key={`views-${current.id}-${days}`}
+                  title={t('topProducts')}
+                  countLabel={t('viewsCol')}
+                  rows={summary.products.map((p) => ({ ...p, count: p.views }))}
+                />
               )}
             </>
           )}
         </>
       )}
     </>
+  );
+}
+
+/**
+ * Products of the site in a table with pages: by name from the catalogue (the article beside it),
+ * a count (views, adds to cart) and people. Nothing when the period has none.
+ */
+function ProductTable({
+  title,
+  hint,
+  countLabel,
+  rows,
+}: {
+  title: string;
+  hint?: string;
+  countLabel: string;
+  rows: {
+    item: string;
+    count: number;
+    visitors: number;
+    title: string | null;
+    url: string | null;
+  }[];
+}) {
+  const t = useTranslations('Flipper');
+  const format = useFormatter();
+  const [page, setPage] = useState(1);
+  if (rows.length === 0) return null;
+  return (
+    <section className="card animate-rise mb-6 overflow-hidden rounded-[24px]">
+      <h2 className="flex items-center gap-1.5 px-5 pt-5 pb-3 text-sm font-semibold">
+        {title}
+        {hint && <InfoTip text={hint} />}
+      </h2>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-line text-left text-xs text-muted">
+            <th className="px-5 pb-2 font-normal">{t('productCol')}</th>
+            <th className="px-3 pb-2 text-right font-normal">{countLabel}</th>
+            <th className="px-5 pb-2 text-right font-normal">{t('visitorsCol')}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {rows.slice((page - 1) * PRODUCTS_PER_PAGE, page * PRODUCTS_PER_PAGE).map((p) => (
+            <tr key={p.item}>
+              <td className="max-w-0 px-5 py-2.5">
+                <div className="flex items-baseline">
+                  {p.url ? (
+                    <a
+                      href={p.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="min-w-0 truncate hover:underline"
+                      title={p.title ?? p.item}
+                    >
+                      {p.title ?? p.item}
+                    </a>
+                  ) : (
+                    <span className="min-w-0 truncate">{p.title ?? p.item}</span>
+                  )}
+                  {p.title && (
+                    <span className="tabular ml-2 shrink-0 text-xs text-muted">{p.item}</span>
+                  )}
+                </div>
+              </td>
+              <td className="tabular px-3 py-2.5 text-right">{format.number(p.count)}</td>
+              <td className="tabular px-5 py-2.5 text-right">{format.number(p.visitors)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {rows.length > PRODUCTS_PER_PAGE && (
+        <nav
+          aria-label={title}
+          className="flex items-center justify-end gap-3 border-t border-line px-5 py-3 text-xs text-muted"
+        >
+          <span className="tabular">
+            {t('liveRange', {
+              from: (page - 1) * PRODUCTS_PER_PAGE + 1,
+              to: Math.min(page * PRODUCTS_PER_PAGE, rows.length),
+              total: rows.length,
+            })}
+          </span>
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => setPage((n) => n - 1)}
+            aria-label={t('pagePrev')}
+            className="rounded-lg border border-line p-1.5 hover:text-foreground"
+          >
+            <ChevronLeft size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            disabled={page * PRODUCTS_PER_PAGE >= rows.length}
+            onClick={() => setPage((n) => n + 1)}
+            aria-label={t('pageNext')}
+            className="rounded-lg border border-line p-1.5 hover:text-foreground"
+          >
+            <ChevronRight size={14} aria-hidden="true" />
+          </button>
+        </nav>
+      )}
+    </section>
   );
 }

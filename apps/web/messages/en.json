@@ -1453,7 +1453,10 @@
     "goalsFunnelKind": "the site type’s funnel",
     "goalsUp": "Up",
     "goalsDown": "Down",
-    "goalsAddStep": "Add a step"
+    "goalsAddStep": "Add a step",
+    "cartProducts": "Added to cart",
+    "cartProductsHint": "Products visitors added to the cart in the chosen period: how many times and by how many people.",
+    "addsCol": "Adds"
   },
   "Links": {
     "title": "Links",

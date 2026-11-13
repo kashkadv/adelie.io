@@ -489,7 +489,7 @@ export class FlipperController {
           FROM website_event
           WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"`
       : Promise.resolve([{}] as Record<string, number | null>[]);
-    const [counts, daily, funnel, channels, products, consent, reached] = await Promise.all([
+    const [counts, daily, funnel, channels, products, cart, consent, reached] = await Promise.all([
       db.$queryRaw<{ name: string; events: number; visitors: number }[]>`
         SELECT name, count(*)::int AS events,
                count(DISTINCT coalesce("visitorId", "dailyId", "eventId"))::int AS visitors FROM website_event
@@ -527,6 +527,16 @@ export class FlipperController {
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
           AND name = 'ProductView' AND properties->>'item_id' IS NOT NULL
         GROUP BY 1 ORDER BY views DESC, visitors DESC LIMIT 100`,
+      // Products added to the cart: how many times, and by how many people.
+      !tabs.includes('products')
+        ? Promise.resolve([] as { item: string; adds: number; visitors: number }[])
+        : db.$queryRaw<{ item: string; adds: number; visitors: number }[]>`
+        SELECT properties->>'item_id' AS item, count(*)::int AS adds,
+               count(DISTINCT coalesce("visitorId", "dailyId"))::int AS visitors
+        FROM website_event
+        WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"
+          AND name = 'AddToCart' AND properties->>'item_id' IS NOT NULL
+        GROUP BY 1 ORDER BY adds DESC, visitors DESC LIMIT 100`,
       db.$queryRaw<{ consenting: number; anonymous: number }[]>`
         SELECT count(*) FILTER (WHERE consent)::int AS consenting,
                count(*) FILTER (WHERE NOT consent)::int AS anonymous
@@ -534,8 +544,9 @@ export class FlipperController {
         WHERE "siteId" = ${sid}::uuid AND "occurredAt" >= ${since} AND NOT "isBot"`,
       goalStats,
     ]);
-    // The viewed products by name, from the site's own catalogue (the article is the feed's g:id).
-    const articles = products.map((p) => p.item);
+    // The viewed and added products by name, from the site's own catalogue (the article is the
+    // feed's g:id).
+    const articles = [...new Set([...products, ...cart].map((p) => p.item))];
     const catalogue = articles.length
       ? await db.shopProduct.findMany({
           where: {
@@ -545,10 +556,11 @@ export class FlipperController {
           select: { externalId: true, articles: true, title: true, url: true },
         })
       : [];
-    const named = products.map((p) => {
+    const name = <T extends { item: string }>(p: T) => {
       const found = catalogue.find((c) => c.externalId === p.item || c.articles.includes(p.item));
       return { ...p, title: found?.title ?? null, url: found?.url ?? null };
-    });
+    };
+    const named = products.map(name);
     const f = funnel[0] ?? {};
     const r = reached[0] ?? {};
     return {
@@ -569,6 +581,7 @@ export class FlipperController {
       })),
       channels,
       products: named,
+      cart: cart.map(name),
       consent: consent[0] ?? { consenting: 0, anonymous: 0 },
     };
   }
