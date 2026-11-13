@@ -217,7 +217,7 @@ export function ProductResearchPanel({
   }
 
   return (
-    <section className="card animate-rise my-6 grid gap-4 rounded-[24px] p-5 text-xs">
+    <section className="card animate-rise my-6 grid gap-5 rounded-[24px] p-5 text-xs">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <button
           type="button"
@@ -282,7 +282,7 @@ export function ProductResearchPanel({
               {!advice && ` · ${t('notAsked')}`}
             </button>
             {open && (
-              <div className="mt-2 grid gap-3">
+              <div className="mt-4 grid gap-5">
                 {advice ? (
                   <>
                     <div>
