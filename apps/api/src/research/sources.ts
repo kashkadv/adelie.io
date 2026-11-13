@@ -6,24 +6,17 @@ import type { ConnectService } from '../social/connect.service.js';
 import {
   etsyMarket,
   readTrends,
-  words,
+  relevantTrends,
+  trendFilters,
   type EtsyListingLite,
   type EtsyMarket,
   type TrendKeyword,
 } from './research.js';
 
 /**
- * The words Trends filters by: the last word of each seed phrase ("wool pillow" → "pillow"), the
- * thing itself — Trends lists only top keywords, so a narrow phrase would often find nothing.
+ * Growing and monthly-top keywords containing the niche's main words, in each region; only those
+ * that share a specific word with the niche are kept (Trends lists only top keywords).
  */
-export function trendFilters(keywords: string[]): string[] {
-  return [...new Set(keywords.map((k) => words(k).at(-1)).filter((w): w is string => !!w))].slice(
-    0,
-    5,
-  );
-}
-
-/** Growing and monthly-top keywords containing the niche's words, in each region. */
 export async function fetchTrends(
   connect: ConnectService,
   accountId: string,
@@ -49,7 +42,7 @@ export async function fetchTrends(
     // The same keyword from "growing" and "monthly" in one region is one entry.
     const seen = new Map<string, TrendKeyword>();
     for (const t of out) seen.set(`${t.region}\u0000${t.keyword}`, t);
-    return [...seen.values()];
+    return relevantTrends([...seen.values()], keywords);
   });
 }
 

@@ -9,7 +9,9 @@ import {
   pinterestRegions,
   rankProducts,
   readTrends,
+  relevantTrends,
   suggestProducts,
+  trendFilters,
 } from './research.js';
 
 describe('markets', () => {
@@ -57,6 +59,30 @@ describe('text', () => {
     expect(phraseKey('Wool Pillows')).toBe('wool pillow');
     expect(mentions('Shaggy Wool Pillow Cover 18x18', 'wool pillows')).toBe(true);
     expect(mentions('Wool rug', 'wool pillow')).toBe(false);
+    expect(phraseKey('Christmas Pillows')).toBe('christmas pillow');
+    expect(phraseKey('cozy bedrooms canvas')).toBe('cozy bedroom canvas');
+  });
+
+  it('trends filter by the specific word and keep what the niche shares', () => {
+    expect(trendFilters(['wool pillow', 'shaggy pillow cover', 'wool rug'])).toEqual([
+      'pillow',
+      'rug',
+    ]);
+    const t = (keyword: string) => ({
+      keyword,
+      region: 'US',
+      wow: null,
+      mom: null,
+      yoy: null,
+      peak: null,
+      recent: [],
+    });
+    expect(
+      relevantTrends(
+        [t('christmas pillows on couch'), t('christmas highlight cover'), t('shaggy rug')],
+        ['wool pillow', 'shaggy pillow cover'],
+      ).map((x) => x.keyword),
+    ).toEqual(['christmas pillows on couch', 'shaggy rug']);
   });
 });
 

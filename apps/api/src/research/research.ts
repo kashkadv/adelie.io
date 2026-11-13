@@ -71,11 +71,14 @@ const STOP = new Set(
     ' ',
   ),
 );
-/** Words of a text: lower case, letters and digits, simple plurals folded ("pillows" → "pillow"). */
+/**
+ * Words of a text: lower case, letters and digits, simple plurals folded ("pillows" → "pillow";
+ * "christmas", "cushions'" stems like "-as", "-is", "-us", "-ss" are left alone).
+ */
 export function words(text: string): string[] {
   return (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])
     .filter((w) => w.length > 1 && !STOP.has(w) && !/^\d+$/.test(w))
-    .map((w) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w));
+    .map((w) => (w.length > 3 && /[^aisu]s$/.test(w) ? w.slice(0, -1) : w));
 }
 /** A phrase as its folded words joined, for comparing phrases ("Wool Pillows" = "wool pillow"). */
 export const phraseKey = (phrase: string) => words(phrase).join(' ');
@@ -359,4 +362,37 @@ export function suggestProducts<
       keywords.some((k) => mentions(`${p.title} ${p.tags.join(' ')} ${p.category ?? ''}`, k)),
     )
     .slice(0, max);
+}
+
+/** Words too general to define a niche on their own ("cover" matches playlist covers too). */
+const GENERIC = new Set(
+  'cover case set kit decor idea gift style design handmade diy aesthetic cute small large'.split(
+    ' ',
+  ),
+);
+
+/** The niche's own words: the seed phrases' words without the general ones. */
+export function nicheWords(keywords: string[]): Set<string> {
+  return new Set(keywords.flatMap(words).filter((w) => !GENERIC.has(w)));
+}
+
+/** The words Trends filters by: the last specific word of each seed phrase ("wool pillow cover" → "pillow"). */
+export function trendFilters(keywords: string[]): string[] {
+  return [
+    ...new Set(
+      keywords
+        .map((k) =>
+          words(k)
+            .filter((w) => !GENERIC.has(w))
+            .at(-1),
+        )
+        .filter((w): w is string => !!w),
+    ),
+  ].slice(0, 5);
+}
+
+/** Keeps the trend keywords that share a specific word with the niche. */
+export function relevantTrends(trends: TrendKeyword[], keywords: string[]): TrendKeyword[] {
+  const niche = nicheWords(keywords);
+  return trends.filter((t) => words(t.keyword).some((w) => niche.has(w)));
 }
