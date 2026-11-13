@@ -1,8 +1,10 @@
 'use client';
 
+import { ChevronDown } from 'lucide-react';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
+import { useStoredFlag } from '@/lib/use-stored-flag';
 import { InfoTip } from '../ui/info-tip';
 import { PlatformIcon, type PlatformKey } from '../ui/platform-icon';
 
@@ -59,6 +61,8 @@ export function ProjectFacts({ base }: { base: string }) {
   const format = useFormatter();
   const locale = useLocale();
   const [facts, setFacts] = useState<Facts | null>(null);
+  // Folded by default; the member's choice is remembered in this browser.
+  const [open, setOpen] = useStoredFlag('adelie.projectFacts.open', false);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,18 +229,31 @@ export function ProjectFacts({ base }: { base: string }) {
 
   return (
     <section className="card rounded-[24px] p-5">
-      <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
-        {t('title')}
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          className="flex items-center gap-1.5"
+        >
+          <ChevronDown
+            size={15}
+            className={`transition-transform ${open ? '' : '-rotate-90'}`}
+            aria-hidden="true"
+          />
+          {t('title')}
+        </button>
         <InfoTip text={t('hint')} />
         <span className="ml-auto text-xs font-normal text-muted">
           {t('links', { count: facts.links })}
         </span>
       </h3>
-      {cards.length ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{cards}</div>
-      ) : (
-        <p className="text-sm text-muted">{t('empty')}</p>
-      )}
+      {open &&
+        (cards.length ? (
+          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{cards}</div>
+        ) : (
+          <p className="mt-3 text-sm text-muted">{t('empty')}</p>
+        ))}
     </section>
   );
 }
