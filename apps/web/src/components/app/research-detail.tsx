@@ -1,7 +1,18 @@
 'use client';
 
-import { ArrowLeft, Check, ListChecks, RefreshCw, Search, Sparkles, X } from 'lucide-react';
-import { useFormatter, useTranslations } from 'next-intl';
+import {
+  ArrowLeft,
+  Check,
+  Eye,
+  EyeOff,
+  ListChecks,
+  Pencil,
+  RefreshCw,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react';
+import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '@/lib/api';
@@ -9,7 +20,8 @@ import { Checkbox } from '../ui/checkbox';
 import { InfoTip } from '../ui/info-tip';
 import { PlatformIcon } from '../ui/platform-icon';
 import { AdviceDialog, ResearchContext, type Advice } from './research-ai';
-import type { Research } from './research-data';
+import type { PoolPhrase, Research, Seeds } from './research-data';
+import { SeedSuggest } from './seed-suggest';
 
 const pct = (v: number | null) =>
   v === null ? '—' : v >= 10000 ? '∞' : `${v > 0 ? '+' : ''}${Math.round(v)}%`;
@@ -38,6 +50,9 @@ export function ResearchDetail({
   const [version, setVersion] = useState(0);
   const [advice, setAdvice] = useState<Record<string, Advice>>({});
   const [advising, setAdvising] = useState<{ id: string; title: string } | null>(null);
+  const [editingPhrases, setEditingPhrases] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +75,26 @@ export function ResearchDetail({
       cancelled = true;
     };
   }, [base, id]);
+
+  /** The owner's word on a pool phrase: hide, keep against the AI, or give back to the AI. */
+  async function phraseAction(phrase: string, phraseAction: 'hide' | 'keep' | 'reset') {
+    await api(`${base}/${id}`, { method: 'PATCH', json: { phrase, phraseAction } }).catch(
+      () => undefined,
+    );
+    setVersion((v) => v + 1);
+  }
+
+  async function review() {
+    setReviewing(true);
+    try {
+      await api(`${base}/${id}/review`, { method: 'POST' });
+      setVersion((v) => v + 1);
+    } catch {
+      // the pool stays as it was
+    } finally {
+      setReviewing(false);
+    }
+  }
 
   async function refresh() {
     setRefreshing(true);
@@ -106,6 +141,9 @@ export function ResearchDetail({
     });
   const n = (v: number | null) => (v === null ? '—' : format.number(v));
   const { pinterest, etsy } = data.sources;
+  const hiddenCount = data.pool.filter((p) => !p.visible).length;
+  const verdictLabel = (p: PoolPhrase) =>
+    p.byOwner === 'hidden' ? t('verdicts.byOwner') : p.verdict ? t(`verdicts.${p.verdict}`) : '';
 
   return (
     <>
@@ -129,15 +167,29 @@ export function ResearchDetail({
           </p>
         </div>
         {canManage && (
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            disabled={refreshing}
-            className="btn-primary flex w-auto items-center gap-2 px-4"
-          >
-            <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" />
-            {refreshing ? t('refreshing') : t('refresh')}
-          </button>
+          <span className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setEditingPhrases(true)}
+              className="inline-flex h-11 items-center gap-2 rounded-2xl border border-line px-4 text-sm hover:bg-hover"
+            >
+              <Pencil size={15} aria-hidden="true" />
+              {t('editPhrases')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              disabled={refreshing}
+              className="btn-primary flex w-auto items-center gap-2 px-4"
+            >
+              <RefreshCw
+                size={15}
+                className={refreshing ? 'animate-spin' : ''}
+                aria-hidden="true"
+              />
+              {refreshing ? t('refreshing') : t('refresh')}
+            </button>
+          </span>
         )}
       </header>
 
@@ -280,17 +332,53 @@ export function ResearchDetail({
         )}
       </section>
 
-      {/* The keyword pool. */}
+      {/* The keyword pool: what fits (the AI's review and the owner's word), the rest on request. */}
       <section className="card animate-rise mb-4 rounded-[24px] p-5">
-        <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
-          {t('poolTitle')}
-          <InfoTip text={t('poolHint')} />
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+            {t('poolTitle')}
+            <InfoTip text={t('poolHint')} />
+          </h2>
+          <span className="flex flex-wrap items-center gap-2">
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowHidden(!showHidden)}
+                className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs text-muted hover:bg-hover hover:text-foreground"
+              >
+                {showHidden ? (
+                  <EyeOff size={13} aria-hidden="true" />
+                ) : (
+                  <Eye size={13} aria-hidden="true" />
+                )}
+                {showHidden ? t('hideHidden') : t('showHidden', { count: hiddenCount })}
+              </button>
+            )}
+            {canManage && data.pool.length > 0 && (
+              <button
+                type="button"
+                onClick={() => void review()}
+                disabled={reviewing}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-line px-2.5 py-1 text-xs hover:bg-hover"
+                title={
+                  data.reviewedAt ? t('reviewedAt', { date: when(data.reviewedAt) }) : undefined
+                }
+              >
+                <Sparkles
+                  size={13}
+                  className={reviewing ? 'animate-pulse' : ''}
+                  aria-hidden="true"
+                />
+                {data.reviewedAt ? t('reviewAgain') : t('review')}
+              </button>
+            )}
+          </span>
+        </div>
         {data.pool.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted">{t('poolEmpty')}</p>
         ) : (
           <div className="scroll-thin overflow-x-auto">
-            <table className="w-full min-w-[620px] text-sm">
+            <table className="w-full min-w-[680px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-muted">
                   <th className="pr-3 pb-2 font-normal">{t('colPhrase')}</th>
@@ -298,33 +386,77 @@ export function ResearchDetail({
                   <th className="px-3 pb-2 text-right font-normal">{t('colYoy')}</th>
                   <th className="px-3 pb-2 text-right font-normal">{t('colEtsy')}</th>
                   <th className="px-3 pb-2 text-right font-normal">{t('colOwn')}</th>
-                  <th className="pb-2 pl-3 text-right font-normal">{t('score')}</th>
+                  <th className="px-3 pb-2 text-right font-normal">{t('score')}</th>
+                  <th className="pb-2 pl-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {data.pool.slice(0, 50).map((p) => (
-                  <tr key={p.phrase}>
-                    <td className="py-1.5 pr-3">
-                      {p.phrase}
-                      {p.pinterest && (
-                        <span className="ml-1.5 text-xs text-muted">
-                          {p.pinterest.regions.join(', ')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="tabular px-3 py-1.5 text-right">
-                      {p.pinterest ? pct(p.pinterest.mom) : '—'}
-                    </td>
-                    <td className="tabular px-3 py-1.5 text-right">
-                      {p.pinterest ? pct(p.pinterest.yoy) : '—'}
-                    </td>
-                    <td className="tabular px-3 py-1.5 text-right">{p.etsy || '—'}</td>
-                    <td className="tabular px-3 py-1.5 text-right">{p.own || '—'}</td>
-                    <td className="tabular py-1.5 pl-3 text-right font-medium">
-                      {format.number(p.score, { maximumFractionDigits: 1 })}
-                    </td>
-                  </tr>
-                ))}
+                {data.pool
+                  .filter((p) => p.visible || showHidden)
+                  .slice(0, showHidden ? 80 : 50)
+                  .map((p) => (
+                    <tr key={p.phrase} className={p.visible ? '' : 'text-muted'}>
+                      <td className="py-1.5 pr-3">
+                        <span className={p.visible ? '' : 'line-through'}>{p.phrase}</span>
+                        {p.pinterest && (
+                          <span className="ml-1.5 text-xs text-muted">
+                            {p.pinterest.regions.join(', ')}
+                          </span>
+                        )}
+                        {!p.visible && (
+                          <span className="ml-1.5 text-xs" title={p.why ?? undefined}>
+                            · {verdictLabel(p)}
+                            {p.why ? ` — ${p.why}` : ''}
+                          </span>
+                        )}
+                      </td>
+                      <td className="tabular px-3 py-1.5 text-right">
+                        {p.pinterest ? pct(p.pinterest.mom) : '—'}
+                      </td>
+                      <td className="tabular px-3 py-1.5 text-right">
+                        {p.pinterest ? pct(p.pinterest.yoy) : '—'}
+                      </td>
+                      <td className="tabular px-3 py-1.5 text-right">{p.etsy || '—'}</td>
+                      <td className="tabular px-3 py-1.5 text-right">{p.own || '—'}</td>
+                      <td className="tabular px-3 py-1.5 text-right font-medium">
+                        {format.number(p.score, { maximumFractionDigits: 1 })}
+                      </td>
+                      <td className="py-1 pl-3 text-right">
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void phraseAction(
+                                p.phrase,
+                                p.byOwner ? 'reset' : p.visible ? 'hide' : 'keep',
+                              )
+                            }
+                            title={
+                              p.byOwner
+                                ? t('phraseReset')
+                                : p.visible
+                                  ? t('phraseHide')
+                                  : t('phraseKeep')
+                            }
+                            aria-label={
+                              p.byOwner
+                                ? t('phraseReset')
+                                : p.visible
+                                  ? t('phraseHide')
+                                  : t('phraseKeep')
+                            }
+                            className="icon-btn h-7 w-7"
+                          >
+                            {p.visible ? (
+                              <EyeOff size={13} aria-hidden="true" />
+                            ) : (
+                              <Eye size={13} aria-hidden="true" />
+                            )}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -371,6 +503,18 @@ export function ResearchDetail({
             </div>
           ))}
         </section>
+      )}
+
+      {editingPhrases && (
+        <PhrasesDialog
+          base={`${base}/${id}`}
+          initial={data.keywords}
+          onClose={() => setEditingPhrases(false)}
+          onSaved={() => {
+            setEditingPhrases(false);
+            void refresh();
+          }}
+        />
       )}
 
       {advising && (
@@ -526,6 +670,95 @@ function ProductPicker({
           >
             <Check size={15} aria-hidden="true" />
             {t('save')}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** The research's niche phrases, with the AI's better ones to pick from; saving refreshes the data. */
+function PhrasesDialog({
+  base,
+  initial,
+  onClose,
+  onSaved,
+}: {
+  base: string;
+  initial: string[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const t = useTranslations('Research');
+  const locale = useLocale();
+  const titleId = useId();
+  const [keywords, setKeywords] = useState(initial.join(', '));
+  const [busy, setBusy] = useState(false);
+  const list = () =>
+    keywords
+      .split(/[,;\n]/)
+      .map((k) => k.trim())
+      .filter(Boolean);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api(base, { method: 'PATCH', json: { keywords: list() } });
+      onSaved();
+    } catch {
+      setBusy(false);
+    }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label={t('close')}
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+        onClick={() => !busy && onClose()}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="glass glass-strong animate-rise scroll-thin relative max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-[28px] p-6"
+      >
+        <h2 id={titleId} className="text-lg font-semibold">
+          {t('editPhrases')}
+        </h2>
+        <label className="mt-4 block">
+          <span className="mb-1.5 flex items-center gap-1.5 px-3.5 text-sm text-muted">
+            {t('keywords')}
+            <InfoTip text={t('keywordsHint')} />
+          </span>
+          <input className="field" value={keywords} onChange={(e) => setKeywords(e.target.value)} />
+        </label>
+        <div className="mt-3">
+          <SeedSuggest
+            request={() =>
+              api<Seeds>(`${base}/seeds`, { method: 'POST', json: { keywords: list(), locale } })
+            }
+            onApply={(phrases) => setKeywords(phrases.join(', '))}
+          />
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-xl px-3.5 py-2 text-sm text-muted hover:bg-hover"
+          >
+            {t('cancel')}
+          </button>
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={busy || list().length === 0}
+            className="btn-primary w-auto px-5"
+          >
+            {t('saveAndRefresh')}
           </button>
         </div>
       </div>

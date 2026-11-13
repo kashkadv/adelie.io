@@ -13,7 +13,8 @@ import { Select } from '../ui/select';
 import { CONNECT_ROLES } from './accounts-data';
 import { EmptyState, PageHeader } from './page-header';
 import { ResearchDetail } from './research-detail';
-import type { Market, ResearchSummary, SalesAccount } from './research-data';
+import type { Market, ResearchSummary, SalesAccount, Seeds } from './research-data';
+import { SeedSuggest } from './seed-suggest';
 import { useWorkspace } from './workspace-context';
 
 /**
@@ -400,6 +401,7 @@ function NewResearch({
   onCreated: (id: string) => void;
 }) {
   const t = useTranslations('Research');
+  const locale = useLocale();
   const titleId = useId();
   const [name, setName] = useState('');
   const [keywords, setKeywords] = useState('');
@@ -498,6 +500,21 @@ function NewResearch({
               </p>
             )}
           </label>
+          <SeedSuggest
+            disabled={!account || (!name.trim() && !keywords.trim())}
+            request={() =>
+              api<Seeds>(`${base}/seeds`, {
+                method: 'POST',
+                json: {
+                  name,
+                  keywords: keywords.split(/[,;\n]/).map((k) => k.trim()),
+                  salesAccountId: account,
+                  locale,
+                },
+              })
+            }
+            onApply={(phrases) => setKeywords(phrases.join(', '))}
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               {label(t('salesPoint'), t('salesPointHint'))}

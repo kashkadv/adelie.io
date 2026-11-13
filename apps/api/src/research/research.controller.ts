@@ -33,12 +33,24 @@ import {
   marketsFromOrders,
   parseMarkets,
   pinterestRegions,
+  phraseKey,
   rankProducts,
   suggestProducts,
   type EtsyMarket,
   type TrendKeyword,
 } from './research.js';
 import { fetchEtsyMarket, fetchTrends } from './sources.js';
+import {
+  POOL_INSTRUCTIONS,
+  POOL_SCHEMA,
+  SEEDS_INSTRUCTIONS,
+  SEEDS_SCHEMA,
+  parseOverrides,
+  parsePoolReview,
+  parseSeeds,
+  phraseVisible,
+  type PoolReview,
+} from './phrases-ai.js';
 import {
   ADVICE_SCHEMA,
   adviceInstructions,
@@ -292,6 +304,18 @@ export class ResearchController {
     if (body?.['directionId'] !== undefined)
       data.directionId = text(body['directionId'], 40) || null;
     if (body?.['archived'] !== undefined) data.archivedAt = body['archived'] ? new Date() : null;
+    // The owner's word on a pool phrase: hide it, keep it against the AI, or give it back to the AI.
+    const phrase = typeof body?.['phrase'] === 'string' ? phraseKey(body['phrase']) : '';
+    const act = body?.['phraseAction'];
+    if (phrase && (act === 'hide' || act === 'keep' || act === 'reset')) {
+      const context = (research.context ?? {}) as Record<string, unknown>;
+      const o = parseOverrides(context['phrases']);
+      const hidden = o.hidden.filter((x) => x !== phrase);
+      const kept = o.kept.filter((x) => x !== phrase);
+      if (act === 'hide') hidden.push(phrase);
+      if (act === 'keep') kept.push(phrase);
+      data.context = { ...context, phrases: { hidden, kept } } as Prisma.InputJsonValue;
+    }
     await this.prisma.client.research.update({ where: { id }, data });
     return { ok: true };
   }
@@ -322,6 +346,7 @@ export class ResearchController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Req() request: { workspace: WorkspaceRequestContext },
+    @Session() session: UserSession,
   ) {
     const ctx = request.workspace;
     const research = await this.researchOf(ctx, projectId, id);
@@ -368,6 +393,8 @@ export class ResearchController {
       market.status === 'rejected' ? errorOf(market.reason) : null,
     );
     await db.research.update({ where: { id }, data: { refreshedAt: new Date() } });
+    // The new pool is reviewed by the AI at once, when it is available and within the limit.
+    await this.reviewPool(projectId, id, request, session).catch(() => undefined);
     return this.get(projectId, id, request);
   }
 
@@ -390,7 +417,7 @@ export class ResearchController {
       brand: brief
         ? { about: brief.about, audience: direction?.audience ?? '', goal: direction?.goal ?? '' }
         : null,
-      pool: view.pool,
+      pool: view.pool.filter((p) => p.visible),
       etsy: view.sources.etsy?.markets ?? [],
       context: parseContext(research.context),
     });
@@ -417,11 +444,16 @@ export class ResearchController {
     @Body() body: unknown,
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
-    await this.researchOf(request.workspace, projectId, id);
+    const research = await this.researchOf(request.workspace, projectId, id);
     const context = parseContext(body);
     await this.prisma.client.research.update({
       where: { id },
-      data: { context: context as unknown as Prisma.InputJsonValue },
+      data: {
+        context: {
+          ...context,
+          phrases: (research.context as { phrases?: unknown } | null)?.phrases ?? null,
+        } as unknown as Prisma.InputJsonValue,
+      },
     });
     return this.context(projectId, id, request);
   }
@@ -627,6 +659,220 @@ export class ResearchController {
     return { itemId: item.id, linkId: created.link.id, code: created.link.code };
   }
 
+  /**
+   * One structured AI request for a research (ADR-0029 rules): the project's monthly limit, the
+   * request logged with its cost. Null when AI is off, over the limit or the answer is unusable.
+   */
+  private async ai(
+    ctx: WorkspaceRequestContext,
+    projectId: string,
+    userId: string,
+    kind: string,
+    request: { instructions: string; input: string; schema: Record<string, unknown>; name: string },
+  ): Promise<
+    { ok: true; data: unknown; costUsd: number } | { ok: false; error: 'off' | 'limit' | 'failed' }
+  > {
+    const ai = config.ai;
+    if (!ai) return { ok: false, error: 'off' };
+    if ((await this.spentMicros(projectId)) >= ai.monthlyLimitUsd * 1e6)
+      return { ok: false, error: 'limit' };
+    const provider = new OpenAiProvider(ai.apiKey, ai.model);
+    const answer = await provider.structured({
+      instructions: request.instructions,
+      input: request.input,
+      schema: request.schema,
+      schemaName: request.name,
+    });
+    const run = await this.prisma.client.aiRun.create({
+      data: {
+        workspaceId: ctx.workspaceId,
+        projectId,
+        userId,
+        kind,
+        provider: provider.name,
+        model: answer.model,
+        status: answer.ok ? 'ok' : 'error',
+        inputTokens: answer.usage.inputTokens,
+        cachedTokens: answer.usage.cachedTokens,
+        outputTokens: answer.usage.outputTokens,
+        costMicros: costMicros(answer.usage, ai.price),
+        input: {
+          instructions: request.instructions,
+          input: request.input,
+        } as Prisma.InputJsonValue,
+        output: answer.ok ? (answer.data as Prisma.InputJsonValue) : Prisma.DbNull,
+        error: answer.ok ? null : answer.error,
+      },
+      select: { costMicros: true },
+    });
+    return answer.ok
+      ? { ok: true, data: answer.data, costUsd: run.costMicros / 1e6 }
+      : { ok: false, error: 'failed' };
+  }
+
+  private aiError(error: 'off' | 'limit' | 'failed'): never {
+    throw new HttpException(
+      { errors: { ai: error } },
+      error === 'off' ? 503 : error === 'limit' ? 429 : 502,
+    );
+  }
+
+  /** What the AI needs to know about the brand and its products to judge phrases. */
+  private async nicheInput(
+    project: { brief: unknown; markets: unknown; id: string },
+    salesAccountId: string,
+    keywords: string[],
+    productIds: string[] | null,
+  ) {
+    const db = this.prisma.client;
+    const catalogue = await db.shopProduct.findMany({
+      where: { accountId: salesAccountId, state: 'active' },
+      orderBy: { favorers: { sort: 'desc', nulls: 'last' } },
+      select: { id: true, title: true, tags: true, category: true },
+      take: 400,
+    });
+    const chosen = productIds
+      ? catalogue.filter((p) => productIds.includes(p.id))
+      : suggestProducts(catalogue, keywords, 15);
+    const sample = (chosen.length ? chosen : catalogue).slice(0, 15);
+    const brief = parseBrief(project.brief);
+    const { markets } = await this.marketsOf(project);
+    return {
+      brand: brief?.about ?? '',
+      markets: markets.map((m) => `${m.code} ${m.share}%`),
+      products: sample.map((p) => ({
+        title: p.title,
+        tags: p.tags.slice(0, 13),
+        category: p.category,
+      })),
+    };
+  }
+
+  /** Better seed phrases for a niche, before a research exists (from the "new research" form). */
+  @Post('seeds')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async seedsNew(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body()
+    body:
+      | { name?: unknown; keywords?: unknown; salesAccountId?: unknown; locale?: unknown }
+      | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+    @Session() session: UserSession,
+  ) {
+    const ctx = request.workspace;
+    const project = await this.visibleProject(ctx, projectId);
+    const sales = await this.salesAccounts(projectId, ctx.workspaceId);
+    const account = sales.find((a) => a.id === body?.salesAccountId);
+    if (!account) throw new BadRequestException({ errors: { salesAccountId: 'invalid' } });
+    return this.seeds(
+      ctx,
+      session.user.id,
+      project,
+      account.id,
+      text(body?.name, 100),
+      parseKeywords(body?.keywords) ?? [],
+      null,
+      body?.locale,
+    );
+  }
+
+  /** Better seed phrases for an existing research. */
+  @Post(':id/seeds')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async seedsOf(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { keywords?: unknown; locale?: unknown } | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+    @Session() session: UserSession,
+  ) {
+    const ctx = request.workspace;
+    const research = await this.researchOf(ctx, projectId, id);
+    const project = await this.visibleProject(ctx, projectId);
+    return this.seeds(
+      ctx,
+      session.user.id,
+      project,
+      research.salesAccountId,
+      research.name,
+      parseKeywords(body?.keywords) ?? research.keywords,
+      research.productIds,
+      body?.locale,
+    );
+  }
+
+  private async seeds(
+    ctx: WorkspaceRequestContext,
+    userId: string,
+    project: { brief: unknown; markets: unknown; id: string },
+    salesAccountId: string,
+    name: string,
+    keywords: string[],
+    productIds: string[] | null,
+    locale: unknown,
+  ) {
+    const niche = await this.nicheInput(project, salesAccountId, keywords, productIds);
+    const result = await this.ai(ctx, project.id, userId, 'research_seeds', {
+      instructions: SEEDS_INSTRUCTIONS,
+      input: [
+        `Owner language: ${locale === 'uk' ? 'Ukrainian' : 'English'}.`,
+        JSON.stringify({ research: name, ownerPhrases: keywords, ...niche }),
+      ].join('\n'),
+      schema: SEEDS_SCHEMA as unknown as Record<string, unknown>,
+      name: 'research_seeds',
+    });
+    if (!result.ok) this.aiError(result.error);
+    const seeds = parseSeeds(result.data);
+    if (!seeds) this.aiError('failed');
+    return { ...seeds, costUsd: result.costUsd };
+  }
+
+  /**
+   * The AI's review of the keyword pool: each phrase relevant, too general, another product or
+   * style, or another intent. Kept as a snapshot; the owner's word still wins over it.
+   */
+  @Post(':id/review')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async reviewPool(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+    @Session() session: UserSession,
+  ) {
+    const ctx = request.workspace;
+    const research = await this.researchOf(ctx, projectId, id);
+    const project = await this.visibleProject(ctx, projectId);
+    const view = await this.get(projectId, id, request);
+    const phrases = view.pool.map((p) => p.phrase);
+    if (!phrases.length) return { reviewed: 0 };
+    const niche = await this.nicheInput(
+      project,
+      research.salesAccountId,
+      research.keywords,
+      research.productIds,
+    );
+    const result = await this.ai(ctx, projectId, session.user.id, 'research_pool_review', {
+      instructions: POOL_INSTRUCTIONS,
+      input: JSON.stringify({
+        research: research.name,
+        niche: research.keywords,
+        ...niche,
+        phrases,
+      }),
+      schema: POOL_SCHEMA as unknown as Record<string, unknown>,
+      name: 'pool_review',
+    });
+    if (!result.ok) this.aiError(result.error);
+    const review = parsePoolReview(result.data, phrases);
+    await this.prisma.client.researchSnapshot.upsert({
+      where: { researchId_source: { researchId: id, source: 'pool_review' } },
+      create: { researchId: id, source: 'pool_review', data: { review } as Prisma.InputJsonValue },
+      update: { data: { review } as Prisma.InputJsonValue, error: null, fetchedAt: new Date() },
+    });
+    return { reviewed: Object.keys(review).length, costUsd: result.costUsd };
+  }
+
   /** A research with its sources, keyword pool and the ranking of its products. */
   @Get(':id')
   async get(
@@ -687,7 +933,12 @@ export class ResearchController {
       etsy,
       studied.map((p) => `${p.title} ${p.tags.join(' ')}`),
     );
-    const ranking = rankProducts(studied, pool);
+    // The AI's review of the pool and the owner's word decide what is shown (ADR-0033).
+    const review = ((snapshot('pool_review')?.data as { review?: PoolReview } | undefined)
+      ?.review ?? {}) as PoolReview;
+    const overrides = parseOverrides((research.context as { phrases?: unknown } | null)?.phrases);
+    const visible = pool.filter((p) => phraseVisible(p.phrase, review, overrides));
+    const ranking = rankProducts(studied, visible);
     const byId = new Map(products.map((p) => [p.id, p]));
     return {
       id: research.id,
@@ -716,7 +967,18 @@ export class ResearchController {
           ? { fetchedAt: marketSnap.fetchedAt, error: marketSnap.error, markets: etsy }
           : null,
       },
-      pool,
+      pool: pool.map((p) => ({
+        ...p,
+        verdict: review[phraseKey(p.phrase)]?.verdict ?? null,
+        why: review[phraseKey(p.phrase)]?.why ?? null,
+        visible: phraseVisible(p.phrase, review, overrides),
+        byOwner: overrides.hidden.includes(p.phrase)
+          ? 'hidden'
+          : overrides.kept.includes(p.phrase)
+            ? 'kept'
+            : null,
+      })),
+      reviewedAt: snapshot('pool_review')?.fetchedAt ?? null,
       products: ranking.map((r) => {
         const p = byId.get(r.id)!;
         return {

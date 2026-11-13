@@ -42,6 +42,13 @@ export interface PoolPhrase {
   etsy: number;
   own: number;
   score: number;
+  /** The AI's review (ADR-0033): null = not reviewed. */
+  verdict: 'relevant' | 'generic' | 'other_product' | 'other_intent' | null;
+  why: string | null;
+  /** Shown in the pool and used for ranking and advice. */
+  visible: boolean;
+  /** The owner's word: hidden by hand, or kept against the AI. */
+  byOwner: 'hidden' | 'kept' | null;
 }
 
 export type Reason =
@@ -84,5 +91,12 @@ export interface Research {
     etsy: { fetchedAt: string; error: string | null; markets: EtsyMarket[] } | null;
   };
   pool: PoolPhrase[];
+  reviewedAt: string | null;
   products: RankedProduct[];
+}
+
+export interface Seeds {
+  phrases: { phrase: string; why: string }[];
+  avoid: { phrase: string; why: string }[];
+  costUsd: number;
 }

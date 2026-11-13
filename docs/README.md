@@ -62,3 +62,4 @@
 - [ADR-0030](decisions/0030-brief-directions-week-focus.md) — Напрями брифу, фокус тижня, пропозиції AI з днем (прийнято)
 - [ADR-0031](decisions/0031-project-facts.md) — «Дані проєкту»: підсумок з підключень для брифу й AI (прийнято)
 - [ADR-0032](decisions/0032-niche-research.md) — Дослідження: ніша · точка продажу · канал (прийнято)
+- [ADR-0033](decisions/0033-research-phrases-ai.md) — AI для фраз дослідження: добір і фільтр пулу (прийнято)

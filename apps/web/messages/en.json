@@ -1824,7 +1824,7 @@
     "missing": "add",
     "score": "Score",
     "poolTitle": "Keyword pool",
-    "poolHint": "Phrases from Pinterest trends, the tags and titles of top Etsy listings, and your products. The score is higher when several sources back a phrase and it grows.",
+    "poolHint": "Phrases from Pinterest trends, the tags and titles of top Etsy listings, and your products. After an update the AI marks what does not fit — too general, another product or style, DIY — and hides it from the pool, from “add” in products and from the AI's context. Your choice (the eye on the right) wins over the AI.",
     "poolEmpty": "Press “Update data” to collect the words.",
     "colPhrase": "Phrase",
     "colMom": "Pinterest, month",
@@ -1897,6 +1897,36 @@
         "limit": "The project's monthly AI limit is used up.",
         "off": "AI is not set up on the server.",
         "failed": "Could not get suggestions. Please try again."
+      }
+    },
+    "editPhrases": "Change phrases",
+    "saveAndRefresh": "Save and update data",
+    "showHidden": "Show hidden ({count})",
+    "hideHidden": "Hide what does not fit",
+    "review": "Check phrases with AI",
+    "reviewAgain": "Check again",
+    "reviewedAt": "Checked {date}",
+    "phraseHide": "Hide the phrase",
+    "phraseKeep": "Bring the phrase back",
+    "phraseReset": "Back to the AI's verdict",
+    "verdicts": {
+      "relevant": "fits",
+      "generic": "too general",
+      "other_product": "another product or style",
+      "other_intent": "another intent",
+      "byOwner": "hidden by you"
+    },
+    "seeds": {
+      "suggest": "Suggest phrases with AI",
+      "again": "Suggest again",
+      "thinking": "The AI is choosing phrases…",
+      "avoid": "Avoid",
+      "use": "Use the chosen ({count})",
+      "cost": "The request cost ${cost}",
+      "errors": {
+        "limit": "The monthly AI limit is used up.",
+        "off": "AI is not set up on the server.",
+        "failed": "Could not suggest phrases. Please try again."
       }
     }
   }
