@@ -175,6 +175,8 @@ export function ProductResearchPanel({
   const locale = useLocale();
   const { data, base, update } = research;
   const [open, setOpen] = useState(false);
+  /** The whole block starts folded. */
+  const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (!data) return null;
@@ -216,106 +218,127 @@ export function ProductResearchPanel({
 
   return (
     <section className="card animate-rise mb-6 grid gap-4 rounded-[24px] p-5 text-xs">
-      <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <Sparkles size={14} aria-hidden="true" />
-        {t('editor.title')}
-        <InfoTip text={t('editor.hint')} />
-      </p>
-      {audit ? (
-        <>
-          <p className="text-muted">
-            <AuditSummary audit={audit} />
-          </p>
-          {audit.replacements.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="text-muted">{t('betterTags')}:</span>
-              {audit.replacements.map((r) => (
-                <VerdictChip
-                  key={r.tag}
-                  tag={r.tag}
-                  score={r.score}
-                  verdict={r.score >= 55 ? 'strong' : 'ok'}
-                  detail={data.details?.[r.tag]}
-                />
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
-        <p className="text-muted">{t('noData')}</p>
-      )}
-
-      <div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <button
           type="button"
-          onClick={() => setOpen(!open)}
-          className="inline-flex items-center gap-1 text-left text-muted hover:text-foreground"
+          onClick={() => setShown(!shown)}
+          aria-expanded={shown}
+          className="flex items-center gap-1.5 text-sm font-semibold text-foreground"
         >
           <ChevronDown
-            size={12}
-            className={`shrink-0 transition-transform ${open ? '' : '-rotate-90'}`}
+            size={14}
+            className={`shrink-0 transition-transform ${shown ? '' : '-rotate-90'}`}
             aria-hidden="true"
           />
-          <Sparkles size={12} aria-hidden="true" />
-          {t('advice')}
-          {!advice && ` · ${t('notAsked')}`}
+          <Sparkles size={14} aria-hidden="true" />
+          {t('editor.title')}
         </button>
-        {open && (
-          <div className="mt-2 grid gap-3">
-            {advice ? (
-              <>
-                <div>
-                  <p className="mb-1 text-muted">{ta('titles')}</p>
-                  <ul className="grid gap-1">
-                    {advice.titles.map((x, i) => (
-                      <li key={i}>
-                        {x.title}
-                        <span className="ml-1.5 text-muted">{x.title.length}/140</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                {advice.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {advice.tags.map((tag) => (
-                      <span key={tag} className="rounded-full border border-line px-2 py-0.5">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {advice.opening && <p className="text-muted">{advice.opening}</p>}
-                {onEdit && (
-                  <button
-                    type="button"
-                    onClick={() => onEdit()}
-                    className="w-fit rounded-full border border-line px-3 py-1 hover:text-foreground"
-                  >
-                    {t('openInEditor')}
-                  </button>
-                )}
-              </>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void ask()}
-                className="rounded-full border border-line px-3 py-1 hover:text-foreground disabled:opacity-60"
-              >
-                {busy ? t('asking') : advice ? t('askAgain') : t('ask')}
-              </button>
-              <InfoTip text={t('askHint')} />
-              {error && (
-                <span className="text-rose-600 dark:text-rose-400">
-                  {t(`error.${error}` as 'error.failed')}
-                </span>
-              )}
-            </div>
-          </div>
+        <InfoTip text={t('editor.hint')} />
+        {!shown && audit && (
+          <span className="text-muted">
+            <AuditSummary audit={audit} />
+          </span>
         )}
       </div>
-      <ResearchSource data={data} />
+      {shown && (
+        <>
+          {audit ? (
+            <>
+              <p className="text-muted">
+                <AuditSummary audit={audit} />
+              </p>
+              {audit.replacements.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-muted">{t('betterTags')}:</span>
+                  {audit.replacements.map((r) => (
+                    <VerdictChip
+                      key={r.tag}
+                      tag={r.tag}
+                      score={r.score}
+                      verdict={r.score >= 55 ? 'strong' : 'ok'}
+                      detail={data.details?.[r.tag]}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-muted">{t('noData')}</p>
+          )}
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              className="inline-flex items-center gap-1 text-left text-muted hover:text-foreground"
+            >
+              <ChevronDown
+                size={12}
+                className={`shrink-0 transition-transform ${open ? '' : '-rotate-90'}`}
+                aria-hidden="true"
+              />
+              <Sparkles size={12} aria-hidden="true" />
+              {t('advice')}
+              {!advice && ` · ${t('notAsked')}`}
+            </button>
+            {open && (
+              <div className="mt-2 grid gap-3">
+                {advice ? (
+                  <>
+                    <div>
+                      <p className="mb-1 text-muted">{ta('titles')}</p>
+                      <ul className="grid gap-1">
+                        {advice.titles.map((x, i) => (
+                          <li key={i}>
+                            {x.title}
+                            <span className="ml-1.5 text-muted">{x.title.length}/140</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    {advice.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {advice.tags.map((tag) => (
+                          <span key={tag} className="rounded-full border border-line px-2 py-0.5">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {advice.opening && <p className="text-muted">{advice.opening}</p>}
+                    {onEdit && (
+                      <button
+                        type="button"
+                        onClick={() => onEdit()}
+                        className="w-fit rounded-full border border-line px-3 py-1 hover:text-foreground"
+                      >
+                        {t('openInEditor')}
+                      </button>
+                    )}
+                  </>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void ask()}
+                    className="rounded-full border border-line px-3 py-1 hover:text-foreground disabled:opacity-60"
+                  >
+                    {busy ? t('asking') : advice ? t('askAgain') : t('ask')}
+                  </button>
+                  <InfoTip text={t('askHint')} />
+                  {error && (
+                    <span className="text-rose-600 dark:text-rose-400">
+                      {t(`error.${error}` as 'error.failed')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <ResearchSource data={data} />
+        </>
+      )}
     </section>
   );
 }
