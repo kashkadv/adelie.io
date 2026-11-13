@@ -1843,6 +1843,61 @@
     "errors": {
       "keywords": "Enter at least one phrase",
       "no_pinterest": "Pinterest is not connected to the project"
+    },
+    "ai": {
+      "contextTitle": "Context for the AI",
+      "contextHint": "What the AI writes from: automatic blocks (your markets' holidays and deadlines, language and sizes, Etsy and Pinterest rules, the brand, the research's data) and your notes. Switch any block off; the full request is shown below.",
+      "blocks": {
+        "season": "Season, holidays and deadlines",
+        "markets": "Markets, language and sizes",
+        "etsy_rules": "Etsy rules",
+        "pinterest_rules": "Pinterest rules",
+        "brand": "Brand from the brief",
+        "research_data": "Research data"
+      },
+      "auto": "auto",
+      "ownBlock": "Note",
+      "enabled": "On",
+      "remove": "Remove",
+      "save": "Save",
+      "addOwn": "Add a note",
+      "showPrompt": "Show the full request",
+      "hidePrompt": "Hide the request",
+      "advise": "Suggest",
+      "showAdvice": "Suggestions",
+      "adviceTitle": "AI suggestions for the product",
+      "again": "Again",
+      "close": "Close",
+      "thinking": "The AI is writing titles, tags and pins…",
+      "titles": "Title — variants",
+      "tags": "Tags ({count}/13)",
+      "tagsHint": "Click a tag to drop or bring it back. Etsy takes 13 tags of up to 20 characters; too long ones are highlighted.",
+      "opening": "Description opening",
+      "copy": "Copy",
+      "openEditor": "Open in the Etsy editor",
+      "pins": "Pins",
+      "pinsHint": "Add any pin to the calendar: Adelie creates a tracked go.adelie.space link to this product (campaign — the research's name) and a draft pin on the chosen day.",
+      "pinned": "Added to the calendar · go.adelie.space/{code}",
+      "pinDay": "Pin day",
+      "noDay": "No day — to ideas",
+      "toCalendar": "To calendar",
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "cost": "The request cost ${cost}",
+      "checks": {
+        "titleLong": "Title {n}: {length} characters, Etsy allows 140",
+        "titleRepeats": "Title {n}: “{word}” is repeated more than twice",
+        "tagsCount": "{count} tags, Etsy takes exactly 13",
+        "tagLong": "Tag “{tag}” is {length} characters, 20 at most",
+        "tagChars": "Tag “{tag}” has characters Etsy does not allow",
+        "pinTitleLong": "Pin {n}: title is {length} characters, 100 at most",
+        "pinDescriptionLong": "Pin {n}: description is {length} characters, 500 at most"
+      },
+      "errors": {
+        "limit": "The project's monthly AI limit is used up.",
+        "off": "AI is not set up on the server.",
+        "failed": "Could not get suggestions. Please try again."
+      }
     }
   }
 }

@@ -12,7 +12,13 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { Prisma } from '@adelie/db';
+import { Session, type UserSession } from '@thallesp/nestjs-better-auth';
+import { OpenAiProvider, costMicros } from '../ai/provider.js';
+import { parseBrief, todayIn } from '../calendar/ideas.js';
+import { config } from '../config.js';
+import { createTrackedLink } from '../links/create-link.js';
 import { CONNECT_ROLES, ConnectService } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
 import { countsAsSale } from '../sales/sales.js';
@@ -33,6 +39,14 @@ import {
   type TrendKeyword,
 } from './research.js';
 import { fetchEtsyMarket, fetchTrends } from './sources.js';
+import {
+  ADVICE_SCHEMA,
+  adviceInstructions,
+  checkAdvice,
+  contextBlocks,
+  parseAdvice,
+  parseContext,
+} from './advice.js';
 
 const CHANNELS = ['pinterest'] as const;
 const SALES_PLATFORMS = ['ETSY', 'WEBSITE'] as const;
@@ -62,7 +76,13 @@ export class ResearchController {
   private async visibleProject(ctx: WorkspaceRequestContext, projectId: string) {
     const project = await this.prisma.client.project.findFirst({
       where: { id: projectId, ...visibleProjectsWhere(ctx) },
-      select: { id: true, markets: true, deliveryDays: true },
+      select: {
+        id: true,
+        markets: true,
+        deliveryDays: true,
+        timezone: true,
+        brief: true,
+      },
     });
     if (!project) throw new NotFoundException();
     return project;
@@ -349,6 +369,262 @@ export class ResearchController {
     );
     await db.research.update({ where: { id }, data: { refreshedAt: new Date() } });
     return this.get(projectId, id, request);
+  }
+
+  /** The context blocks the AI gets for this research (automatic and the owner's). */
+  private async blocksOf(ctx: WorkspaceRequestContext, projectId: string, id: string) {
+    const research = await this.researchOf(ctx, projectId, id);
+    const project = await this.visibleProject(ctx, projectId);
+    const view = await this.get(projectId, id, { workspace: ctx });
+    const brief = parseBrief(project.brief);
+    const direction =
+      brief?.directions.find((d) => d.id === research.directionId) ??
+      (brief?.directions.length === 1 ? brief.directions[0] : undefined);
+    const blocks = contextBlocks({
+      today: todayIn(project.timezone),
+      endsOn: view.endsOn,
+      markets: (await this.marketsOf(project)).markets,
+      deliveryDays: project.deliveryDays,
+      salesPlatform: (view.salesAccount.platform as 'ETSY' | 'WEBSITE' | null) ?? null,
+      channel: research.channel,
+      brand: brief
+        ? { about: brief.about, audience: direction?.audience ?? '', goal: direction?.goal ?? '' }
+        : null,
+      pool: view.pool,
+      etsy: view.sources.etsy?.markets ?? [],
+      context: parseContext(research.context),
+    });
+    return { research, view, blocks };
+  }
+
+  /** The AI's context for this research: the blocks, and the full instructions as sent. */
+  @Get(':id/context')
+  async context(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const { blocks } = await this.blocksOf(request.workspace, projectId, id);
+    return { blocks, instructions: adviceInstructions(blocks) };
+  }
+
+  /** Saves the owner's blocks and which automatic ones are off. */
+  @Put(':id/context')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async saveContext(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    await this.researchOf(request.workspace, projectId, id);
+    const context = parseContext(body);
+    await this.prisma.client.research.update({
+      where: { id },
+      data: { context: context as unknown as Prisma.InputJsonValue },
+    });
+    return this.context(projectId, id, request);
+  }
+
+  /** This month's AI spending of the project, in millionths of a dollar (ADR-0029). */
+  private async spentMicros(projectId: string) {
+    const now = new Date();
+    const month = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const sum = await this.prisma.client.aiRun.aggregate({
+      where: { projectId, createdAt: { gte: month } },
+      _sum: { costMicros: true },
+    });
+    return sum._sum.costMicros ?? 0;
+  }
+
+  /** The last advice for each product of the research. */
+  @Get(':id/advice')
+  async advices(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    await this.researchOf(request.workspace, projectId, id);
+    const rows = await this.prisma.client.researchSnapshot.findMany({
+      where: { researchId: id, source: { startsWith: 'advice:' } },
+      select: { source: true, data: true, fetchedAt: true },
+    });
+    return {
+      advice: Object.fromEntries(
+        rows.map((r) => [r.source.slice(7), { ...(r.data as object), createdAt: r.fetchedAt }]),
+      ),
+    };
+  }
+
+  /**
+   * Advice for one product from the AI: title variants, 13 tags, the description's opening and two
+   * pins — from the research's context; Etsy's and Pinterest's limits checked without the AI.
+   */
+  @Post(':id/advice')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async advise(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { productId?: unknown; locale?: unknown } | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+    @Session() session: UserSession,
+  ) {
+    const ai = config.ai;
+    if (!ai) throw new HttpException({ errors: { ai: 'off' } }, 503);
+    const ctx = request.workspace;
+    const { research, view, blocks } = await this.blocksOf(ctx, projectId, id);
+    const productId = typeof body?.productId === 'string' ? body.productId : '';
+    if (!research.productIds.includes(productId)) {
+      throw new BadRequestException({ errors: { productId: 'invalid' } });
+    }
+    if ((await this.spentMicros(projectId)) >= ai.monthlyLimitUsd * 1e6) {
+      throw new HttpException({ errors: { ai: 'limit' } }, 429);
+    }
+    const db = this.prisma.client;
+    const product = await db.shopProduct.findUniqueOrThrow({
+      where: { id: productId },
+      select: {
+        title: true,
+        details: true,
+        tags: true,
+        category: true,
+        price: true,
+        currency: true,
+      },
+    });
+    const ranked = view.products.find((p) => p.id === productId);
+    const input = [
+      `Owner language: ${body?.locale === 'uk' ? 'Ukrainian' : 'English'}.`,
+      'Product (JSON):',
+      JSON.stringify({
+        title: product.title,
+        tags: product.tags,
+        category: product.category,
+        price: product.price !== null ? `${product.price / 100} ${product.currency ?? ''}` : null,
+        // Sites keep the feed's description; Etsy's is read live by the editor, not stored.
+        description:
+          typeof (product.details as { description?: unknown } | null)?.description === 'string'
+            ? (product.details as { description: string }).description.slice(0, 1500)
+            : null,
+        soldLastYear: ranked?.sold12m ?? null,
+        favorites: ranked?.favorers ?? null,
+        views: ranked?.views ?? null,
+        poolPhrasesItHas: ranked?.matched ?? [],
+        poolPhrasesItLacks: ranked?.missing ?? [],
+      }),
+    ].join('\n');
+    const instructions = adviceInstructions(blocks);
+    const provider = new OpenAiProvider(ai.apiKey, ai.model);
+    const answer = await provider.structured({
+      instructions,
+      input,
+      schema: ADVICE_SCHEMA as unknown as Record<string, unknown>,
+      schemaName: 'listing_advice',
+    });
+    const advice = answer.ok ? parseAdvice(answer.data) : null;
+    const run = await db.aiRun.create({
+      data: {
+        workspaceId: ctx.workspaceId,
+        projectId,
+        userId: session.user.id,
+        kind: 'research_advice',
+        provider: provider.name,
+        model: answer.model,
+        status: advice ? 'ok' : 'error',
+        inputTokens: answer.usage.inputTokens,
+        cachedTokens: answer.usage.cachedTokens,
+        outputTokens: answer.usage.outputTokens,
+        costMicros: costMicros(answer.usage, ai.price),
+        input: { researchId: id, productId, instructions, input } as Prisma.InputJsonValue,
+        output: answer.ok ? (answer.data as Prisma.InputJsonValue) : Prisma.DbNull,
+        error: answer.ok ? (advice ? null : 'no valid advice') : answer.error,
+      },
+      select: { id: true, costMicros: true },
+    });
+    if (!advice) throw new HttpException({ errors: { ai: 'failed' } }, 502);
+    const data = {
+      ...advice,
+      checks: checkAdvice(advice),
+      aiRunId: run.id,
+      costUsd: run.costMicros / 1e6,
+    };
+    await db.researchSnapshot.upsert({
+      where: { researchId_source: { researchId: id, source: `advice:${productId}` } },
+      create: {
+        researchId: id,
+        source: `advice:${productId}`,
+        data: data as Prisma.InputJsonValue,
+      },
+      update: { data: data as Prisma.InputJsonValue, error: null, fetchedAt: new Date() },
+    });
+    return { ...data, createdAt: new Date() };
+  }
+
+  /**
+   * A pin for a product into the calendar: a tracked Pinterest link to the product's page
+   * (campaign = the research) and a draft pin on the chosen day carrying it.
+   */
+  @Post(':id/pin')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async pin(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body()
+    body:
+      { productId?: unknown; title?: unknown; description?: unknown; date?: unknown } | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const ctx = request.workspace;
+    const research = await this.researchOf(ctx, projectId, id);
+    const productId = typeof body?.productId === 'string' ? body.productId : '';
+    const title = text(body?.title, 200);
+    const description = text(body?.description, 2000);
+    const date = body?.date === null || body?.date === undefined ? null : body.date;
+    if (!research.productIds.includes(productId)) {
+      throw new BadRequestException({ errors: { productId: 'invalid' } });
+    }
+    if (!title) throw new BadRequestException({ errors: { title: 'invalid' } });
+    if (date !== null && !isDay(date))
+      throw new BadRequestException({ errors: { date: 'invalid' } });
+    const db = this.prisma.client;
+    const product = await db.shopProduct.findUniqueOrThrow({
+      where: { id: productId },
+      select: { url: true, title: true },
+    });
+    if (!product.url) throw new BadRequestException({ errors: { productId: 'noUrl' } });
+    const created = await createTrackedLink(
+      db,
+      { workspaceId: ctx.workspaceId, projectId },
+      {
+        destination: product.url,
+        channel: 'pinterest',
+        campaign: research.name,
+        name: `${product.title.slice(0, 80)} · Pinterest`,
+      },
+    );
+    if (!created.ok) throw new BadRequestException({ errors: { link: created.error } });
+    const day = date ? new Date(`${date as string}T00:00:00Z`) : null;
+    const last = await db.calendarItem.aggregate({
+      where: { projectId, suggestion: null, date: day },
+      _max: { position: true },
+    });
+    const item = await db.calendarItem.create({
+      data: {
+        workspaceId: ctx.workspaceId,
+        projectId,
+        date: day,
+        position: (last._max.position ?? -1) + 1,
+        channel: 'pinterest',
+        format: 'pin',
+        title,
+        notes: description || null,
+        minutes: 15,
+        status: 'draft',
+        linkId: created.link.id,
+      },
+      select: { id: true },
+    });
+    return { itemId: item.id, linkId: created.link.id, code: created.link.code };
   }
 
   /** A research with its sources, keyword pool and the ranking of its products. */

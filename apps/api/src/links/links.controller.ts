@@ -24,30 +24,11 @@ import {
   WorkspaceRoles,
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
-import {
-  buildLinkUrl,
-  carriedLinks,
-  channelOf,
-  newLinkCode,
-  parseDestination,
-  parseLinkInput,
-} from './links.js';
+import { buildLinkUrl, carriedLinks, channelOf, parseDestination } from './links.js';
 import { linkResults } from './link-stats.js';
 import { publishShortLink, shortUrlOf } from './short-links.js';
 
-const LINK_SELECT = {
-  id: true,
-  code: true,
-  name: true,
-  destination: true,
-  source: true,
-  medium: true,
-  campaign: true,
-  content: true,
-  publishedAt: true,
-  createdAt: true,
-  archivedAt: true,
-} as const;
+import { LINK_SELECT, createTrackedLink } from './create-link.js';
 type LinkRow = Prisma.TrackedLinkGetPayload<{ select: typeof LINK_SELECT }>;
 
 /** A link as the cabinet shows it: both forms, its channel. */
@@ -253,39 +234,18 @@ export class LinksController {
   ) {
     const ctx = request.workspace;
     await this.visibleProject(ctx, projectId);
-    const db = this.prisma.client;
-    let code = newLinkCode();
-    while (await db.trackedLink.findUnique({ where: { code }, select: { id: true } })) {
-      code = newLinkCode();
+    const created = await createTrackedLink(
+      this.prisma.client,
+      { workspaceId: ctx.workspaceId, projectId },
+      body ?? {},
+    );
+    if (!created.ok) {
+      if (created.error === 'taken') {
+        throw new ConflictException({ errors: { content: 'taken' }, linkId: created.linkId });
+      }
+      throw new BadRequestException({ errors: { [created.error]: 'invalid' } });
     }
-    const parsed = parseLinkInput(body ?? {}, code);
-    if (!parsed.ok) throw new BadRequestException({ errors: { [parsed.error]: 'invalid' } });
-    const { labels } = parsed;
-    const same = await db.trackedLink.findFirst({
-      where: {
-        projectId,
-        workspaceId: ctx.workspaceId,
-        archivedAt: null,
-        source: labels.source,
-        medium: labels.medium,
-        campaign: labels.campaign,
-        content: labels.content,
-      },
-      select: { id: true },
-    });
-    if (same) throw new ConflictException({ errors: { content: 'taken' }, linkId: same.id });
-    const link = await db.trackedLink.create({
-      data: {
-        workspaceId: ctx.workspaceId,
-        projectId,
-        code,
-        name: parsed.name,
-        destination: parsed.destination,
-        ...labels,
-      },
-      select: LINK_SELECT,
-    });
-    return present(await this.publish(link));
+    return present(created.link);
   }
 
   /**

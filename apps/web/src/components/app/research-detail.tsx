@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Check, ListChecks, RefreshCw, Search, X } from 'lucide-react';
+import { ArrowLeft, Check, ListChecks, RefreshCw, Search, Sparkles, X } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { Checkbox } from '../ui/checkbox';
 import { InfoTip } from '../ui/info-tip';
 import { PlatformIcon } from '../ui/platform-icon';
+import { AdviceDialog, ResearchContext, type Advice } from './research-ai';
 import type { Research } from './research-data';
 
 const pct = (v: number | null) =>
@@ -35,6 +36,8 @@ export function ResearchDetail({
   const [refreshing, setRefreshing] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [version, setVersion] = useState(0);
+  const [advice, setAdvice] = useState<Record<string, Advice>>({});
+  const [advising, setAdvising] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +49,17 @@ export function ResearchDetail({
       cancelled = true;
     };
   }, [base, id, version]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api<{ advice: Record<string, Advice> }>(`${base}/${id}/advice`).then(
+      (r) => !cancelled && setAdvice(r.advice),
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [base, id]);
 
   async function refresh() {
     setRefreshing(true);
@@ -163,6 +177,8 @@ export function ResearchDetail({
         </p>
       </section>
 
+      <ResearchContext key={version} base={`${base}/${id}`} canManage={canManage} />
+
       {/* Products ranked for promotion. */}
       <section className="card animate-rise mb-4 rounded-[24px] p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -243,9 +259,21 @@ export function ResearchDetail({
                     </p>
                   )}
                 </div>
-                <span className="tabular shrink-0 pt-1 text-sm font-semibold" title={t('score')}>
-                  {format.number(p.score, { maximumFractionDigits: 1 })}
-                </span>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <span className="tabular pt-1 text-sm font-semibold" title={t('score')}>
+                    {format.number(p.score, { maximumFractionDigits: 1 })}
+                  </span>
+                  {(canManage || advice[p.id]) && (
+                    <button
+                      type="button"
+                      onClick={() => setAdvising({ id: p.id, title: p.title })}
+                      className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs hover:bg-hover ${advice[p.id] ? 'border-accent' : 'border-line'}`}
+                    >
+                      <Sparkles size={13} aria-hidden="true" />
+                      {advice[p.id] ? t('ai.showAdvice') : t('ai.advise')}
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ol>
@@ -343,6 +371,18 @@ export function ResearchDetail({
             </div>
           ))}
         </section>
+      )}
+
+      {advising && (
+        <AdviceDialog
+          base={`${base}/${id}`}
+          product={advising}
+          initial={advice[advising.id] ?? null}
+          canManage={canManage}
+          isEtsy={data.salesAccount.platform === 'ETSY'}
+          onClose={() => setAdvising(null)}
+          onAdvice={(a) => setAdvice((all) => ({ ...all, [advising.id]: a }))}
+        />
       )}
 
       {choosing && (

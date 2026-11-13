@@ -208,11 +208,14 @@ function TagInput({
 export function ProductEditor({
   base,
   productId,
+  proposed,
   onClose,
   onSaved,
 }: {
   base: string;
   productId: string;
+  /** Values to start from instead of the live ones (a research's advice, ADR-0032). */
+  proposed?: { title?: string; tags?: string[] };
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -239,7 +242,7 @@ export function ProductEditor({
   function reset(d: EditData) {
     setData(d);
     if (d.current) {
-      setValues(valuesOf(d.current));
+      setValues({ ...valuesOf(d.current), ...proposed });
       setPriceText(priceTextOf(d.current.price?.amount ?? null, digitsOf(d.current)));
       setVarPrices(
         Object.fromEntries(
