@@ -286,8 +286,8 @@ export function ProductResearchPanel({
                 {advice ? (
                   <>
                     <div>
-                      <p className="mb-1 text-muted">{ta('titles')}</p>
-                      <ul className="grid gap-1">
+                      <p className="mb-2 text-muted">{ta('titles')}</p>
+                      <ul className="grid gap-2">
                         {advice.titles.map((x, i) => (
                           <li key={i}>
                             {x.title}
@@ -297,7 +297,7 @@ export function ProductResearchPanel({
                       </ul>
                     </div>
                     {advice.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1.5">
                         {advice.tags.map((tag) => (
                           <span key={tag} className="rounded-full border border-line px-2 py-0.5">
                             {tag}
