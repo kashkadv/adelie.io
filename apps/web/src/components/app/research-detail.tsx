@@ -351,21 +351,6 @@ export function ResearchDetail({
                       </span>
                     ))}
                   </div>
-                  {(p.matched.length > 0 || p.missing.length > 0) && (
-                    <p className="mt-3 grid gap-1 text-xs leading-relaxed">
-                      {p.matched.length > 0 && (
-                        <span className="text-muted">
-                          {t('matched')}: {p.matched.slice(0, 6).join(', ')}
-                        </span>
-                      )}
-                      {p.missing.length > 0 && (
-                        <span className="block">
-                          <span className="text-muted">{t('missing')}: </span>
-                          {p.missing.slice(0, 6).join(', ')}
-                        </span>
-                      )}
-                    </p>
-                  )}
                   <TagAuditLine audit={p.tagAudit} />
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">

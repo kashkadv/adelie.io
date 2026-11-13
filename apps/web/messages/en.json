@@ -1820,8 +1820,6 @@
       "fewTags": "fewer than 13 tags",
       "shortTitle": "short title"
     },
-    "matched": "has",
-    "missing": "add",
     "score": "Score",
     "poolTitle": "Keyword pool",
     "poolHint": "Phrases from Pinterest trends, the tags and titles of top Etsy listings, and your products. After an update the AI marks what does not fit — too general, another product or style, DIY — and hides it from the pool, from “add” in products and from the AI's context. Your choice (the eye on the right) wins over the AI.",
