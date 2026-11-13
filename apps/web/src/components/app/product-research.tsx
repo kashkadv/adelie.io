@@ -167,8 +167,8 @@ export function ProductResearchPanel({
 }: {
   productId: string;
   research: ReturnType<typeof useProductResearch>;
-  /** Opens the editor with these values already in (they are not saved until reviewed). */
-  onEdit?: (proposed: { title?: string; tags?: string[] }) => void;
+  /** Opens the editor; its research panel offers the advice (nothing is filled in by itself). */
+  onEdit?: () => void;
 }) {
   const t = useTranslations('Sales.research');
   const ta = useTranslations('Research.ai');
@@ -183,7 +183,7 @@ export function ProductResearchPanel({
 
   if (!data.research) {
     return (
-      <p className="mt-3 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+      <p className="mb-6 flex flex-wrap items-center gap-x-2 text-xs text-muted">
         {t('noResearch')}
         <Link href="/research" className="underline hover:text-foreground">
           {t('openResearches')}
@@ -215,7 +215,12 @@ export function ProductResearchPanel({
   }
 
   return (
-    <div className="mt-3 grid gap-2.5 text-xs">
+    <section className="card animate-rise mb-6 grid gap-4 rounded-[24px] p-5 text-xs">
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+        <Sparkles size={14} aria-hidden="true" />
+        {t('editor.title')}
+        <InfoTip text={t('editor.hint')} />
+      </p>
       {audit ? (
         <>
           <p className="text-muted">
@@ -283,7 +288,7 @@ export function ProductResearchPanel({
                 {onEdit && (
                   <button
                     type="button"
-                    onClick={() => onEdit({ title: advice.titles[0]?.title, tags: advice.tags })}
+                    onClick={() => onEdit()}
                     className="w-fit rounded-full border border-line px-3 py-1 hover:text-foreground"
                   >
                     {t('openInEditor')}
@@ -311,7 +316,7 @@ export function ProductResearchPanel({
         )}
       </div>
       <ResearchSource data={data} />
-    </div>
+    </section>
   );
 }
 
@@ -424,10 +429,14 @@ export function EditorResearchPanel({
   if (!data.research) return null;
   const advice = data.advice;
   const weak = audit ? audit.counts.weak + audit.counts.off : 0;
+  // The AI's tags the product does not have yet: the ones taken drop out, the rest stay.
+  const aiTags = (advice?.tags ?? []).filter(
+    (a) => !tags.some((x) => x.toLowerCase() === a.toLowerCase()),
+  );
   const swapped = replaceWeak(tags, audit);
   const canReplace = swapped.some((x, i) => x !== tags[i]);
   return (
-    <div className="mt-3 grid gap-3 rounded-2xl border border-line p-3 text-xs">
+    <div className="mt-3 grid gap-4 rounded-2xl border border-line p-4 text-xs">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 font-medium text-foreground">
           <Sparkles size={13} aria-hidden="true" />
@@ -468,6 +477,24 @@ export function EditorResearchPanel({
                 detail={details[r.tag]}
                 onClick={() => onTags(withTag(tags, audit, r.tag))}
               />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {aiTags.length > 0 && (
+        <div className="grid gap-1.5">
+          <span className="text-muted">{t('editor.aiTags')}</span>
+          <div className="flex flex-wrap gap-1">
+            {aiTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => onTags(withTag(tags, audit, tag))}
+                className="rounded-full border border-line px-2 py-0.5 hover:bg-hover"
+              >
+                {tag}
+              </button>
             ))}
           </div>
         </div>

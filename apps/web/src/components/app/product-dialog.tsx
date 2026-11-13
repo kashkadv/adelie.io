@@ -633,7 +633,7 @@ export function ProductDialog({
   onPrevious?: () => void;
   onNext?: () => void;
   /** Absent for products that cannot be edited (e.g. removed from the shop). */
-  onEdit?: (proposed?: { title?: string; tags?: string[] }) => void;
+  onEdit?: () => void;
 }) {
   const t = useTranslations('Sales.card');
   const ts = useTranslations('Sales');
@@ -880,15 +880,14 @@ export function ProductDialog({
                           {t('noTags')}
                         </p>
                       )}
-                      <ProductResearchPanel
-                        productId={productId}
-                        research={research}
-                        onEdit={onEdit}
-                      />
                     </div>
                   )}
                 </div>
               </div>
+
+              {detail.account.platform === 'ETSY' && (
+                <ProductResearchPanel productId={productId} research={research} onEdit={onEdit} />
+              )}
 
               {issues && (
                 <Improvements

@@ -1153,7 +1153,7 @@
       "noData": "The research has no rated tags yet: press “Update data” in it.",
       "advice": "AI advice",
       "notAsked": "not asked yet",
-      "openInEditor": "Open in the editor with these",
+      "openInEditor": "Open in the editor",
       "asking": "Asking…",
       "ask": "Ask the AI",
       "askAgain": "Ask again",
@@ -1170,6 +1170,7 @@
         "replaceWeak": "Replace weak ones ({count})",
         "replaceWeakHint": "Swaps every weak or unfitting tag for the next better one the product lacks",
         "addTag": "Better tags — click to add",
+        "aiTags": "AI's tags — click to add",
         "opening": "Opening of the description",
         "insertOpening": "Put at the start of the description"
       }
