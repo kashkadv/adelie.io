@@ -185,7 +185,7 @@ export function ProductResearchPanel({
 
   if (!data.research) {
     return (
-      <p className="mb-6 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+      <p className="my-6 flex flex-wrap items-center gap-x-2 text-xs text-muted">
         {t('noResearch')}
         <Link href="/research" className="underline hover:text-foreground">
           {t('openResearches')}
@@ -217,7 +217,7 @@ export function ProductResearchPanel({
   }
 
   return (
-    <section className="card animate-rise mb-6 grid gap-4 rounded-[24px] p-5 text-xs">
+    <section className="card animate-rise my-6 grid gap-4 rounded-[24px] p-5 text-xs">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <button
           type="button"
