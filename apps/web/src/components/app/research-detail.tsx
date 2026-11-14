@@ -23,6 +23,10 @@ import { AdviceDialog, ResearchContext, type Advice } from './research-ai';
 import { RatedTags, TagAuditLine } from './research-tags';
 import { Select } from '../ui/select';
 import type { PoolPhrase, Research, Seeds } from './research-data';
+import { ProductDialog } from './product-dialog';
+import { ProductEditor } from './product-editor';
+import { ResearchResult } from './research-result';
+import { useSalesBase } from './sales-data';
 import { SeedSuggest } from './seed-suggest';
 
 const pct = (v: number | null) =>
@@ -53,6 +57,10 @@ export function ResearchDetail({
   const [advice, setAdvice] = useState<Record<string, Advice>>({});
   const [advising, setAdvising] = useState<{ id: string; title: string } | null>(null);
   const [editingPhrases, setEditingPhrases] = useState(false);
+  const salesBase = useSalesBase();
+  /** The product whose card is open, and the one being edited (back to its card after). */
+  const [card, setCard] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   /** A version other than the latest, when the owner looks back. */
@@ -285,6 +293,13 @@ export function ResearchDetail({
         </p>
       </section>
 
+      <ResearchResult
+        base={`${base}/${id}`}
+        version={version}
+        products={data.products}
+        onOpen={setCard}
+      />
+
       <ResearchContext key={version} base={`${base}/${id}`} canManage={canManage} />
 
       {/* Products ranked for promotion. */}
@@ -321,14 +336,14 @@ export function ResearchDetail({
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <a
-                    href={p.url ?? undefined}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="line-clamp-2 text-sm font-medium hover:underline"
+                  {/* The product's card in Adelie, not the listing on Etsy. */}
+                  <button
+                    type="button"
+                    onClick={() => setCard(p.id)}
+                    className="line-clamp-2 text-left text-sm font-medium hover:underline"
                   >
                     {p.title}
-                  </a>
+                  </button>
                   <p className="mt-1 text-xs text-muted">
                     {t('productStats', {
                       sold: n(p.sold12m),
@@ -547,6 +562,34 @@ export function ResearchDetail({
             </div>
           ))}
         </section>
+      )}
+
+      {card && salesBase && (
+        <ProductDialog
+          base={salesBase}
+          productId={card}
+          onChanged={() => setVersion((v) => v + 1)}
+          onClose={() => setCard(null)}
+          onEdit={
+            canManage && data.salesAccount.platform === 'ETSY'
+              ? () => {
+                  setEditingProduct(card);
+                  setCard(null);
+                }
+              : undefined
+          }
+        />
+      )}
+      {editingProduct && salesBase && (
+        <ProductEditor
+          base={salesBase}
+          productId={editingProduct}
+          onClose={() => {
+            setCard(editingProduct);
+            setEditingProduct(null);
+          }}
+          onSaved={() => setVersion((v) => v + 1)}
+        />
       )}
 
       {editingPhrases && (

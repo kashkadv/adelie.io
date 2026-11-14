@@ -2006,6 +2006,30 @@
         "unknownHint": "Etsy numbers for this tag are not collected yet"
       }
     },
-    "refreshFailed": "The last update failed: {error}"
+    "refreshFailed": "The last update failed: {error}",
+    "result": {
+      "title": "Result",
+      "hint": "What the changes of titles, tags and descriptions did: views and favourites a day and sales before and after the first change — and the same for unchanged products over the same days. The season (Christmas) lifts everyone; the difference between the groups matters more than the growth itself.",
+      "nothingChanged": "Nothing changed yet. Change a product's title or tags (“Suggest” → editor) and the comparison appears here.",
+      "period": "First change {since} · days before: {before} · after: {after}",
+      "notEnough": "Too few days after the changes — the numbers are still random. The comparison becomes meaningful around {date}.",
+      "changed": "Changed",
+      "changedHint": "Research products with changes applied in the editor; “before” — up to 14 days before the first change, “after” — from the change to today.",
+      "unchanged": "Unchanged",
+      "unchangedHint": "The research's other products over the same days — to tell the changes' effect from the season.",
+      "viewsPerDay": "Views a day",
+      "favorersPerDay": "Favourites a day",
+      "sales": "Sales",
+      "colProduct": "Product",
+      "colChanged": "Changed",
+      "fields": {
+        "title": "title",
+        "tags": "tags",
+        "description": "description",
+        "price": "price",
+        "quantity": "quantity",
+        "sku": "SKU"
+      }
+    }
   }
 }

@@ -65,3 +65,4 @@
 - [ADR-0033](decisions/0033-research-phrases-ai.md) — AI для фраз дослідження: добір і фільтр пулу (прийнято)
 - [ADR-0034](decisions/0034-research-versions-tag-ratings.md) — Версії дослідження й оцінка тегів (прийнято)
 - [ADR-0035](decisions/0035-research-in-product-card-editor.md) — Підказки дослідження в картці й редакторі товару (прийнято)
+- [ADR-0036](decisions/0036-research-result.md) — Результат дослідження: до/після змін проти незмінених (прийнято)

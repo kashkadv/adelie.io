@@ -20,6 +20,7 @@ import { OpenAiProvider, costMicros } from '../ai/provider.js';
 import { parseBrief, todayIn } from '../calendar/ideas.js';
 import { config } from '../config.js';
 import { createTrackedLink } from '../links/create-link.js';
+import { researchResult } from './result.js';
 import { auditTags, OK, STRONG } from './tag-audit.js';
 import { CONNECT_ROLES, ConnectService } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
@@ -1090,6 +1091,62 @@ export class ResearchController {
     });
     if (!result.ok) this.aiError(result.error);
     return parsePoolReview(result.data, phrases);
+  }
+
+  /**
+   * The research's result (ADR-0036): its changed products before and after their changes from the
+   * editor, against the unchanged ones over the same days — views and favourites a day, and sales.
+   */
+  @Get(':id/result')
+  async result(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const ctx = request.workspace;
+    const research = await this.researchOf(ctx, projectId, id);
+    const project = await this.visibleProject(ctx, projectId);
+    const ids = research.productIds;
+    const db = this.prisma.client;
+    const since = new Date(Date.now() - 120 * DAY);
+    const [daily, changes, sales] = ids.length
+      ? await Promise.all([
+          db.shopProductDaily.findMany({
+            where: { productId: { in: ids }, date: { gte: since } },
+            orderBy: { date: 'asc' },
+            select: { productId: true, date: true, views: true, favorers: true },
+          }),
+          db.shopProductChange.findMany({
+            where: { productId: { in: ids }, status: 'applied', createdAt: { gte: since } },
+            select: { productId: true, createdAt: true, changes: true },
+          }),
+          db.$queryRaw<{ productId: string; date: string; quantity: number }[]>`
+            SELECT i."productId", to_char(o."orderedAt", 'YYYY-MM-DD') AS date, sum(i.quantity)::int AS quantity
+            FROM shop_order_item i JOIN shop_order o ON o.id = i."orderId"
+            WHERE i."productId" = ANY(${ids}::uuid[]) AND o."orderedAt" >= ${since}
+              AND (o.status IS NULL OR lower(o.status) NOT IN ('canceled', 'cancelled', 'fully refunded'))
+            GROUP BY 1, 2`,
+        ])
+      : [[], [], []];
+    const day = (d: Date) => d.toISOString().slice(0, 10);
+    return researchResult(
+      ids.map((pid) => ({
+        id: pid,
+        daily: daily
+          .filter((d) => d.productId === pid)
+          .map((d) => ({ date: day(d.date), views: d.views, favorers: d.favorers })),
+        changes: changes
+          .filter((c) => c.productId === pid)
+          .map((c) => ({
+            date: todayIn(project.timezone, c.createdAt),
+            fields: Object.keys((c.changes ?? {}) as object),
+          })),
+        sales: sales
+          .filter((x) => x.productId === pid)
+          .map((x) => ({ date: x.date, quantity: x.quantity })),
+      })),
+      todayIn(project.timezone),
+    );
   }
 
   /**

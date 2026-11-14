@@ -1172,3 +1172,17 @@ model ResearchVersion {
   @@index([researchId, createdAt])
   @@map("research_version")
 }
+
+/// A product's counters on a day (ADR-0036): views and favourites as the shop reported them
+/// (cumulative, all-time) — their growth between days is the activity. Written by each sync.
+model ShopProductDaily {
+  productId String   @db.Uuid
+  accountId String   @db.Uuid
+  date      DateTime @db.Date
+  views     Int?
+  favorers  Int?
+
+  @@id([productId, date])
+  @@index([accountId, date])
+  @@map("shop_product_daily")
+}

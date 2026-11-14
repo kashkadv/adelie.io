@@ -617,7 +617,7 @@ export async function runSync(
               ...(p.skuGroups !== undefined ? { skuGroups: p.skuGroups } : {}),
               listedAt: p.listedAt ?? null,
             };
-            await prisma.shopProduct.upsert({
+            const saved = await prisma.shopProduct.upsert({
               where: { accountId_externalId: { accountId: account.id, externalId: p.externalId } },
               create: {
                 workspaceId: account.workspaceId,
@@ -627,7 +627,23 @@ export async function runSync(
                 ...data,
               },
               update: data,
+              select: { id: true },
             });
+            // The day's counters, for the research's before/after (ADR-0036): the latest of the day.
+            if (p.views !== null || p.favorers !== null) {
+              const date = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+              await prisma.shopProductDaily.upsert({
+                where: { productId_date: { productId: saved.id, date } },
+                create: {
+                  productId: saved.id,
+                  accountId: account.id,
+                  date,
+                  views: p.views,
+                  favorers: p.favorers,
+                },
+                update: { views: p.views, favorers: p.favorers },
+              });
+            }
             count('products');
           }
         }
