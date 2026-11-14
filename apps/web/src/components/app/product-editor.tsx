@@ -1,6 +1,16 @@
 'use client';
 
-import { ArrowLeft, ArrowRight, Check, ExternalLink, List, Lock, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  ExternalLink,
+  List,
+  Lock,
+  RotateCcw,
+  X,
+} from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
@@ -253,6 +263,13 @@ export function ProductEditor({
   /** Per-variation price as typed, by variation id. */
   const [varPrices, setVarPrices] = useState<Record<string, string>>({});
   const [step, setStep] = useState<'edit' | 'review'>('edit');
+  /** The history entry shown in full, and what a revert put back (and what it could not). */
+  const [openChange, setOpenChange] = useState<string | null>(null);
+  const [reverted, setReverted] = useState<{
+    at: string;
+    since: Field[];
+    skipped: Field[];
+  } | null>(null);
   // What the research that studies the product says of its tags, rechecked as they change (ADR-0035).
   const research = useProductResearch(productId);
   const live = useLiveAudit(
@@ -475,6 +492,41 @@ export function ProductEditor({
         ]),
       ),
     );
+  /**
+   * Puts back what a saved change replaced: its "from" values become "will be", reviewed and saved
+   * as any edit (Etsy is read live before the write). Fields edited again since are named; the
+   * variations come back only while their set is the same.
+   */
+  function revert(h: Change) {
+    if (!data?.current || !values) return;
+    const now = valuesOf(data.current);
+    const next: Values = { ...values };
+    const since: Field[] = [];
+    const skipped: Field[] = [];
+    for (const [key, c] of Object.entries(h.changes)) {
+      const f = key as Field;
+      if (!c || !FIELDS.includes(f)) continue;
+      if (!same(now[f], c.to)) since.push(f);
+      if (f === 'variations') {
+        const from = (c.from as Var[]).map((v) => v.id).sort();
+        if (!same(from, now.variations.map((v) => v.id).sort())) {
+          skipped.push(f);
+          continue;
+        }
+        next.variations = [...(c.from as Var[])].sort((a, b) => a.id.localeCompare(b.id));
+        continue;
+      }
+      (next as Record<Field, unknown>)[f] = c.from;
+    }
+    setValues(next);
+    setPriceText(priceTextOf(next.price, digits));
+    setVarPrices(
+      Object.fromEntries(next.variations.map((v) => [v.id, priceTextOf(v.price, digits)])),
+    );
+    setReverted({ at: h.createdAt, since, skipped });
+    setStep('edit');
+  }
+
   const changed = FIELDS.filter((f) => original && edited && !same(original[f], edited[f]));
 
   // Etsy's rules, shown under the field (rules.md §6: only errors there).
@@ -1052,33 +1104,105 @@ export function ProductEditor({
             )
           )}
 
+          {reverted && step === 'edit' && (
+            <p
+              role="status"
+              className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-800 dark:text-amber-300"
+            >
+              {t('revertedNotice', {
+                date: format.dateTime(new Date(reverted.at), {
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                }),
+              })}
+              {reverted.since.length > 0 &&
+                ` ${t('revertedSince', { fields: reverted.since.map((f) => t(`fields.${f}`)).join(', ') })}`}
+              {reverted.skipped.length > 0 &&
+                ` ${t('revertedSkipped', { fields: reverted.skipped.map((f) => t(`fields.${f}`)).join(', ') })}`}
+            </p>
+          )}
+
           {data && data.history.length > 0 && step === 'edit' && (
             <section className="mt-6">
-              <h3 className="mb-2 px-1 text-sm font-semibold">{t('history')}</h3>
-              <ul className="grid gap-1.5 text-xs text-muted">
-                {data.history.map((h) => (
-                  <li key={h.id} className="flex flex-wrap items-center gap-x-2 px-1">
-                    <span className="tabular">
-                      {format.dateTime(new Date(h.createdAt), {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                      })}
-                    </span>
-                    <span>·</span>
-                    <span>{h.user?.name ?? '—'}</span>
-                    <span>·</span>
-                    <span>
-                      {Object.keys(h.changes)
-                        .map((f) => t(`fields.${f as Field}`))
-                        .join(', ')}
-                    </span>
-                    {h.status === 'failed' && (
-                      <span className="text-rose-600 dark:text-rose-400" title={h.error ?? ''}>
-                        {t('failedBadge')}
-                      </span>
-                    )}
-                  </li>
-                ))}
+              <h3 className="mb-2 flex items-center gap-1.5 px-1 text-sm font-semibold">
+                {t('history')}
+                <InfoTip text={t('historyHint')} />
+              </h3>
+              <ul className="grid gap-1.5 text-xs">
+                {data.history.map((h) => {
+                  const open = openChange === h.id;
+                  return (
+                    <li key={h.id} className="rounded-xl border border-line">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-2.5 py-1.5 text-muted">
+                        <button
+                          type="button"
+                          onClick={() => setOpenChange(open ? null : h.id)}
+                          aria-expanded={open}
+                          className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 text-left hover:text-foreground"
+                        >
+                          <ChevronDown
+                            size={12}
+                            className={`shrink-0 transition-transform ${open ? '' : '-rotate-90'}`}
+                            aria-hidden="true"
+                          />
+                          <span className="tabular">
+                            {format.dateTime(new Date(h.createdAt), {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            })}
+                          </span>
+                          <span>·</span>
+                          <span>{h.user?.name ?? '—'}</span>
+                          <span>·</span>
+                          <span>
+                            {Object.keys(h.changes)
+                              .map((f) => t(`fields.${f as Field}`))
+                              .join(', ')}
+                          </span>
+                          {h.status === 'failed' && (
+                            <span
+                              className="text-rose-600 dark:text-rose-400"
+                              title={h.error ?? ''}
+                            >
+                              {t('failedBadge')}
+                            </span>
+                          )}
+                        </button>
+                        {data.canEdit && h.status === 'applied' && (
+                          <button
+                            type="button"
+                            onClick={() => revert(h)}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-0.5 hover:bg-hover hover:text-foreground"
+                          >
+                            <RotateCcw size={12} aria-hidden="true" />
+                            {t('revert')}
+                          </button>
+                        )}
+                      </div>
+                      {open && (
+                        <dl className="grid gap-2.5 border-t border-line px-3 py-2.5">
+                          {Object.entries(h.changes).map(([key, c]) =>
+                            c ? (
+                              <div key={key}>
+                                <dt className="mb-1 font-medium text-foreground">
+                                  {t(`fields.${key as Field}`)}
+                                </dt>
+                                <dd>
+                                  <ChangeValue
+                                    field={key as Field}
+                                    from={c.from}
+                                    to={c.to}
+                                    digits={digits}
+                                  />
+                                </dd>
+                              </div>
+                            ) : null,
+                          )}
+                        </dl>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           )}
@@ -1127,5 +1251,82 @@ export function ProductEditor({
         </div>
       )}
     </PanelSheet>
+  );
+}
+
+/** One field of a saved change, as it was and as it became. */
+function ChangeValue({
+  field,
+  from,
+  to,
+  digits,
+}: {
+  field: Field;
+  from: unknown;
+  to: unknown;
+  digits: number;
+}) {
+  const t = useTranslations('Sales.editor');
+  const [full, setFull] = useState(false);
+  if (field === 'tags' || field.endsWith('OnProperty')) {
+    const a = (Array.isArray(from) ? from : []) as string[];
+    const b = (Array.isArray(to) ? to : []) as string[];
+    const removed = a.filter((x) => !b.includes(x));
+    const added = b.filter((x) => !a.includes(x));
+    const kept = b.filter((x) => a.includes(x));
+    return (
+      <div className="flex flex-wrap gap-1">
+        {removed.map((x) => (
+          <span
+            key={`-${x}`}
+            className="rounded-full bg-rose-500/10 px-2 py-0.5 text-rose-700 line-through dark:text-rose-300"
+          >
+            {x}
+          </span>
+        ))}
+        {added.map((x) => (
+          <span key={`+${x}`} className="rounded-full bg-accent px-2 py-0.5 text-accent-foreground">
+            {x}
+          </span>
+        ))}
+        {kept.map((x) => (
+          <span key={`=${x}`} className="rounded-full bg-hover px-2 py-0.5 text-muted">
+            {x}
+          </span>
+        ))}
+        {!a.length && !b.length && <span className="text-muted">—</span>}
+      </div>
+    );
+  }
+  if (field === 'variations') {
+    const a = new Map(((from as Var[]) ?? []).map((v) => [v.id, v]));
+    const changedCount = ((to as Var[]) ?? []).filter((v) => !same(a.get(v.id), v)).length;
+    return <span className="text-muted">{t('variationsChanged', { count: changedCount })}</span>;
+  }
+  const show = (v: unknown) =>
+    v === null || v === undefined || v === ''
+      ? '—'
+      : field === 'price'
+        ? priceTextOf(v as number, digits)
+        : String(v);
+  const long = field === 'description';
+  const clip = (text: string) =>
+    long && !full && text.length > 220 ? `${text.slice(0, 220)}…` : text;
+  return (
+    <div className="grid gap-1">
+      <p className="whitespace-pre-line text-muted line-through decoration-rose-500/50">
+        {clip(show(from))}
+      </p>
+      <p className="whitespace-pre-line">{clip(show(to))}</p>
+      {long && (show(from).length > 220 || show(to).length > 220) && (
+        <button
+          type="button"
+          onClick={() => setFull(!full)}
+          className="w-fit text-muted hover:text-foreground hover:underline"
+        >
+          {full ? t('showLess') : t('showMore')}
+        </button>
+      )}
+    </div>
   );
 }

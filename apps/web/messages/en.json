@@ -915,7 +915,15 @@
       "priceModeHint": "Etsy’s “Prices vary”. One for all: one price for every variation. By an option (colour, size): one price per value of it. Each variation: its own price.",
       "quantityModeHint": "Etsy’s “Quantities vary”. One for all: one stock for every variation. By an option: one stock per value of it. Each variation: its own stock.",
       "openInEtsyEditor": "Edit in Etsy",
-      "skuOneForAllWarning": "The variations differ by {count} options, but one SKU is set for all — most likely a mistake."
+      "skuOneForAllWarning": "The variations differ by {count} options, but one SKU is set for all — most likely a mistake.",
+      "historyHint": "Every save from Adelie: what was and what became. “Restore as it was” puts the old values in as “will be” — review and save like any edit (the restore goes to the history too). Changes made in Etsy itself are not shown here.",
+      "revert": "Restore as it was",
+      "revertedNotice": "The values before the change of {date} are put in. Review and save to bring them back on Etsy.",
+      "revertedSince": "Changed since ({fields}) — restoring overwrites the later edits too.",
+      "revertedSkipped": "Not restored: {fields} — the set of variations is different now.",
+      "variationsChanged": "Variations changed: {count}",
+      "showMore": "Show in full",
+      "showLess": "Collapse"
     },
     "card": {
       "close": "Close",
