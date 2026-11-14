@@ -566,15 +566,17 @@ export function Products() {
                         >
                           {p.title}
                         </button>
-                        <p className="mt-1.5 flex items-center gap-2 text-xs text-muted">
+                        {/* One line: no item wraps inside; the SKU gives way, the date shows on wide
+                            screens only (the card has it). */}
+                        <p className="mt-1.5 flex min-w-0 items-center gap-2 overflow-hidden text-xs whitespace-nowrap text-muted">
                           {p.state !== 'active' && (
-                            <span className="rounded-full border border-line px-1.5 leading-4">
+                            <span className="shrink-0 rounded-full border border-line px-1.5 leading-4">
                               {t(`states.${p.state as (typeof STATES)[number]}`)}
                             </span>
                           )}
                           {p.posts > 0 && (
                             <span
-                              className="flex items-center gap-1 rounded-full bg-hover px-1.5 leading-4 text-foreground"
+                              className="flex shrink-0 items-center gap-1 rounded-full bg-hover px-1.5 leading-4 text-foreground"
                               title={t('products.postsHint')}
                             >
                               <Pin size={11} aria-hidden="true" />
@@ -582,20 +584,23 @@ export function Products() {
                             </span>
                           )}
                           {p.skus.length > 0 && (
-                            <span className="tabular truncate" title={p.skus.join(', ')}>
+                            <span className="tabular min-w-0 truncate" title={p.skus.join(', ')}>
                               {p.skus.length > 2
                                 ? `${p.skus.slice(0, 2).join(', ')} +${p.skus.length - 2}`
                                 : p.skus.join(', ')}
                             </span>
                           )}
-                          {p.listedAt &&
-                            t('products.listed', {
-                              date: format.dateTime(new Date(p.listedAt), {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                              }),
-                            })}
+                          {p.listedAt && (
+                            <span className="hidden shrink-0 2xl:inline">
+                              {t('products.listed', {
+                                date: format.dateTime(new Date(p.listedAt), {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                }),
+                              })}
+                            </span>
+                          )}
                           {/* The same product on the other channels: opens the rows below. */}
                           {p.elsewhere.length > 0 && (
                             <button
@@ -603,7 +608,7 @@ export function Products() {
                               onClick={() => toggleExpanded(p.id)}
                               aria-expanded={expanded.has(p.id)}
                               title={t('products.elsewhere')}
-                              className="ml-3 inline-flex shrink-0 items-center gap-1 rounded-full bg-hover px-2 leading-5 font-medium text-foreground hover:bg-[var(--field-focus)]"
+                              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-hover px-2 leading-5 font-medium text-foreground hover:bg-[var(--field-focus)]"
                             >
                               {t('products.linked', { count: p.elsewhere.length })}
                               <ChevronDown

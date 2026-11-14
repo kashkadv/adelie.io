@@ -395,6 +395,31 @@ h3 {
   width: 68px;
 }
 
+/* The menu scrolls on short screens without showing a bar; a fade at the edge with more content
+   tells that something is above or below (set from the scroll position in sidebar.tsx). */
+.sidebar-scroll {
+  scrollbar-width: none;
+  --fade: 2.5rem;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  display: none;
+}
+.sidebar-scroll[data-more='bottom'] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent);
+}
+.sidebar-scroll[data-more='top'] {
+  mask-image: linear-gradient(to top, #000 calc(100% - var(--fade)), transparent);
+}
+.sidebar-scroll[data-more='both'] {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--fade),
+    #000 calc(100% - var(--fade)),
+    transparent
+  );
+}
+
 .sidebar .label {
   white-space: nowrap;
   overflow: hidden;
@@ -483,6 +508,12 @@ h3 {
   pointer-events: none;
   /* Own keyframes keep translateY(-50%): a generic animation would reset the transform and drop the
      tooltip below the icon. */
+  animation: tip-in 180ms var(--ease-soft) both;
+}
+
+/* The collapsed menu's item names (drawn in a portal, sidebar.tsx): centred on the item. */
+.sidebar-tip {
+  transform: translateY(-50%);
   animation: tip-in 180ms var(--ease-soft) both;
 }
 

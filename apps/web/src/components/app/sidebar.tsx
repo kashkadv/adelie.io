@@ -20,7 +20,15 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { isSidebarCollapsed, setSidebarCollapsed } from '@/lib/theme';
-import type { ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
 
 type NavKey =
   | 'home'
@@ -94,12 +102,45 @@ export function Sidebar({
 }) {
   const t = useTranslations('Nav');
   const pathname = usePathname();
+  // On a short screen the menu scrolls (without a visible bar); a soft fade at an edge says there
+  // is more above or below.
+  const navRef = useRef<HTMLElement>(null);
+  const [more, setMore] = useState<'none' | 'top' | 'bottom' | 'both'>('none');
+  // Collapsed, an item's name shows beside it — drawn over the page, as the scrolling menu clips.
+  const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
+  const showTip = (e: MouseEvent<HTMLElement> | FocusEvent<HTMLElement>, text: string) => {
+    if (!isSidebarCollapsed()) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ text, top: r.top + r.height / 2, left: r.right + 12 });
+  };
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const update = () => {
+      const top = nav.scrollTop > 2;
+      const bottom = nav.scrollTop + nav.clientHeight < nav.scrollHeight - 2;
+      setMore(top && bottom ? 'both' : top ? 'top' : bottom ? 'bottom' : 'none');
+    };
+    update();
+    nav.addEventListener('scroll', update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(nav);
+    return () => {
+      nav.removeEventListener('scroll', update);
+      observer.disconnect();
+    };
+  }, []);
 
   return (
     <aside className="sidebar flex h-full flex-col gap-1 px-3 pb-1">
       {header}
 
-      <nav className="flex flex-1 flex-col gap-2.5" aria-label={t('main')}>
+      <nav
+        ref={navRef}
+        data-more={more}
+        className="sidebar-scroll flex min-h-0 flex-1 flex-col gap-2.5 overflow-x-hidden overflow-y-auto *:shrink-0"
+        aria-label={t('main')}
+      >
         {NAV.flatMap(({ group, items }, i) => [
           ...(group || i > 0
             ? [
@@ -117,7 +158,11 @@ export function Sidebar({
                 href={href}
                 onClick={onNavigate}
                 aria-current={active ? 'page' : undefined}
-                data-tip={t(key)}
+                aria-label={t(key)}
+                onMouseEnter={(e) => showTip(e, t(key))}
+                onMouseLeave={() => setTip(null)}
+                onFocus={(e) => showTip(e, t(key))}
+                onBlur={() => setTip(null)}
                 className={`flex h-11 items-center rounded-2xl pr-3 text-sm transition-[background-color,color,box-shadow] duration-300 ease-(--ease-soft) ${
                   active
                     ? 'bg-accent font-medium text-accent-foreground shadow-[0_8px_24px_-10px_var(--shadow)]'
@@ -133,13 +178,24 @@ export function Sidebar({
           }),
         ])}
       </nav>
+      {tip &&
+        createPortal(
+          <span
+            role="tooltip"
+            className="sidebar-tip pointer-events-none fixed z-[95] rounded-[10px] bg-accent px-2.5 py-1.5 text-[13px] whitespace-nowrap text-accent-foreground shadow-[0_8px_24px_-8px_var(--shadow)]"
+            style={{ top: tip.top, left: tip.left }}
+          >
+            {tip.text}
+          </span>,
+          document.body,
+        )}
 
       {collapsible && (
         <button
           type="button"
           onClick={() => setSidebarCollapsed(!isSidebarCollapsed())}
           data-tip={t('expand')}
-          className="flex h-11 items-center rounded-2xl pr-3 text-sm text-muted transition-colors duration-200 hover:bg-hover hover:text-foreground"
+          className="flex h-11 shrink-0 items-center rounded-2xl pr-3 text-sm text-muted transition-colors duration-200 hover:bg-hover hover:text-foreground"
         >
           <span className="slot">
             <PanelLeftClose
