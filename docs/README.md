@@ -18,6 +18,7 @@
 | [plans/link-builder.md](plans/link-builder.md) | Link Builder: кроки реалізації (готово) |
 | [plans/content-calendar.md](plans/content-calendar.md) | Календар публікацій і огляд тижня (в роботі) |
 | [plans/niche-research.md](plans/niche-research.md) | Дослідження ніш: що просувати й як писати (в роботі) |
+| [plans/pin-workshop.md](plans/pin-workshop.md) | Майстерня публікацій: візуал, шаблони Figma, текст, GPU-воркер (план) |
 | [plans/stage-2-data-model.md](plans/stage-2-data-model.md) | Етап 2: модель даних соцмереж і метрик (узгоджено) |
 | [plans/mvp-discussion.md](plans/mvp-discussion.md) | Обговорення обсягу MVP і стеку (завершено) |
 | [plans/infra-discussion.md](plans/infra-discussion.md) | Обговорення інфраструктури на домашньому Proxmox (в роботі) |
@@ -69,3 +70,5 @@
 - [ADR-0037](decisions/0037-direction-hits.md) — Хіти напряму: що просувати, не повторюючись (прийнято)
 - [ADR-0038](decisions/0038-brief-context.md) — Бриф: лише те, чого Adelie не бачить; згортувані напрями (прийнято)
 - [ADR-0039](decisions/0039-calendar-direction.md) — Напрям у записах календаря; фокус фільтрує картки (прийнято)
+- [ADR-0040](decisions/0040-publication-workshop.md) — Майстерня публікацій: візуал і текст у записі календаря (запропоновано)
+- [ADR-0041](decisions/0041-gpu-worker-on-demand.md) — GPU-воркер на ПК за потреби, pull-модель (запропоновано)
