@@ -763,7 +763,7 @@ function Budget({
             if (!Number.isInteger(n) || n < 1 || n > 1440) return setError(true);
             void save(n);
           }}
-          className="glass glass-strong animate-rise absolute top-full left-0 z-50 mt-2 w-64 rounded-2xl p-3"
+          className="glass glass-strong animate-rise absolute top-full right-0 z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl p-3"
         >
           <label className="block">
             <span className="mb-1.5 block px-3.5 text-sm text-muted">{t('budgetLabel')}</span>
