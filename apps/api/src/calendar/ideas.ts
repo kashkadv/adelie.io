@@ -19,8 +19,15 @@ export interface Direction {
 }
 
 export interface Brief {
+  /** What the project is, in a sentence or two (no numbers: Adelie counts those itself). */
   about: string;
-  /** What already exists: materials, pages, accounts. */
+  /** How the project speaks: tone, person, what to say and not to say, a liked example. */
+  voice: string;
+  /** What sets it apart: the story, the craft, the proof. */
+  difference: string;
+  /** What never to do or claim: taboos, words to avoid. */
+  avoid: string;
+  /** What the owner can create: photos, video, people in the frame, time (not numbers). */
   assets: string;
   directions: Direction[];
 }
@@ -61,7 +68,14 @@ export function parseBrief(raw: unknown): Brief | null {
     const parsed = parseDirection(d, `d${i + 1}`);
     if (parsed && !directions.some((x) => x.id === parsed.id)) directions.push(parsed);
   }
-  return { about, assets: text(b['assets'], 2000), directions };
+  return {
+    about,
+    voice: text(b['voice'], 1500),
+    difference: text(b['difference'], 1500),
+    avoid: text(b['avoid'], 1500),
+    assets: text(b['assets'], 2000),
+    directions,
+  };
 }
 
 /** The ISO week number of a Monday (for alternating before anything was chosen). */
@@ -175,6 +189,9 @@ export function ideasSchema(days: string[], channels: LinkChannel[], hitKeys: st
 export interface IdeasContext {
   project: string;
   about: string;
+  voice: string;
+  difference: string;
+  avoid: string;
   assets: string;
   /** The directions in the week's focus. */
   focus: Direction[];
@@ -207,6 +224,7 @@ Propose publications for the remaining days of the week, each on a day. Rules:
 - Do not repeat topics already planned, waiting as ideas, or rejected by the owner; vary formats.
 - "projectData" is counted from the connected platforms (followers, content, sales, site visits): treat it as reliable facts.
 - Base ideas on the project's own results when they exist: what got clicks, visits, goals or engagement. Cite those numbers in "why" and mark evidence "results". When there are no relevant results, say so and mark evidence "hypothesis". Never invent numbers or claim market data you were not given.
+- Write in the project's voice ("voiceAndTone"), build ideas on what makes it different ("whatMakesItDifferent"), respect "neverDoOrSay" strictly, and propose only what the owner can create ("whatTheOwnerCanCreate"). Empty fields mean nothing is known: do not invent a voice or a story.
 - "title" and "notes" are in the audience language of the idea's direction; "why" is in the owner language.
 - "notes" is practical: a hook for the first line, a short caption draft, a few tags or hashtags fitting the channel, a call to action pointing to the direction's goal.
 - "hits" are the products that sold, were put in checkout or viewed the most on the project's sites and shop over the period (purchases weigh most, then started checkouts, then views). When hits are given, base most ideas on them: set "hit" to the hit's id, at most one idea per hit, and mention its numbers in "why". Hits are ordered by priority: the first have sold well and been published the least. "anglesAlreadyUsed" are titles of posts already published for the product: propose a clearly different angle, format or season. Never propose a product listed under "resting". Ideas that are not about a listed product get "hit" = "none".
@@ -220,7 +238,10 @@ export function ideasInput(ctx: IdeasContext): string {
     JSON.stringify({
       project: ctx.project,
       about: ctx.about,
-      whatExists: ctx.assets,
+      voiceAndTone: ctx.voice,
+      whatMakesItDifferent: ctx.difference,
+      neverDoOrSay: ctx.avoid,
+      whatTheOwnerCanCreate: ctx.assets,
       projectData: ctx.projectData,
       directionsInFocus: ctx.focus.map(({ id: _id, hits: _hits, ...d }) => d),
       hits: ctx.hits.map((h) => ({

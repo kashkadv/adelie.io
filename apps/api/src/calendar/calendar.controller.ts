@@ -799,6 +799,9 @@ export class CalendarController {
     const context: IdeasContext = {
       project: project.name,
       about: brief.about,
+      voice: brief.voice,
+      difference: brief.difference,
+      avoid: brief.avoid,
       assets: brief.assets,
       focus: inFocus,
       dailyMinutes: project.dailyMinutes,

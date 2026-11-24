@@ -20,6 +20,9 @@ describe('brief', () => {
       }),
     ).toEqual({
       about: 'Wool rugs',
+      voice: '',
+      difference: '',
+      avoid: '',
       assets: '',
       directions: [
         {
@@ -42,6 +45,17 @@ describe('brief', () => {
         },
       ],
     });
+  });
+
+  it('keeps the voice, difference and taboos', () => {
+    expect(
+      parseBrief({
+        about: 'Rugs',
+        voice: ' warm, we ',
+        difference: 'Carpathian weaving',
+        avoid: 'discounts',
+      }),
+    ).toMatchObject({ voice: 'warm, we', difference: 'Carpathian weaving', avoid: 'discounts' });
   });
 
   it('a brief saved before directions reads as one direction', () => {
