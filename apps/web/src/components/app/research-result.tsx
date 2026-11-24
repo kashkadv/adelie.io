@@ -15,6 +15,7 @@ interface Window {
 }
 interface Group {
   products: number;
+  counted: number;
   before: { viewsPerDay: number | null; favorersPerDay: number | null; sales: number };
   after: { viewsPerDay: number | null; favorersPerDay: number | null; sales: number };
   viewsChange: number | null;
@@ -25,6 +26,7 @@ interface Result {
   daysBefore: number;
   daysAfter: number;
   enough: boolean;
+  readyOn: string | null;
   changed: Group;
   unchanged: Group;
   products: {
@@ -33,6 +35,7 @@ interface Result {
     fields: string[];
     before: Window | null;
     after: Window | null;
+    enough: boolean;
   }[];
 }
 
@@ -94,10 +97,13 @@ export function ResearchResult({
   const groupCard = (title: string, g: Group, hint: string) => (
     <div className="rounded-2xl border border-line p-4 text-sm">
       <p className="mb-2 flex items-center gap-1.5 font-medium">
-        {title} <span className="text-muted">({g.products})</span>
-        <InfoTip text={hint} />
+        {title}{' '}
+        <span className="text-muted">
+          ({g.counted === g.products ? g.products : `${g.counted}/${g.products}`})
+        </span>
+        <InfoTip text={g.counted < g.products ? `${hint} ${t('countedHint')}` : hint} />
       </p>
-      {g.products === 0 ? (
+      {g.counted === 0 ? (
         <p className="text-muted">—</p>
       ) : (
         <dl className="grid gap-1.5">
@@ -147,15 +153,9 @@ export function ResearchResult({
           </p>
           {!data.enough && (
             <p className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-800 dark:text-amber-300">
-              {data.daysAfter >= 14
-                ? t('noHistory', { date: date(data.since) })
-                : t('notEnough', {
-                    date: date(
-                      new Date(Date.parse(`${data.since}T00:00:00Z`) + 14 * 86_400_000)
-                        .toISOString()
-                        .slice(0, 10),
-                    ),
-                  })}
+              {data.readyOn
+                ? t('notEnough', { date: date(data.readyOn) })
+                : t('noHistory', { date: date(data.since) })}
             </p>
           )}
           <div className="grid gap-3 md:grid-cols-2">
@@ -179,7 +179,7 @@ export function ResearchResult({
                   {changed.map((r) => {
                     const p = byId.get(r.id);
                     return (
-                      <tr key={r.id}>
+                      <tr key={r.id} className={r.enough ? undefined : 'text-muted'}>
                         <td className="max-w-[280px] py-2 pr-3">
                           <button
                             type="button"

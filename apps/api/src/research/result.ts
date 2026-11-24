@@ -64,10 +64,14 @@ export interface ProductResult {
   fields: string[];
   before: Window | null;
   after: Window | null;
+  /** Both windows have enough days (before ≥ 3, after ≥ 14) and counted views: it enters the totals. */
+  enough: boolean;
 }
 
 export interface GroupResult {
   products: number;
+  /** How many of them enter the totals: the same products on both sides of the arrow. */
+  counted: number;
   before: { viewsPerDay: number | null; favorersPerDay: number | null; sales: number };
   after: { viewsPerDay: number | null; favorersPerDay: number | null; sales: number };
   /** Change of views per day, after against before, in percent. */
@@ -80,8 +84,10 @@ export interface ResearchResult {
   since: string | null;
   daysBefore: number;
   daysAfter: number;
-  /** Enough days after the changes to say anything (≥ 14) and some before (≥ 3). */
+  /** At least one changed product has enough days on both sides (before ≥ 3, after ≥ 14). */
   enough: boolean;
+  /** When the first changed product with history before its change gets 14 days after; null if none will. */
+  readyOn: string | null;
   changed: GroupResult;
   unchanged: GroupResult;
   products: ProductResult[];
@@ -94,7 +100,8 @@ const pct = (before: number | null, after: number | null) =>
     ? null
     : Math.round(((after - before) / before) * 100);
 
-function group(results: ProductResult[]): GroupResult {
+function group(all: ProductResult[]): GroupResult {
+  const results = all.filter((r) => r.enough);
   const before = {
     viewsPerDay: sum(results.map((r) => r.before?.viewsPerDay ?? null)),
     favorersPerDay: sum(results.map((r) => r.before?.favorersPerDay ?? null)),
@@ -106,7 +113,8 @@ function group(results: ProductResult[]): GroupResult {
     sales: results.reduce((n, r) => n + (r.after?.sales ?? 0), 0),
   };
   return {
-    products: results.length,
+    products: all.length,
+    counted: results.length,
     before,
     after,
     viewsChange: pct(before.viewsPerDay, after.viewsPerDay),
@@ -114,51 +122,74 @@ function group(results: ProductResult[]): GroupResult {
   };
 }
 
+const MIN_BEFORE = 3;
+const MIN_AFTER = 14;
+
 /**
  * Before: up to 14 days before a product's first change (not before the history starts); after:
- * from the change to today, up to 28 days. Unchanged products are measured over the same days as
- * the first change of the group.
+ * from the change to today, up to 28 days. Totals count only products with enough days on both
+ * sides, so "before → after" is about the same products. Unchanged products are measured around
+ * the median change day of the counted changed ones.
  */
 export function researchResult(products: ProductInput[], today: string): ResearchResult {
   const historyStart = products.flatMap((p) => p.daily.map((d) => d.date)).sort()[0];
   const firstChange = (p: ProductInput) => p.changes.map((c) => c.date).sort()[0] ?? null;
-  const since =
-    products
-      .map(firstChange)
-      .filter((d): d is string => !!d)
-      .sort()[0] ?? null;
+  const changes = products.map(firstChange).filter((d): d is string => !!d);
+  const since = [...changes].sort()[0] ?? null;
 
-  const measure = (p: ProductInput, at: string): Pick<ProductResult, 'before' | 'after'> => {
+  const measure = (
+    p: ProductInput,
+    at: string,
+  ): Pick<ProductResult, 'before' | 'after' | 'enough'> => {
     const start = [addDays(at, -14), historyStart ?? at].sort().at(-1)!;
     const end = [addDays(at, 28), today].sort()[0]!;
-    return {
-      before: start < at ? window(p.daily, p.sales, start, at) : null,
-      after: at < end ? window(p.daily, p.sales, at, end) : null,
-    };
+    const before = start < at ? window(p.daily, p.sales, start, at) : null;
+    const after = at < end ? window(p.daily, p.sales, at, end) : null;
+    const enough =
+      !!before &&
+      !!after &&
+      before.days >= MIN_BEFORE &&
+      after.days >= MIN_AFTER &&
+      before.viewsPerDay !== null &&
+      after.viewsPerDay !== null;
+    return { before, after, enough };
   };
 
-  const results: ProductResult[] = products.map((p) => {
-    const changedOn = firstChange(p);
-    const at = changedOn ?? since;
-    return {
-      id: p.id,
-      changedOn,
-      fields: [...new Set(p.changes.flatMap((c) => c.fields))].sort(),
-      ...(at ? measure(p, at) : { before: null, after: null }),
-    };
+  const build = (p: ProductInput, at: string | null, changedOn: string | null): ProductResult => ({
+    id: p.id,
+    changedOn,
+    fields: [...new Set(p.changes.flatMap((c) => c.fields))].sort(),
+    ...(at ? measure(p, at) : { before: null, after: null, enough: false }),
   });
-  const changed = results.filter((r) => r.changedOn);
-  const unchanged = results.filter((r) => !r.changedOn);
+
+  const changedResults = products
+    .filter((p) => firstChange(p))
+    .map((p) => build(p, firstChange(p), firstChange(p)));
+  const counted = changedResults
+    .filter((r) => r.enough)
+    .map((r) => r.changedOn!)
+    .sort();
+  const controlAt = counted.length ? counted[Math.floor(counted.length / 2)]! : since;
+  const unchangedResults = products
+    .filter((p) => !firstChange(p))
+    .map((p) => build(p, controlAt, null));
+  const byId = new Map([...changedResults, ...unchangedResults].map((r) => [r.id, r]));
+
   const daysBefore =
     since && historyStart ? Math.min(14, Math.max(0, between(historyStart, since))) : 0;
   const daysAfter = since ? Math.max(0, between(since, today)) : 0;
+  const ready = changes
+    .filter((d) => historyStart && between(historyStart, d) >= MIN_BEFORE)
+    .map((d) => addDays(d, MIN_AFTER))
+    .sort()[0];
   return {
     since,
     daysBefore,
     daysAfter,
-    enough: daysAfter >= 14 && daysBefore >= 3,
-    changed: group(changed),
-    unchanged: group(unchanged),
-    products: results,
+    enough: counted.length > 0,
+    readyOn: ready ?? null,
+    changed: group(changedResults),
+    unchanged: group(unchangedResults),
+    products: products.map((p) => byId.get(p.id)!),
   };
 }

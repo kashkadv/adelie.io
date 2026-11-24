@@ -2021,6 +2021,7 @@
       "nothingChanged": "Nothing changed yet. Change a product's title or tags (“Suggest” → editor) and the comparison appears here.",
       "period": "First change {since} · days before: {before} · after: {after}",
       "notEnough": "Too few days after the changes — the numbers are still random. From {date} the comparison becomes meaningful.",
+      "countedHint": "Only products with at least 3 days of history before the change and 14 days after are counted, so “before” and “after” in the total are the same products. The rest are greyed in the table below.",
       "noHistory": "There is no view history from before the changes: Etsy only gives cumulative counters, and Adelie started saving them daily on {date}. A before/after comparison is not possible for these products — look at the difference between changed and unchanged ones.",
       "changed": "Changed",
       "changedHint": "Research products with changes applied in the editor; “before” — up to 14 days before the first change, “after” — from the change to today.",

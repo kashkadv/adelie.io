@@ -73,4 +73,38 @@ describe('research result', () => {
     expect(r.changed.products).toBe(0);
     expect(r.products[0]!.before).toBeNull();
   });
+
+  it('counts only products with both windows, so before and after are about the same products', () => {
+    // changed on the first history day: no "before" at all
+    const early = {
+      id: 'c',
+      daily: series('2026-11-08', 23, '2026-11-08', 0, 50),
+      changes: [{ date: '2026-11-08', fields: ['tags'] }],
+      sales: [],
+    };
+    const r = researchResult([changed, early, unchanged], today);
+    expect(r.changed.products).toBe(2);
+    expect(r.changed.counted).toBe(1);
+    expect(r.changed.before.viewsPerDay).toBe(2);
+    expect(r.changed.after.viewsPerDay).toBe(6);
+    expect(r.products.find((p) => p.id === 'c')!.enough).toBe(false);
+  });
+
+  it('no history before any change: not enough, and no date to wait for', () => {
+    const early = {
+      id: 'c',
+      daily: series('2026-11-08', 23, '2026-11-08', 0, 50),
+      changes: [{ date: '2026-11-08', fields: ['tags'] }],
+      sales: [],
+    };
+    const r = researchResult([early, unchanged], today);
+    expect(r.enough).toBe(false);
+    expect(r.readyOn).toBeNull();
+    expect(r.changed.counted).toBe(0);
+  });
+
+  it('gives the date when the first product with history gets 14 days after', () => {
+    const r = researchResult([changed, unchanged], '2026-11-15');
+    expect(r.readyOn).toBe('2026-11-27');
+  });
 });
