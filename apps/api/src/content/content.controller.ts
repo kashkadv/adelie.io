@@ -1,7 +1,11 @@
 import {
   BadRequestException,
+  Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  Post,
   NotFoundException,
   Param,
   ParseUUIDPipe,
@@ -12,10 +16,12 @@ import {
 import type { Prisma } from '@adelie/db';
 import { productKeys } from '@adelie/platforms';
 import { PrismaService } from '../prisma.service.js';
+import { CONNECT_ROLES } from '../social/connect.service.js';
 import { PERIOD_METRICS, periodMetrics, sortByPeriod, type PeriodValues } from './period.js';
 import { visibleProjectsWhere } from '../workspaces/project-visibility.js';
 import {
   WorkspaceAccessGuard,
+  WorkspaceRoles,
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
 
@@ -440,11 +446,18 @@ export class ContentController {
         })
       : [];
     const linkedProduct = linkedProducts[0] ?? null;
+    // Tied by hand (source "manual"): those can be untied here; the post's own links cannot.
+    const manualIds = new Set(
+      post.links
+        .filter((l) => l.source === 'manual')
+        .map((l) => products.get(l.key)?.id)
+        .filter((id): id is string => !!id),
+    );
 
     return {
       ...rest,
       linkedProduct,
-      linkedProducts,
+      linkedProducts: linkedProducts.map((p) => ({ ...p, manual: manualIds.has(p.id) })),
       /** Links that lead elsewhere (not to a shop product). */
       otherLinks: post.links.filter((l) => !products.has(l.key)),
       dataStatus: latest?.dataStatus ?? null,
@@ -457,6 +470,95 @@ export class ContentController {
       })),
       daily,
     };
+  }
+
+  /** The post's product in the project (a catalogue product of a shop or a site). */
+  private async postAndProduct(
+    ctx: WorkspaceRequestContext,
+    projectId: string,
+    postId: string,
+    productId: unknown,
+  ) {
+    await this.visibleProject(ctx, projectId);
+    const db = this.prisma.client;
+    const post = await db.socialPost.findFirst({
+      where: { id: postId, projectId, workspaceId: ctx.workspaceId },
+      select: { id: true },
+    });
+    if (!post) throw new NotFoundException();
+    if (typeof productId !== 'string' || !/^[0-9a-f-]{36}$/i.test(productId)) {
+      throw new BadRequestException({ errors: { productId: 'invalid' } });
+    }
+    const product = await db.shopProduct.findFirst({
+      where: { id: productId, projectId, workspaceId: ctx.workspaceId },
+      select: { id: true, externalId: true, url: true, account: { select: { platform: true } } },
+    });
+    if (!product) throw new BadRequestException({ errors: { productId: 'invalid' } });
+    const keys = productKeys({
+      platform: product.account.platform,
+      externalId: product.externalId,
+      url: product.url,
+    });
+    return { post, product, keys };
+  }
+
+  /**
+   * Ties a product to a post by hand — a carousel or a shot may show several — so the post counts
+   * for the product wherever post links do (its card, "Leads to", research). The sync keeps it.
+   */
+  @Post('content/:postId/products')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async tieProduct(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('postId', ParseUUIDPipe) postId: string,
+    @Body() body: { productId?: unknown } | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const ctx = request.workspace;
+    const { post, product, keys } = await this.postAndProduct(
+      ctx,
+      projectId,
+      postId,
+      body?.productId,
+    );
+    // An Etsy listing by its id, a site product by its page (the key the catalogue matches).
+    const key =
+      keys.find((k) => k.startsWith('etsy:')) ?? keys.find((k) => k.startsWith('url:')) ?? keys[0]!;
+    await this.prisma.client.socialPostLink.createMany({
+      data: [
+        {
+          postId: post.id,
+          workspaceId: ctx.workspaceId,
+          projectId,
+          url: product.url ?? '',
+          key,
+          source: 'manual',
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return { ok: true };
+  }
+
+  /** Unties a product tied by hand (the post's own links stay). */
+  @Delete('content/:postId/products/:productId')
+  @HttpCode(204)
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async untieProduct(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('postId', ParseUUIDPipe) postId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const { post, keys } = await this.postAndProduct(
+      request.workspace,
+      projectId,
+      postId,
+      productId,
+    );
+    await this.prisma.client.socialPostLink.deleteMany({
+      where: { postId: post.id, source: 'manual', key: { in: keys } },
+    });
   }
 
   /** Boards of the project's accounts, for the content filter. */

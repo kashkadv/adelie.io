@@ -489,8 +489,12 @@ export async function runSync(
           }
           const links = codes.length ? resolveShortLinks(found, (c) => shortLinks.get(c)) : found;
           await prisma.$transaction([
-            prisma.socialPostLink.deleteMany({ where: { postId: post.id } }),
+            // Links tied by hand (source "manual") stay; the post's own are read again.
+            prisma.socialPostLink.deleteMany({
+              where: { postId: post.id, source: { not: 'manual' } },
+            }),
             prisma.socialPostLink.createMany({
+              skipDuplicates: true,
               data: links.map((l) => ({
                 postId: post.id,
                 workspaceId: account.workspaceId,

@@ -821,7 +821,7 @@ model SocialPostLink {
   projectId   String     @db.Uuid
   url         String
   key         String
-  /// link | text
+  /// link (the post's own) | text (in its caption) | manual (tied to a product by hand)
   source      String
 
   @@unique([postId, key])

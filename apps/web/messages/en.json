@@ -698,7 +698,13 @@
     "leadsToProduct": "Leads to product",
     "leadsTo": "Leads to",
     "linkInText": "Link from the description",
-    "tiktokNoDaily": "TikTok does not report video statistics per day — Adelie derives them from daily totals; this video has no days yet."
+    "tiktokNoDaily": "TikTok does not report video statistics per day — Adelie derives them from daily totals; this video has no days yet.",
+    "tiedByHand": "In the photo — product",
+    "untie": "Untie the product",
+    "tie": "Tie a product",
+    "tieSearch": "Search products",
+    "tieNone": "Nothing found",
+    "tieHint": "Which products the post shows (several in a carousel or a shared shot). The post counts for them wherever Adelie shows a product's posts: the product card, the “Leads to” filter, research. Syncing keeps the ties."
   },
   "Sales": {
     "shop": "Shop",

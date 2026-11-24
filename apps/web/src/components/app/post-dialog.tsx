@@ -9,7 +9,10 @@ import { PanelSheet } from '../ui/panel-sheet';
 import { Segmented } from '../ui/segmented';
 import { LinksSection } from './links-section';
 import { ImpressionsChart, type SeriesPoint } from './impressions-chart';
+import { CONNECT_ROLES } from './accounts-data';
 import { useMoney } from './sales-data';
+import { useWorkspace } from './workspace-context';
+import { Select } from '../ui/select';
 
 type Platform = 'PINTEREST' | 'INSTAGRAM' | 'TIKTOK';
 type Detail = {
@@ -34,6 +37,8 @@ type Detail = {
     url: string | null;
     price: number | null;
     currency: string | null;
+    /** Tied by hand (can be untied), not found in the post's own links. */
+    manual: boolean;
   }[];
   otherLinks: { key: string; url: string; source: 'link' | 'text' }[];
   linkedProduct: {
@@ -117,6 +122,39 @@ export function PostDialog({
   // The loaded post is kept with its id: while the next one loads, the old one is not shown.
   const [loaded, setLoaded] = useState<{ id: string; detail: Detail | null } | null>(null);
   const [chosenChartMetric, setChartMetric] = useState<string | null>(null);
+  const { workspace } = useWorkspace();
+  const canManage = !!workspace && CONNECT_ROLES.includes(workspace.role);
+  /** Bumped after a product is tied or untied: the post is read again. */
+  const [reload, setReload] = useState(0);
+  /** The project's catalogue, for tying products to the post by hand. */
+  const [catalogue, setCatalogue] = useState<
+    { id: string; title: string; url: string; channel: string }[]
+  >([]);
+  useEffect(() => {
+    if (!canManage) return;
+    let cancelled = false;
+    api<{ products: { id: string; title: string; url: string; channel: string }[] }>(
+      `${base}/links/products`,
+    ).then(
+      (r) => !cancelled && setCatalogue(r.products),
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [base, canManage]);
+  async function tie(productId: string) {
+    await api(`${base}/content/${postId}/products`, { method: 'POST', json: { productId } }).catch(
+      () => undefined,
+    );
+    setReload((v) => v + 1);
+  }
+  async function untie(productId: string) {
+    await api(`${base}/content/${postId}/products/${productId}`, { method: 'DELETE' }).catch(
+      () => undefined,
+    );
+    setReload((v) => v + 1);
+  }
   const detail = loaded?.id === postId ? loaded.detail : null;
   const failed = loaded?.id === postId && loaded.detail === null;
 
@@ -129,10 +167,13 @@ export function PostDialog({
     return () => {
       cancelled = true;
     };
-  }, [base, postId]);
+  }, [base, postId, reload]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Typing (the product search) and open lists keep their keys to themselves.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input, textarea, [role="listbox"], [role="combobox"]')) return;
       if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowLeft') onPrevious?.();
       if (e.key === 'ArrowRight') onNext?.();
@@ -290,32 +331,70 @@ export function PostDialog({
                   {/* Where the post leads: shop products (promotion → sales) and other links —
                       from its own link and from its text (ADR-0018). */}
                   {detail.linkedProducts.map((product) => (
-                    <a
+                    <div
                       key={product.id}
-                      href={product.url ?? undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-4 flex items-center gap-3 rounded-2xl border border-line p-2 pr-3 hover:bg-hover"
+                      className="mt-4 flex items-center gap-2 rounded-2xl border border-line p-2 pr-2 hover:bg-hover"
                     >
-                      <span className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-hover">
-                        {product.imageUrl && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={product.imageUrl}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-xs text-muted">{t('leadsToProduct')}</span>
-                        <span className="block truncate text-sm font-medium">{product.title}</span>
-                      </span>
-                      <span className="tabular shrink-0 text-sm">
-                        {money(product.price, product.currency)}
-                      </span>
-                    </a>
+                      <a
+                        href={product.url ?? undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex min-w-0 flex-1 items-center gap-3"
+                      >
+                        <span className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-hover">
+                          {product.imageUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={product.imageUrl}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs text-muted">
+                            {product.manual ? t('tiedByHand') : t('leadsToProduct')}
+                          </span>
+                          <span className="block truncate text-sm font-medium">
+                            {product.title}
+                          </span>
+                        </span>
+                        <span className="tabular shrink-0 text-sm">
+                          {money(product.price, product.currency)}
+                        </span>
+                      </a>
+                      {canManage && product.manual && (
+                        <button
+                          type="button"
+                          onClick={() => void untie(product.id)}
+                          title={t('untie')}
+                          aria-label={t('untie')}
+                          className="icon-btn h-8 w-8 shrink-0"
+                        >
+                          <X size={14} aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
                   ))}
+                  {canManage && catalogue.length > 0 && (
+                    <div className="mt-3 flex items-center gap-1.5">
+                      <div className="min-w-0 flex-1">
+                        <Select
+                          ariaLabel={t('tie')}
+                          value=""
+                          onChange={(id) => void tie(id)}
+                          placeholder={t('tie')}
+                          searchable
+                          searchPlaceholder={t('tieSearch')}
+                          emptyText={t('tieNone')}
+                          options={catalogue
+                            .filter((c) => !detail.linkedProducts.some((p) => p.id === c.id))
+                            .map((c) => ({ value: c.id, label: c.title, hint: c.channel }))}
+                        />
+                      </div>
+                      <InfoTip text={t('tieHint')} />
+                    </div>
+                  )}
                   {detail.otherLinks.length > 0 && (
                     <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
                       <span>{t('leadsTo')}</span>
