@@ -73,6 +73,8 @@ export function CalendarBrief({
   const [edited, setEdited] = useState(false);
   /** Directions that are open: all start folded, a new or still unnamed one starts open. */
   const [open, setOpen] = useState<Set<string>>(new Set());
+  /** The general information starts folded, open only while still empty. */
+  const [commonOpen, setCommonOpen] = useState(false);
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
 
   useEffect(() => {
@@ -81,6 +83,7 @@ export function CalendarBrief({
       (r) => {
         if (cancelled) return;
         setSources(r.sources ?? []);
+        setCommonOpen(!r.brief?.about.trim());
         setOpen(
           new Set(
             (r.brief?.directions ?? [newDirection()])
@@ -170,12 +173,32 @@ export function CalendarBrief({
       <ProjectFacts base={base} />
       <div className="grid gap-4">
         <section className="card grid gap-4 rounded-[24px] p-5">
-          <h3 className="text-sm font-semibold">{t('common')}</h3>
-          {area('about', brief.about, (about) => set({ about }), 2, 2000)}
-          {area('voice', brief.voice, (voice) => set({ voice }), 3, 1500)}
-          {area('difference', brief.difference, (difference) => set({ difference }), 3, 1500)}
-          {area('avoid', brief.avoid, (avoid) => set({ avoid }), 2, 1500)}
-          {area('assets', brief.assets, (assets) => set({ assets }), 2, 2000)}
+          <button
+            type="button"
+            onClick={() => setCommonOpen(!commonOpen)}
+            aria-expanded={commonOpen}
+            title={commonOpen ? t('directionClose') : t('directionOpen')}
+            className="flex min-w-0 items-center gap-2 rounded-xl text-left"
+          >
+            <ChevronDown
+              size={15}
+              className={`shrink-0 transition-transform ${commonOpen ? '' : '-rotate-90'}`}
+              aria-hidden="true"
+            />
+            <span className="text-sm font-semibold">{t('common')}</span>
+            {!commonOpen && brief.about && (
+              <span className="ml-1 truncate text-xs text-muted">{brief.about}</span>
+            )}
+          </button>
+          {commonOpen && (
+            <>
+              {area('about', brief.about, (about) => set({ about }), 2, 2000)}
+              {area('voice', brief.voice, (voice) => set({ voice }), 3, 1500)}
+              {area('difference', brief.difference, (difference) => set({ difference }), 3, 1500)}
+              {area('avoid', brief.avoid, (avoid) => set({ avoid }), 2, 1500)}
+              {area('assets', brief.assets, (assets) => set({ assets }), 2, 2000)}
+            </>
+          )}
         </section>
 
         {brief.directions.map((d, i) => {

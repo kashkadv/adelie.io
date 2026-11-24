@@ -1757,7 +1757,7 @@
       "directionOpen": "Expand",
       "directionClose": "Collapse",
       "hitsSummary": "hits: {n}",
-      "common": "Shared",
+      "common": "General project information",
       "direction": "Direction {n}",
       "directionsHint": "A direction is a separate goal with its own audience, language and channels, e.g. “World” and “Ukraine”. The week's focus picks which direction the AI proposes ideas for.",
       "removeDirection": "Remove direction",
