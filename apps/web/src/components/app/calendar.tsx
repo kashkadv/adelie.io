@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  GripVertical,
   Lightbulb,
   Link2,
   Plus,
@@ -236,7 +237,7 @@ export function Calendar() {
   });
 
   /** One publication as a full-width row. */
-  const row = (item: CalendarItem) => (
+  const row = (item: CalendarItem, pool = false) => (
     <li
       key={item.id}
       draggable={canManage}
@@ -255,36 +256,53 @@ export function Calendar() {
       {over?.before === item.id && dragging !== item.id && (
         <div className="mb-1 h-0.5 rounded-full bg-accent" />
       )}
-      <button
-        type="button"
-        onClick={() => setDialog({ item })}
-        className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-sm transition-colors hover:bg-hover"
+      <div
+        className={`group flex items-center rounded-xl border border-line transition-colors hover:border-foreground/20 ${
+          pool ? 'bg-[var(--card)]' : 'bg-hover'
+        }`}
       >
-        <ChannelIcon channel={item.channel} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate">{item.title}</span>
-          <span className="block truncate text-xs text-muted">{t(`formats.${item.format}`)}</span>
-        </span>
-        {item.why && (
-          <Sparkles size={13} className="shrink-0 text-muted" aria-label={t('fromAi')} />
+        {canManage && (
+          <GripVertical
+            size={14}
+            className="ml-1.5 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-70"
+            aria-hidden="true"
+          />
         )}
-        {item.link && <Link2 size={13} className="shrink-0 text-muted" aria-label={t('hasLink')} />}
-        <span
-          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
-            isPublished(item.status)
-              ? 'bg-accent text-accent-foreground'
-              : item.status === 'ready'
-                ? 'border border-accent'
-                : 'bg-hover text-muted'
+        <button
+          type="button"
+          onClick={() => setDialog({ item })}
+          className={`flex min-w-0 flex-1 items-center gap-3 py-2 pr-2.5 text-left text-sm ${
+            canManage ? 'pl-1' : 'pl-2.5'
           }`}
         >
-          {isPublished(item.status) && <Check size={11} aria-hidden="true" />}
-          {t(`statuses.${item.status}`)}
-        </span>
-        <span className="tabular w-12 shrink-0 text-right text-xs text-muted">
-          {item.minutes ? t('minutesShort', { n: item.minutes }) : ''}
-        </span>
-      </button>
+          <ChannelIcon channel={item.channel} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">{item.title}</span>
+            <span className="block truncate text-xs text-muted">{t(`formats.${item.format}`)}</span>
+          </span>
+          {item.why && (
+            <Sparkles size={13} className="shrink-0 text-muted" aria-label={t('fromAi')} />
+          )}
+          {item.link && (
+            <Link2 size={13} className="shrink-0 text-muted" aria-label={t('hasLink')} />
+          )}
+          <span
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
+              isPublished(item.status)
+                ? 'bg-accent text-accent-foreground'
+                : item.status === 'ready'
+                  ? 'border border-accent'
+                  : 'bg-hover text-muted'
+            }`}
+          >
+            {isPublished(item.status) && <Check size={11} aria-hidden="true" />}
+            {t(`statuses.${item.status}`)}
+          </span>
+          <span className="tabular w-12 shrink-0 text-right text-xs text-muted">
+            {item.minutes ? t('minutesShort', { n: item.minutes }) : ''}
+          </span>
+        </button>
+      </div>
     </li>
   );
 
@@ -301,7 +319,9 @@ export function Calendar() {
         {...dropZone(date, null)}
         className={`grid gap-1 px-2 py-2 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3 ${
           over && over.date === date && over.before === null ? 'rounded-2xl ring-2 ring-accent' : ''
-        } ${past ? 'opacity-60' : ''}`}
+        } ${past ? 'opacity-60' : ''} ${isToday ? 'rounded-2xl bg-hover/60' : ''} ${
+          dragging && !past ? 'rounded-2xl outline outline-1 outline-dashed outline-line' : ''
+        }`}
       >
         <div className="flex items-baseline justify-between gap-2 px-1 pt-2 sm:block">
           <p className={`text-sm first-letter:uppercase ${isToday ? 'font-semibold' : ''}`}>
@@ -325,14 +345,14 @@ export function Calendar() {
             </p>
           )}
         </div>
-        <ul className="flex flex-col gap-0.5">
-          {list.map(row)}
+        <ul className="flex flex-col gap-1.5">
+          {list.map((i) => row(i))}
           {canManage && !past && (
             <li>
               <button
                 type="button"
                 onClick={() => setDialog({ date })}
-                className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs text-muted hover:bg-hover hover:text-foreground"
+                className="flex h-8 w-full items-center gap-1.5 rounded-xl border border-dashed border-line px-2.5 text-xs text-muted hover:bg-hover hover:text-foreground"
               >
                 <Plus size={13} aria-hidden="true" />
                 {t('add')}
@@ -486,7 +506,7 @@ export function Calendar() {
 
         <section
           {...dropZone(null, null)}
-          className={`rounded-[24px] bg-hover p-2 ${over && over.date === null && over.before === null ? 'ring-2 ring-accent' : ''}`}
+          className={`rounded-[24px] bg-hover p-2 ${dragging ? 'outline outline-1 outline-dashed outline-line' : ''} ${over && over.date === null && over.before === null ? 'ring-2 ring-accent' : ''}`}
         >
           <div className="flex items-center justify-between gap-2 px-1">
             <button
@@ -517,7 +537,9 @@ export function Calendar() {
             </span>
           </div>
           {showIdeas && ideas.length > 0 && (
-            <ul className="mt-1 flex flex-col gap-0.5">{ideas.map(row)}</ul>
+            <ul className="mt-1 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {ideas.map((i) => row(i, true))}
+            </ul>
           )}
         </section>
       </div>
