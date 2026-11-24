@@ -61,6 +61,7 @@ export function ProjectFacts({ base }: { base: string }) {
   const format = useFormatter();
   const locale = useLocale();
   const [facts, setFacts] = useState<Facts | null>(null);
+  const [failed, setFailed] = useState(false);
   // Folded by default; the member's choice is remembered in this browser.
   const [open, setOpen] = useStoredFlag('adelie.projectFacts.open', false);
 
@@ -68,14 +69,43 @@ export function ProjectFacts({ base }: { base: string }) {
     let cancelled = false;
     api<Facts>(`${base}/facts`).then(
       (f) => !cancelled && setFacts(f),
-      () => undefined,
+      () => !cancelled && setFailed(true),
     );
     return () => {
       cancelled = true;
     };
   }, [base]);
 
-  if (!facts) return null;
+  if (failed) return null;
+  // While the facts are counted the block keeps its place and size, so nothing jumps when they arrive.
+  if (!facts) {
+    return (
+      <section className="card rounded-[24px] p-5" aria-busy="true">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+          <span className="flex items-center gap-1.5">
+            <ChevronDown
+              size={15}
+              className={`transition-transform ${open ? '' : '-rotate-90'}`}
+              aria-hidden="true"
+            />
+            {t('title')}
+          </span>
+          <InfoTip text={t('hint')} />
+          <span className="ml-auto h-3 w-24 rounded-full bg-hover motion-safe:animate-pulse" />
+        </h3>
+        {open && (
+          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-40 rounded-2xl border border-line bg-hover/50 motion-safe:animate-pulse"
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  }
   const n = (v: number | null | undefined) =>
     v === null || v === undefined ? '—' : format.number(v);
   const money = (v: number | null, currency: string | null) =>
