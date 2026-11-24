@@ -204,7 +204,6 @@ export function CalendarBrief({
         <div className="mt-6 flex items-center justify-between gap-3 px-1">
           <h2 className="flex items-center gap-1.5 text-base font-semibold">
             {t('directions')}
-            <span className="font-normal text-muted">({brief.directions.length})</span>
             <InfoTip text={t('directionsHint')} />
           </h2>
           {canManage && (
