@@ -1776,6 +1776,7 @@
     "pastDays": "Минулі дні: {days} · публікацій: {count}",
     "ideasCount": "Ідеї ({count})",
     "direction": "Напрям",
+    "directionLabel": "Напрям: {name}",
     "directionNone": "Без напряму",
     "focus": "Фокус",
     "focusAll": "Усі",

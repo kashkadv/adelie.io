@@ -1776,6 +1776,7 @@
     "pastDays": "Past days: {days} · publications: {count}",
     "ideasCount": "Ideas ({count})",
     "direction": "Direction",
+    "directionLabel": "Direction: {name}",
     "directionNone": "No direction",
     "focus": "Focus",
     "focusAll": "All",

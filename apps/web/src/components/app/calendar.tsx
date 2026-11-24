@@ -180,9 +180,12 @@ export function Calendar() {
   const focusValue = data?.focus.value ?? 'all';
   const dirName = (id: string | null) =>
     id ? directions.find((d) => d.id === id)?.name || t('unnamed') : null;
-  /** Under a direction's focus only its cards show (and those without a direction); "all" shows all. */
+  /**
+   * Under a direction's focus only its own cards show; those without a direction only under "All".
+   * With one direction (or none) there is no focus to filter by: everything shows.
+   */
   const inFocus = (i: { direction: string | null }) =>
-    focusValue === 'all' || !i.direction || i.direction === focusValue;
+    directions.length < 2 || focusValue === 'all' || i.direction === focusValue;
   const today = data?.today ?? todayDay();
   const budget = data?.dailyMinutes ?? null;
   const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
@@ -288,7 +291,9 @@ export function Calendar() {
             <span className="block truncate">{item.title}</span>
             <span className="block truncate text-xs text-muted">
               {t(`formats.${item.format}`)}
-              {directions.length > 1 && item.direction ? ` · ${dirName(item.direction)}` : ''}
+              {directions.length > 1 && item.direction
+                ? ` · ${t('directionLabel', { name: dirName(item.direction) ?? '' })}`
+                : ''}
             </span>
           </span>
           {item.why && (
@@ -446,7 +451,9 @@ export function Calendar() {
                     <span className="block text-sm font-medium hover:underline">{s.title}</span>
                     <span className="mt-0.5 block text-xs text-muted">
                       {t(`formats.${s.format}`)}
-                      {directions.length > 1 && s.direction ? ` · ${dirName(s.direction)}` : ''}
+                      {directions.length > 1 && s.direction
+                        ? ` · ${t('directionLabel', { name: dirName(s.direction) ?? '' })}`
+                        : ''}
                       {s.minutes ? ` · ${t('minutesShort', { n: s.minutes })}` : ''} ·{' '}
                       {t(`evidence.${s.evidence ?? 'hypothesis'}`)}
                     </span>
