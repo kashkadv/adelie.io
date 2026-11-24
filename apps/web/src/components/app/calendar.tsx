@@ -307,9 +307,11 @@ export function Calendar() {
           <p className={`text-sm first-letter:uppercase ${isToday ? 'font-semibold' : ''}`}>
             {dayLabel(date, { weekday: 'short', day: 'numeric', month: 'short' })}
             {isToday && (
-              <span className="ml-1.5 rounded-full bg-accent px-1.5 py-0.5 text-[11px] text-accent-foreground">
-                {t('today')}
-              </span>
+              <span
+                className="ml-1.5 inline-block h-2 w-2 rounded-full bg-accent align-middle"
+                title={t('today')}
+                aria-label={t('today')}
+              />
             )}
           </p>
           {(planned > 0 || (budget !== null && !past)) && (
