@@ -201,6 +201,29 @@ export function CalendarBrief({
           )}
         </section>
 
+        <div className="mt-6 flex items-center justify-between gap-3 px-1">
+          <h2 className="flex items-center gap-1.5 text-base font-semibold">
+            {t('directions')}
+            <span className="font-normal text-muted">({brief.directions.length})</span>
+            <InfoTip text={t('directionsHint')} />
+          </h2>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => {
+                const d = newDirection();
+                setOpen((o) => new Set(o).add(d.id));
+                set({ directions: [...brief.directions, d] });
+              }}
+              disabled={brief.directions.length >= MAX_DIRECTIONS}
+              className="inline-flex h-10 items-center gap-1.5 rounded-2xl border border-line px-3.5 text-sm hover:bg-hover"
+            >
+              <Plus size={15} aria-hidden="true" />
+              {t('addDirection')}
+            </button>
+          )}
+        </div>
+
         {brief.directions.map((d, i) => {
           const isOpen = open.has(d.id);
           return (
@@ -221,7 +244,6 @@ export function CalendarBrief({
                   <span className="truncate text-sm font-semibold">
                     {d.name.trim() || t('direction', { n: i + 1 })}
                   </span>
-                  {i === 0 && <InfoTip text={t('directionsHint')} />}
                   {!isOpen && (
                     <span className="ml-1 flex min-w-0 items-center gap-2 text-xs text-muted">
                       {d.channels.map((c) => (
@@ -324,20 +346,7 @@ export function CalendarBrief({
           </p>
         )}
         {canManage && (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                const d = newDirection();
-                setOpen((o) => new Set(o).add(d.id));
-                set({ directions: [...brief.directions, d] });
-              }}
-              disabled={brief.directions.length >= MAX_DIRECTIONS}
-              className="inline-flex h-10 items-center gap-1.5 rounded-2xl border border-line px-3.5 text-sm hover:bg-hover"
-            >
-              <Plus size={15} aria-hidden="true" />
-              {t('addDirection')}
-            </button>
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <span className="flex items-center gap-3">
               {state === 'saved' && (
                 <span className="inline-flex items-center gap-1 text-sm text-muted">
