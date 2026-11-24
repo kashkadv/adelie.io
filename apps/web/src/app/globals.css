@@ -462,7 +462,8 @@ h3 {
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--muted);
+  /* Darker than the items' muted tone: the titles are what the eye scans for (a token mix, both themes). */
+  color: color-mix(in srgb, var(--foreground) 80%, transparent);
 }
 
 .sidebar .nav-group::before {
