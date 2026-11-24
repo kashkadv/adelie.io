@@ -147,13 +147,15 @@ export function ResearchResult({
           </p>
           {!data.enough && (
             <p className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-800 dark:text-amber-300">
-              {t('notEnough', {
-                date: date(
-                  new Date(Date.parse(`${data.since}T00:00:00Z`) + 14 * 86_400_000)
-                    .toISOString()
-                    .slice(0, 10),
-                ),
-              })}
+              {data.daysAfter >= 14
+                ? t('noHistory', { date: date(data.since) })
+                : t('notEnough', {
+                    date: date(
+                      new Date(Date.parse(`${data.since}T00:00:00Z`) + 14 * 86_400_000)
+                        .toISOString()
+                        .slice(0, 10),
+                    ),
+                  })}
             </p>
           )}
           <div className="grid gap-3 md:grid-cols-2">
