@@ -4,7 +4,6 @@ import { ChevronDown } from 'lucide-react';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
-import { useStoredFlag } from '@/lib/use-stored-flag';
 import { InfoTip } from '../ui/info-tip';
 import { PlatformIcon, type PlatformKey } from '../ui/platform-icon';
 
@@ -62,8 +61,8 @@ export function ProjectFacts({ base }: { base: string }) {
   const locale = useLocale();
   const [facts, setFacts] = useState<Facts | null>(null);
   const [failed, setFailed] = useState(false);
-  // Folded by default; the member's choice is remembered in this browser.
-  const [open, setOpen] = useStoredFlag('adelie.projectFacts.open', false);
+  // Always starts folded: just the title and its hint.
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -274,16 +273,17 @@ export function ProjectFacts({ base }: { base: string }) {
           {t('title')}
         </button>
         <InfoTip text={t('hint')} />
-        <span className="ml-auto text-xs font-normal text-muted">
-          {t('links', { count: facts.links })}
-        </span>
       </h3>
-      {open &&
-        (cards.length ? (
-          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{cards}</div>
-        ) : (
-          <p className="mt-3 text-sm text-muted">{t('empty')}</p>
-        ))}
+      {open && (
+        <>
+          {cards.length ? (
+            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{cards}</div>
+          ) : (
+            <p className="mt-3 text-sm text-muted">{t('empty')}</p>
+          )}
+          <p className="mt-3 text-xs text-muted">{t('links', { count: facts.links })}</p>
+        </>
+      )}
     </section>
   );
 }

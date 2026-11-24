@@ -1765,7 +1765,8 @@
       "addDirection": "Add direction",
       "name": "Name",
       "nameHint": "A short name for the focus switch above the week.",
-      "namePlaceholder": "World"
+      "namePlaceholder": "World",
+      "commonHint": "Who you are and how you speak: about the project, voice and tone, what makes you different, what to avoid, what you can create. Shared by all directions — the AI uses it in every suggestion. Numbers (followers, sales, visits) Adelie takes from Project data itself."
     },
     "suggestionsTitle": "AI ideas ({count})",
     "suggestionsHint": "Proposals for the rest of the week, following the focus, the time budget and your results. Accept one and it joins the plan on its day; change the day or reject it. Rejected topics are not proposed again. A new request replaces the week's undecided proposals.",

@@ -73,7 +73,7 @@ export function CalendarBrief({
   const [edited, setEdited] = useState(false);
   /** Directions that are open: all start folded, a new or still unnamed one starts open. */
   const [open, setOpen] = useState<Set<string>>(new Set());
-  /** The general information starts folded, open only while still empty. */
+  /** The general information always starts folded: just its title and hint. */
   const [commonOpen, setCommonOpen] = useState(false);
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
 
@@ -83,7 +83,6 @@ export function CalendarBrief({
       (r) => {
         if (cancelled) return;
         setSources(r.sources ?? []);
-        setCommonOpen(!r.brief?.about.trim());
         setOpen(
           new Set(
             (r.brief?.directions ?? [newDirection()])
@@ -173,23 +172,23 @@ export function CalendarBrief({
       <ProjectFacts base={base} />
       <div className="grid gap-4">
         <section className="card grid gap-4 rounded-[24px] p-5">
-          <button
-            type="button"
-            onClick={() => setCommonOpen(!commonOpen)}
-            aria-expanded={commonOpen}
-            title={commonOpen ? t('directionClose') : t('directionOpen')}
-            className="flex min-w-0 items-center gap-2 rounded-xl text-left"
-          >
-            <ChevronDown
-              size={15}
-              className={`shrink-0 transition-transform ${commonOpen ? '' : '-rotate-90'}`}
-              aria-hidden="true"
-            />
-            <span className="text-sm font-semibold">{t('common')}</span>
-            {!commonOpen && brief.about && (
-              <span className="ml-1 truncate text-xs text-muted">{brief.about}</span>
-            )}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setCommonOpen(!commonOpen)}
+              aria-expanded={commonOpen}
+              title={commonOpen ? t('directionClose') : t('directionOpen')}
+              className="flex min-w-0 items-center gap-2 rounded-xl text-left"
+            >
+              <ChevronDown
+                size={15}
+                className={`shrink-0 transition-transform ${commonOpen ? '' : '-rotate-90'}`}
+                aria-hidden="true"
+              />
+              <span className="text-sm font-semibold">{t('common')}</span>
+            </button>
+            <InfoTip text={t('commonHint')} />
+          </div>
           {commonOpen && (
             <>
               {area('about', brief.about, (about) => set({ about }), 2, 2000)}
