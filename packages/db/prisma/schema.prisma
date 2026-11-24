@@ -704,10 +704,11 @@ model ShopProduct {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  orderItems   ShopOrderItem[]
-  changes      ShopProductChange[]
-  issueIgnores ShopProductIssueIgnore[]
-  seoChecks    ProductSeoCheck[]
+  orderItems    ShopOrderItem[]
+  changes       ShopProductChange[]
+  issueIgnores  ShopProductIssueIgnore[]
+  seoChecks     ProductSeoCheck[]
+  calendarItems CalendarItem[]
 
   @@unique([accountId, externalId])
   @@index([projectId])
@@ -1032,6 +1033,10 @@ model CalendarItem {
   link        TrackedLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
   postId      String?      @db.Uuid
   post        SocialPost?  @relation(fields: [postId], references: [id], onDelete: SetNull)
+  /// The product the publication is about (ADR-0037): set by the AI's idea from a hit, so a product
+  /// already planned is not proposed again before its pin exists.
+  productId   String?      @db.Uuid
+  product     ShopProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
   /// An AI suggestion (ADR-0029): why it is proposed, and on what evidence (hypothesis | results).
   why         String?
   evidence    String?
@@ -1042,6 +1047,7 @@ model CalendarItem {
   updatedAt   DateTime     @updatedAt
 
   @@index([projectId, date])
+  @@index([productId])
   @@map("calendar_item")
 }
 

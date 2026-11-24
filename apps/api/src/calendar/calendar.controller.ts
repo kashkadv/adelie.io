@@ -53,6 +53,8 @@ import {
   type IdeasContext,
 } from './ideas.js';
 import { projectFacts } from './facts.js';
+import { MAX_HITS } from './hits.js';
+import { directionHits, hitSources } from './hits-data.js';
 
 const LINK = {
   select: {
@@ -542,7 +544,33 @@ export class CalendarController {
       where: { id: projectId },
       select: { brief: true },
     });
-    return { brief: parseBrief(row?.brief), ai: await this.aiState(projectId) };
+    return {
+      brief: parseBrief(row?.brief),
+      ai: await this.aiState(projectId),
+      sources: await hitSources(this.prisma.client, {
+        projectId,
+        workspaceId: request.workspace.workspaceId,
+      }),
+    };
+  }
+
+  /** The hits of a direction (ADR-0037): weighed, with what has been published for each. */
+  @Get('hits')
+  async hits(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Query('direction') directionId: string | undefined,
+    @Req() request: { workspace: WorkspaceRequestContext },
+  ) {
+    const project = await this.visibleProject(request.workspace, projectId);
+    const direction = parseBrief(project.brief)?.directions.find((d) => d.id === directionId);
+    if (!direction?.hits) return { days: null, hits: [] };
+    const hits = await directionHits(
+      this.prisma.client,
+      { projectId, workspaceId: request.workspace.workspaceId },
+      direction.hits,
+      todayIn(project.timezone),
+    );
+    return { days: direction.hits.days, hits };
   }
 
   /** What Adelie knows about the project from its connections (ADR-0031). */
@@ -693,6 +721,26 @@ export class CalendarController {
         ? brief.directions
         : brief.directions.filter((d) => d.id === focus.value);
     const channels = [...new Set(inFocus.flatMap((d) => d.channels))];
+    // Hits of the directions in focus (ADR-0037): ready ones go to the AI, resting ones are named.
+    const hitsByDirection = await Promise.all(
+      inFocus
+        .filter((d) => d.hits)
+        .map(async (d) => {
+          const all = await directionHits(
+            db,
+            { projectId, workspaceId: ctx.workspaceId },
+            d.hits!,
+            today,
+          );
+          return {
+            direction: d.name || d.id,
+            ready: all.filter((h) => h.status === 'ready').slice(0, MAX_HITS),
+            resting: all.filter((h) => h.status === 'cooling').map((h) => h.title),
+          };
+        }),
+    );
+    const hitList = hitsByDirection.flatMap((h) => h.ready);
+    const hitKeys = [...new Set(hitList.map((h) => h.key))];
     const since = addDays(start, -28);
     const where = { projectId, workspaceId: ctx.workspaceId };
     const [accounts, planned, waiting, rejected, past, posts] = await Promise.all([
@@ -793,6 +841,7 @@ export class CalendarController {
           published: p.publishedAt ? dayOf(p.publishedAt) : null,
           ...numbers(p.latest),
         })),
+      hits: hitsByDirection,
       projectData: await projectFacts(db, projectId, ctx.workspaceId),
       ownerLanguage: body?.locale === 'uk' ? 'Ukrainian' : 'English',
     };
@@ -801,10 +850,10 @@ export class CalendarController {
     const answer = await provider.structured({
       instructions: IDEAS_INSTRUCTIONS,
       input: ideasInput(context),
-      schema: ideasSchema(dates, channels),
+      schema: ideasSchema(dates, channels, hitKeys),
       schemaName: 'calendar_ideas',
     });
-    const ideas = answer.ok ? parseIdeas(answer.data, dates) : [];
+    const ideas = answer.ok ? parseIdeas(answer.data, dates, hitKeys) : [];
     const run = await db.aiRun.create({
       data: {
         workspaceId: ctx.workspaceId,
@@ -850,6 +899,7 @@ export class CalendarController {
           why: idea.why || null,
           evidence: idea.evidence,
           aiRunId: run.id,
+          productId: hitList.find((h) => h.key === idea.hit)?.productId ?? null,
           suggestion: 'pending',
         })),
       }),

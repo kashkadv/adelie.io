@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { Checkbox } from '../ui/checkbox';
 import { InfoTip } from '../ui/info-tip';
 import { ChannelIcon } from './link-ui';
+import { DirectionHits, type HitSettings, type HitSource } from './calendar-hits';
 import { ProjectFacts } from './project-facts';
 import { LINK_CHANNELS, type LinkChannel } from './links-data';
 
@@ -18,6 +19,8 @@ export interface Direction {
   audience: string;
   language: string;
   channels: LinkChannel[];
+  /** Where the direction's hits come from (ADR-0037); null = none. */
+  hits: HitSettings | null;
 }
 export interface Brief {
   about: string;
@@ -35,6 +38,7 @@ const newDirection = (): Direction => ({
   audience: '',
   language: '',
   channels: [],
+  hits: null,
 });
 const emptyBrief = (): Brief => ({ about: '', assets: '', directions: [newDirection()] });
 
@@ -54,13 +58,17 @@ export function CalendarBrief({
   const t = useTranslations('Calendar.brief');
   const tl = useTranslations('Links');
   const [brief, setBrief] = useState<Brief | null>(null);
+  const [sources, setSources] = useState<HitSource[]>([]);
+  const [version, setVersion] = useState(0);
+  const [edited, setEdited] = useState(false);
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
 
   useEffect(() => {
     let cancelled = false;
-    api<{ brief: Brief | null }>(`${base}/brief`).then(
+    api<{ brief: Brief | null; sources?: HitSource[] }>(`${base}/brief`).then(
       (r) => {
         if (cancelled) return;
+        setSources(r.sources ?? []);
         setBrief(
           r.brief
             ? {
@@ -80,6 +88,7 @@ export function CalendarBrief({
   if (!brief) return <p className="py-10 text-center text-sm text-muted">…</p>;
   const set = (patch: Partial<Brief>) => {
     setBrief({ ...brief, ...patch });
+    setEdited(true);
     setState('idle');
   };
   const setDirection = (id: string, patch: Partial<Direction>) =>
@@ -95,6 +104,8 @@ export function CalendarBrief({
         directions: r.brief.directions.length ? r.brief.directions : [newDirection()],
       });
       setState('saved');
+      setVersion((v) => v + 1);
+      setEdited(false);
       onSaved();
     } catch {
       setState('failed');
@@ -203,6 +214,16 @@ export function CalendarBrief({
                 ))}
               </div>
             </div>
+            <DirectionHits
+              base={base}
+              directionId={d.id}
+              settings={d.hits}
+              sources={sources}
+              canManage={canManage}
+              version={version}
+              edited={edited}
+              onChange={(hits) => setDirection(d.id, { hits })}
+            />
           </section>
         ))}
 

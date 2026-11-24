@@ -66,3 +66,4 @@
 - [ADR-0034](decisions/0034-research-versions-tag-ratings.md) — Версії дослідження й оцінка тегів (прийнято)
 - [ADR-0035](decisions/0035-research-in-product-card-editor.md) — Підказки дослідження в картці й редакторі товару (прийнято)
 - [ADR-0036](decisions/0036-research-result.md) — Результат дослідження: до/після змін проти незмінених (прийнято)
+- [ADR-0037](decisions/0037-direction-hits.md) — Хіти напряму: що просувати, не повторюючись (прийнято)

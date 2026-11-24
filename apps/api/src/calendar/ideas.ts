@@ -3,6 +3,7 @@
 // is checked. Pure and unit-tested; the controller does the I/O.
 import { LINK_CHANNELS, isLinkChannel, type LinkChannel } from '../links/links.js';
 import { FORMATS, asDate, type Format } from './calendar.js';
+import { parseHitSettings, type Hit, type HitSettings } from './hits.js';
 
 /** One direction of the project: its own goal, audience, language and channels. */
 export interface Direction {
@@ -13,6 +14,8 @@ export interface Direction {
   /** The audience's language, in words ("English", "українська"). */
   language: string;
   channels: LinkChannel[];
+  /** Where this direction's hits come from (ADR-0037); null = none. */
+  hits: HitSettings | null;
 }
 
 export interface Brief {
@@ -36,6 +39,7 @@ function parseDirection(raw: unknown, fallbackId: string): Direction | null {
     audience: text(d['audience'], 1500),
     language: text(d['language'], 100),
     channels: Array.isArray(d['channels']) ? [...new Set(d['channels'].filter(isLinkChannel))] : [],
+    hits: parseHitSettings(d['hits']),
   };
   return direction.name || direction.goal || direction.audience || direction.channels.length
     ? direction
@@ -108,10 +112,12 @@ export interface Idea {
   notes: string;
   why: string;
   evidence: Evidence;
+  /** The hit the idea is about (its key), if any. */
+  hit: string | null;
 }
 
 /** The answer's JSON schema (strict: every property required, nothing else); days are the ones left. */
-export function ideasSchema(days: string[], channels: LinkChannel[]) {
+export function ideasSchema(days: string[], channels: LinkChannel[], hitKeys: string[] = []) {
   return {
     type: 'object',
     additionalProperties: false,
@@ -122,7 +128,17 @@ export function ideasSchema(days: string[], channels: LinkChannel[]) {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['title', 'channel', 'format', 'day', 'minutes', 'notes', 'why', 'evidence'],
+          required: [
+            'title',
+            'channel',
+            'format',
+            'day',
+            'minutes',
+            'notes',
+            'why',
+            'evidence',
+            'hit',
+          ],
           properties: {
             title: { type: 'string', description: 'The topic, short, in the audience language.' },
             channel: {
@@ -143,6 +159,12 @@ export function ideasSchema(days: string[], channels: LinkChannel[]) {
                 'Why this idea and this day, citing the numbers it relies on, in the owner language.',
             },
             evidence: { type: 'string', enum: [...EVIDENCE] },
+            hit: {
+              type: 'string',
+              enum: [...hitKeys, 'none'],
+              description:
+                'The id of the hit this idea is about (one idea per hit), or "none" when it is not about a listed product.',
+            },
           },
         },
       },
@@ -170,6 +192,8 @@ export interface IdeasContext {
   history: Record<string, unknown>[];
   /** The project's best posts of the last 90 days, by their platform's numbers. */
   topPosts: Record<string, unknown>[];
+  /** Hits per direction in focus (ADR-0037): ready to be proposed, and resting. */
+  hits: { direction: string; ready: Hit[]; resting: string[] }[];
   /** What Adelie knows about the project from its connections (ADR-0031). */
   projectData: unknown;
   /** The owner's interface language (for `why`). */
@@ -185,6 +209,7 @@ Propose publications for the remaining days of the week, each on a day. Rules:
 - Base ideas on the project's own results when they exist: what got clicks, visits, goals or engagement. Cite those numbers in "why" and mark evidence "results". When there are no relevant results, say so and mark evidence "hypothesis". Never invent numbers or claim market data you were not given.
 - "title" and "notes" are in the audience language of the idea's direction; "why" is in the owner language.
 - "notes" is practical: a hook for the first line, a short caption draft, a few tags or hashtags fitting the channel, a call to action pointing to the direction's goal.
+- "hits" are the products that sold, were put in checkout or viewed the most on the project's sites and shop over the period (purchases weigh most, then started checkouts, then views). When hits are given, base most ideas on them: set "hit" to the hit's id, at most one idea per hit, and mention its numbers in "why". Hits are ordered by priority: the first have sold well and been published the least. "anglesAlreadyUsed" are titles of posts already published for the product: propose a clearly different angle, format or season. Never propose a product listed under "resting". Ideas that are not about a listed product get "hit" = "none".
 - Propose between 2 and 8 ideas.`;
 
 /** The request's text: the task and the data, as compact JSON. */
@@ -197,7 +222,21 @@ export function ideasInput(ctx: IdeasContext): string {
       about: ctx.about,
       whatExists: ctx.assets,
       projectData: ctx.projectData,
-      directionsInFocus: ctx.focus.map(({ id: _id, ...d }) => d),
+      directionsInFocus: ctx.focus.map(({ id: _id, hits: _hits, ...d }) => d),
+      hits: ctx.hits.map((h) => ({
+        direction: h.direction,
+        ready: h.ready.map((x) => ({
+          id: x.key,
+          product: x.title,
+          purchases: x.signals.purchases,
+          startedCheckouts: x.signals.checkouts,
+          views: x.signals.views,
+          postsPublishedLast90Days: x.coverage.pins90,
+          daysSinceLastPost: x.daysSincePin,
+          anglesAlreadyUsed: x.coverage.pinTitles,
+        })),
+        resting: h.resting,
+      })),
       dailyMinutes: ctx.dailyMinutes,
       connectedPlatforms: ctx.connected,
       remainingDays: ctx.days,
@@ -210,10 +249,11 @@ export function ideasInput(ctx: IdeasContext): string {
 }
 
 /** The answer, checked: valid ideas only, at most 8, on one of the given days. */
-export function parseIdeas(data: unknown, days: string[]): Idea[] {
+export function parseIdeas(data: unknown, days: string[], hitKeys: string[] = []): Idea[] {
   const list = (data as { ideas?: unknown } | null)?.ideas;
   if (!Array.isArray(list) || !days.length) return [];
   const ideas: Idea[] = [];
+  const used = new Set<string>();
   for (const raw of list) {
     if (!raw || typeof raw !== 'object') continue;
     const i = raw as Record<string, unknown>;
@@ -224,6 +264,10 @@ export function parseIdeas(data: unknown, days: string[]): Idea[] {
       typeof i['minutes'] === 'number' && Number.isFinite(i['minutes'])
         ? Math.min(1440, Math.max(5, Math.round(i['minutes'])))
         : 30;
+    const hit = typeof i['hit'] === 'string' && hitKeys.includes(i['hit']) ? i['hit'] : null;
+    // One idea per product: a second one about the same hit is the repetition this is against.
+    if (hit && used.has(hit)) continue;
+    if (hit) used.add(hit);
     ideas.push({
       title,
       channel: i['channel'],
@@ -233,6 +277,7 @@ export function parseIdeas(data: unknown, days: string[]): Idea[] {
       notes: text(i['notes'], 5000),
       why: text(i['why'], 1000),
       evidence: i['evidence'] === 'results' ? 'results' : 'hypothesis',
+      hit,
     });
     if (ideas.length === 8) break;
   }

@@ -29,6 +29,7 @@ describe('brief', () => {
           audience: '',
           language: '',
           channels: ['pinterest'],
+          hits: null,
         },
         {
           id: 'd3',
@@ -37,6 +38,7 @@ describe('brief', () => {
           audience: '',
           language: 'українська',
           channels: ['instagram'],
+          hits: null,
         },
       ],
     });
@@ -122,6 +124,7 @@ describe('ideas', () => {
         notes: 'n',
         why: 'w',
         evidence: 'results',
+        hit: null,
       },
       {
         title: 'Reel',
@@ -132,9 +135,36 @@ describe('ideas', () => {
         notes: '',
         why: '',
         evidence: 'hypothesis',
+        hit: null,
       },
     ]);
     expect(parseIdeas(null, days)).toEqual([]);
+  });
+
+  it('one idea per hit: a second one about the same product is dropped; unknown hits are none', () => {
+    const idea = (title: string, hit: string) => ({
+      title,
+      channel: 'pinterest',
+      format: 'pin',
+      day: '2026-11-14',
+      minutes: 15,
+      notes: '',
+      why: '',
+      evidence: 'results',
+      hit,
+    });
+    const r = parseIdeas(
+      { ideas: [idea('a', 'rug'), idea('b', 'rug'), idea('c', 'ghost'), idea('d', 'none')] },
+      days,
+      ['rug'],
+    );
+    expect(r.map((i) => [i.title, i.hit])).toEqual([
+      ['a', 'rug'],
+      ['c', null],
+      ['d', null],
+    ]);
+    const item = ideasSchema(days, ['pinterest'], ['rug']).properties.ideas.items;
+    expect(item.properties.hit.enum).toEqual(['rug', 'none']);
   });
 
   it('the schema is strict and limited to the days and channels given', () => {
