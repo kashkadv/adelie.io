@@ -41,6 +41,8 @@ export function CalendarItemDialog({
   linksBase,
   item,
   initialDate,
+  directions = [],
+  defaultDirection = null,
   canManage,
   onClose,
   onSaved,
@@ -50,6 +52,10 @@ export function CalendarItemDialog({
   item?: CalendarItem;
   /** A new item's day (null = an idea). */
   initialDate?: string | null;
+  /** The brief's directions (ADR-0039); the field shows when there are several. */
+  directions?: { id: string; name: string }[];
+  /** The direction a new item starts in: the week's focus, when it is one. */
+  defaultDirection?: string | null;
   canManage: boolean;
   onClose: () => void;
   onSaved: (item: CalendarItem | null) => void;
@@ -65,6 +71,9 @@ export function CalendarItemDialog({
   const [minutes, setMinutes] = useState(item?.minutes ? String(item.minutes) : '');
   const [status, setStatus] = useState<Status>(item?.status ?? 'idea');
   const [notes, setNotes] = useState(item?.notes ?? '');
+  const [direction, setDirection] = useState<string>(
+    item ? (item.direction ?? '') : (defaultDirection ?? ''),
+  );
   const [link, setLink] = useState(item?.link ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Field | null>(null);
@@ -95,7 +104,16 @@ export function CalendarItemDialog({
     if (m !== null && (!Number.isInteger(m) || m < 0 || m > 1440)) return setError('minutes');
     setBusy(true);
     setError(null);
-    const json = { title, channel, format: fmt, date, minutes: m, status, notes };
+    const json = {
+      title,
+      channel,
+      format: fmt,
+      date,
+      minutes: m,
+      status,
+      notes,
+      ...(directions.length > 1 ? { direction: direction || null } : {}),
+    };
     try {
       const saved = item
         ? await api<CalendarItem>(`${base}/${item.id}`, { method: 'PATCH', json })
@@ -213,6 +231,21 @@ export function CalendarItemDialog({
             />
             {errorOf('title')}
           </label>
+
+          {directions.length > 1 && (
+            <div>
+              {label(t('direction'))}
+              <Select
+                ariaLabel={t('direction')}
+                value={direction}
+                onChange={setDirection}
+                options={[
+                  { value: '', label: t('directionNone') },
+                  ...directions.map((d) => ({ value: d.id, label: d.name || t('unnamed') })),
+                ]}
+              />
+            </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>

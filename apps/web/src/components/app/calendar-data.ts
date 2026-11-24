@@ -32,6 +32,8 @@ export interface CalendarItem {
   evidence: 'hypothesis' | 'results' | null;
   /** An AI proposal waiting for a decision (ADR-0030); null = part of the plan. */
   suggestion: 'pending' | 'rejected' | null;
+  /** The brief direction it belongs to (ADR-0039); null = none, shown under every focus. */
+  direction: string | null;
   link: {
     id: string;
     code: string;

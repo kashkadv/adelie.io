@@ -128,10 +128,17 @@ export interface Idea {
   evidence: Evidence;
   /** The hit the idea is about (its key), if any. */
   hit: string | null;
+  /** The direction the idea is for (its id in the brief). */
+  direction: string | null;
 }
 
 /** The answer's JSON schema (strict: every property required, nothing else); days are the ones left. */
-export function ideasSchema(days: string[], channels: LinkChannel[], hitKeys: string[] = []) {
+export function ideasSchema(
+  days: string[],
+  channels: LinkChannel[],
+  hitKeys: string[] = [],
+  directionIds: string[] = [],
+) {
   return {
     type: 'object',
     additionalProperties: false,
@@ -152,6 +159,7 @@ export function ideasSchema(days: string[], channels: LinkChannel[], hitKeys: st
             'why',
             'evidence',
             'hit',
+            'direction',
           ],
           properties: {
             title: { type: 'string', description: 'The topic, short, in the audience language.' },
@@ -173,6 +181,12 @@ export function ideasSchema(days: string[], channels: LinkChannel[], hitKeys: st
                 'Why this idea and this day, citing the numbers it relies on, in the owner language.',
             },
             evidence: { type: 'string', enum: [...EVIDENCE] },
+            direction: {
+              type: 'string',
+              enum: directionIds.length ? directionIds : ['none'],
+              description:
+                'The id of the direction this idea is for: its channel, language, audience and goal. Every idea belongs to exactly one direction.',
+            },
             hit: {
               type: 'string',
               enum: [...hitKeys, 'none'],
@@ -195,6 +209,8 @@ export interface IdeasContext {
   assets: string;
   /** The directions in the week's focus. */
   focus: Direction[];
+  /** How many publications are already planned this week per direction (id → count). */
+  plannedPerDirection: Record<string, number>;
   /** Minutes a day; null = not set. */
   dailyMinutes: number | null;
   /** Platforms connected to the project (their data is in `history` and `topPosts`). */
@@ -210,7 +226,7 @@ export interface IdeasContext {
   /** The project's best posts of the last 90 days, by their platform's numbers. */
   topPosts: Record<string, unknown>[];
   /** Hits per direction in focus (ADR-0037): ready to be proposed, and resting. */
-  hits: { direction: string; ready: Hit[]; resting: string[] }[];
+  hits: { directionId: string; direction: string; ready: Hit[]; resting: string[] }[];
   /** What Adelie knows about the project from its connections (ADR-0031). */
   projectData: unknown;
   /** The owner's interface language (for `why`). */
@@ -228,6 +244,7 @@ Propose publications for the remaining days of the week, each on a day. Rules:
 - "title" and "notes" are in the audience language of the idea's direction; "why" is in the owner language.
 - "notes" is practical: a hook for the first line, a short caption draft, a few tags or hashtags fitting the channel, a call to action pointing to the direction's goal.
 - "hits" are the products that sold, were put in checkout or viewed the most on the project's sites and shop over the period (purchases weigh most, then started checkouts, then views). When hits are given, base most ideas on them: set "hit" to the hit's id, at most one idea per hit, and mention its numbers in "why". Hits are ordered by priority: the first have sold well and been published the least. "anglesAlreadyUsed" are titles of posts already published for the product: propose a clearly different angle, format or season. Never propose a product listed under "resting". Ideas that are not about a listed product get "hit" = "none".
+- Every idea belongs to exactly one direction: set "direction" to its id, take the idea's channel from that direction's channels, and write it for that direction's audience, language and goal. Never mix directions in one idea. When several directions are in focus, spread the ideas over them, starting with those that have the fewest publications planned this week ("plannedThisWeek"). A hit is only for ideas of its own direction.
 - Propose between 2 and 8 ideas.`;
 
 /** The request's text: the task and the data, as compact JSON. */
@@ -243,9 +260,13 @@ export function ideasInput(ctx: IdeasContext): string {
       neverDoOrSay: ctx.avoid,
       whatTheOwnerCanCreate: ctx.assets,
       projectData: ctx.projectData,
-      directionsInFocus: ctx.focus.map(({ id: _id, hits: _hits, ...d }) => d),
+      directionsInFocus: ctx.focus.map(({ hits: _hits, ...d }) => ({
+        ...d,
+        plannedThisWeek: ctx.plannedPerDirection[d.id] ?? 0,
+      })),
       hits: ctx.hits.map((h) => ({
-        direction: h.direction,
+        direction: h.directionId,
+        directionName: h.direction,
         ready: h.ready.map((x) => ({
           id: x.key,
           product: x.title,
@@ -270,7 +291,12 @@ export function ideasInput(ctx: IdeasContext): string {
 }
 
 /** The answer, checked: valid ideas only, at most 8, on one of the given days. */
-export function parseIdeas(data: unknown, days: string[], hitKeys: string[] = []): Idea[] {
+export function parseIdeas(
+  data: unknown,
+  days: string[],
+  hitKeys: string[] = [],
+  directions: { id: string; channels: LinkChannel[] }[] = [],
+): Idea[] {
   const list = (data as { ideas?: unknown } | null)?.ideas;
   if (!Array.isArray(list) || !days.length) return [];
   const ideas: Idea[] = [];
@@ -285,6 +311,14 @@ export function parseIdeas(data: unknown, days: string[], hitKeys: string[] = []
       typeof i['minutes'] === 'number' && Number.isFinite(i['minutes'])
         ? Math.min(1440, Math.max(5, Math.round(i['minutes'])))
         : 30;
+    // The direction: one of those in focus (the only one, when there is one); its channels only.
+    const direction =
+      directions.find((d) => d.id === i['direction']) ??
+      (directions.length === 1 ? directions[0]! : null);
+    if (directions.length && !direction) continue;
+    if (direction && direction.channels.length && !direction.channels.includes(i['channel'])) {
+      continue;
+    }
     const hit = typeof i['hit'] === 'string' && hitKeys.includes(i['hit']) ? i['hit'] : null;
     // One idea per product: a second one about the same hit is the repetition this is against.
     if (hit && used.has(hit)) continue;
@@ -299,6 +333,7 @@ export function parseIdeas(data: unknown, days: string[], hitKeys: string[] = []
       why: text(i['why'], 1000),
       evidence: i['evidence'] === 'results' ? 'results' : 'hypothesis',
       hit,
+      direction: direction?.id ?? null,
     });
     if (ideas.length === 8) break;
   }

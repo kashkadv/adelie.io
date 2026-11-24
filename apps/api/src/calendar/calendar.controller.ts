@@ -105,6 +105,7 @@ const ITEM_SELECT = {
   why: true,
   evidence: true,
   suggestion: true,
+  direction: true,
   link: LINK,
   post: POST,
 } as const;
@@ -283,11 +284,12 @@ export class CalendarController {
     @Req() request: { workspace: WorkspaceRequestContext },
   ) {
     const ctx = request.workspace;
-    await this.visibleProject(ctx, projectId);
+    const project = await this.visibleProject(ctx, projectId);
     const parsed = parseItem(body ?? {}, true);
     if (!parsed.ok) throw new BadRequestException({ errors: { [parsed.error]: 'invalid' } });
     const input = parsed.item as Required<Pick<ItemInput, 'channel' | 'format' | 'title'>> &
       ItemInput;
+    this.checkDirection(project.brief, input.direction);
     await this.checkLink(projectId, ctx.workspaceId, input.linkId);
     // A new item goes last in its day.
     const last = await this.prisma.client.calendarItem.aggregate({
@@ -305,12 +307,21 @@ export class CalendarController {
         minutes: input.minutes ?? null,
         status: input.status ?? 'idea',
         linkId: input.linkId ?? null,
+        direction: input.direction ?? null,
         date: input.date ? asDate(input.date) : null,
         position: input.position ?? (last._max.position ?? -1) + 1,
       },
       select: ITEM_SELECT,
     });
     return present(item);
+  }
+
+  /** A direction of an item must be one of the brief's (null or absent = none). */
+  private checkDirection(rawBrief: unknown, direction: string | null | undefined) {
+    if (!direction) return;
+    if (!parseBrief(rawBrief)?.directions.some((d) => d.id === direction)) {
+      throw new BadRequestException({ errors: { direction: 'invalid' } });
+    }
   }
 
   /** Changes an item: any of its fields, its day and place (moving), its link. */
@@ -324,6 +335,7 @@ export class CalendarController {
   ) {
     const ctx = request.workspace;
     const current = await this.itemOf(ctx, projectId, id);
+    const project = await this.visibleProject(ctx, projectId);
     // An AI proposal is accepted (null) or turned down ("rejected"); nothing else is set by hand.
     const { suggestion, ...fields } = body ?? {};
     if (suggestion !== undefined && suggestion !== null && suggestion !== 'rejected') {
@@ -332,6 +344,7 @@ export class CalendarController {
     const parsed = parseItem(fields, false);
     if (!parsed.ok) throw new BadRequestException({ errors: { [parsed.error]: 'invalid' } });
     const { date, linkId, ...rest } = parsed.item;
+    this.checkDirection(project.brief, rest.direction);
     await this.checkLink(projectId, ctx.workspaceId, linkId);
     const data: Prisma.CalendarItemUncheckedUpdateInput = { ...rest };
     if (date !== undefined) data.date = date ? asDate(date) : null;
@@ -733,6 +746,7 @@ export class CalendarController {
             today,
           );
           return {
+            directionId: d.id,
             direction: d.name || d.id,
             ready: all.filter((h) => h.status === 'ready').slice(0, MAX_HITS),
             resting: all.filter((h) => h.status === 'cooling').map((h) => h.title),
@@ -754,7 +768,7 @@ export class CalendarController {
           suggestion: null,
           date: { gte: asDate(dates[0]!), lte: asDate(addDays(start, 6)) },
         },
-        select: { date: true, title: true, minutes: true },
+        select: { date: true, title: true, minutes: true, direction: true },
       }),
       db.calendarItem.findMany({
         where: { ...where, suggestion: null, date: null },
@@ -804,6 +818,10 @@ export class CalendarController {
       avoid: brief.avoid,
       assets: brief.assets,
       focus: inFocus,
+      plannedPerDirection: planned.reduce<Record<string, number>>((n, p) => {
+        if (p.direction) n[p.direction] = (n[p.direction] ?? 0) + 1;
+        return n;
+      }, {}),
       dailyMinutes: project.dailyMinutes,
       connected: [...new Set(accounts.map((a) => a.platform))],
       days: dates.map((date) => {
@@ -853,10 +871,22 @@ export class CalendarController {
     const answer = await provider.structured({
       instructions: IDEAS_INSTRUCTIONS,
       input: ideasInput(context),
-      schema: ideasSchema(dates, channels, hitKeys),
+      schema: ideasSchema(
+        dates,
+        channels,
+        hitKeys,
+        inFocus.map((d) => d.id),
+      ),
       schemaName: 'calendar_ideas',
     });
-    const ideas = answer.ok ? parseIdeas(answer.data, dates, hitKeys) : [];
+    const ideas = answer.ok
+      ? parseIdeas(
+          answer.data,
+          dates,
+          hitKeys,
+          inFocus.map((d) => ({ id: d.id, channels: d.channels })),
+        )
+      : [];
     const run = await db.aiRun.create({
       data: {
         workspaceId: ctx.workspaceId,
@@ -902,6 +932,7 @@ export class CalendarController {
           why: idea.why || null,
           evidence: idea.evidence,
           aiRunId: run.id,
+          direction: idea.direction,
           productId: hitList.find((h) => h.key === idea.hit)?.productId ?? null,
           suggestion: 'pending',
         })),

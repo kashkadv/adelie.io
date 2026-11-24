@@ -49,6 +49,8 @@ export interface ItemInput {
   minutes?: number | null;
   status?: Status;
   linkId?: string | null;
+  /** A direction id of the brief; null = none. */
+  direction?: string | null;
 }
 export type ItemField = keyof ItemInput;
 
@@ -102,6 +104,13 @@ export function parseItem(
   if (has('status')) {
     if (!STATUSES.includes(body['status'] as Status)) return { ok: false, error: 'status' };
     item.status = body['status'] as Status;
+  }
+  if (has('direction')) {
+    const d = body['direction'];
+    if (d !== null && (typeof d !== 'string' || !/^[a-z0-9-]{1,40}$/.test(d))) {
+      return { ok: false, error: 'direction' };
+    }
+    item.direction = d as string | null;
   }
   if (has('linkId')) {
     const id = body['linkId'];

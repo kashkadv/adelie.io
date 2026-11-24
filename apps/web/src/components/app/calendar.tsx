@@ -176,6 +176,13 @@ export function Calendar() {
   }
 
   const items = data?.items ?? [];
+  const directions = data?.focus.directions ?? [];
+  const focusValue = data?.focus.value ?? 'all';
+  const dirName = (id: string | null) =>
+    id ? directions.find((d) => d.id === id)?.name || t('unnamed') : null;
+  /** Under a direction's focus only its cards show (and those without a direction); "all" shows all. */
+  const inFocus = (i: { direction: string | null }) =>
+    focusValue === 'all' || !i.direction || i.direction === focusValue;
   const today = data?.today ?? todayDay();
   const budget = data?.dailyMinutes ?? null;
   const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
@@ -183,6 +190,7 @@ export function Calendar() {
   const comingDays = days.filter((d) => d >= today);
   const inDay = (date: string | null) =>
     items.filter((i) => i.date === date).sort((a, b) => a.position - b.position);
+  const shownInDay = (date: string | null) => inDay(date).filter(inFocus);
   const dayLabel = (date: string, opts: DateTimeFormatOptions) =>
     format.dateTime(asDate(date), { ...opts, timeZone: 'UTC' });
 
@@ -278,7 +286,10 @@ export function Calendar() {
           <ChannelIcon channel={item.channel} />
           <span className="min-w-0 flex-1">
             <span className="block truncate">{item.title}</span>
-            <span className="block truncate text-xs text-muted">{t(`formats.${item.format}`)}</span>
+            <span className="block truncate text-xs text-muted">
+              {t(`formats.${item.format}`)}
+              {directions.length > 1 && item.direction ? ` · ${dirName(item.direction)}` : ''}
+            </span>
           </span>
           {item.why && (
             <Sparkles size={13} className="shrink-0 text-muted" aria-label={t('fromAi')} />
@@ -308,8 +319,9 @@ export function Calendar() {
 
   /** A day: its label and minutes on the left, its publications on the right. */
   const dayRow = (date: string) => {
-    const list = inDay(date);
-    const planned = list.reduce((n, i) => n + (i.minutes ?? 0), 0);
+    const list = shownInDay(date);
+    // The day's minutes are the owner's time: all directions count, shown or not.
+    const planned = inDay(date).reduce((n, i) => n + (i.minutes ?? 0), 0);
     const overBudget = budget !== null && planned > budget;
     const isToday = date === today;
     const past = date < today;
@@ -369,9 +381,9 @@ export function Calendar() {
     addDays(week, 6),
     { day: 'numeric', month: 'short', year: 'numeric' },
   )}`;
-  const pastCount = pastDays.reduce((n, d) => n + inDay(d).length, 0);
-  const ideas = inDay(null);
-  const suggestions = data?.suggestions ?? [];
+  const pastCount = pastDays.reduce((n, d) => n + shownInDay(d).length, 0);
+  const ideas = shownInDay(null);
+  const suggestions = (data?.suggestions ?? []).filter(inFocus);
 
   let body: ReactNode;
   if (tab === 'brief' && base) {
@@ -434,6 +446,7 @@ export function Calendar() {
                     <span className="block text-sm font-medium hover:underline">{s.title}</span>
                     <span className="mt-0.5 block text-xs text-muted">
                       {t(`formats.${s.format}`)}
+                      {directions.length > 1 && s.direction ? ` · ${dirName(s.direction)}` : ''}
                       {s.minutes ? ` · ${t('minutesShort', { n: s.minutes })}` : ''} ·{' '}
                       {t(`evidence.${s.evidence ?? 'hypothesis'}`)}
                     </span>
@@ -699,6 +712,8 @@ export function Calendar() {
           linksBase={linksBase}
           item={'item' in dialog ? dialog.item : undefined}
           initialDate={'date' in dialog ? dialog.date : undefined}
+          directions={directions}
+          defaultDirection={focusValue === 'all' ? null : focusValue}
           canManage={canManage}
           onClose={() => {
             setDialog(null);

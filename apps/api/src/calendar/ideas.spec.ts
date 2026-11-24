@@ -139,6 +139,7 @@ describe('ideas', () => {
         why: 'w',
         evidence: 'results',
         hit: null,
+        direction: null,
       },
       {
         title: 'Reel',
@@ -150,6 +151,7 @@ describe('ideas', () => {
         why: '',
         evidence: 'hypothesis',
         hit: null,
+        direction: null,
       },
     ]);
     expect(parseIdeas(null, days)).toEqual([]);
@@ -179,6 +181,47 @@ describe('ideas', () => {
     ]);
     const item = ideasSchema(days, ['pinterest'], ['rug']).properties.ideas.items;
     expect(item.properties.hit.enum).toEqual(['rug', 'none']);
+  });
+
+  it("every idea is for one direction and uses that direction's channels", () => {
+    const idea = (channel: string, direction: string) => ({
+      title: `${direction} ${channel}`,
+      channel,
+      format: 'pin',
+      day: '2026-11-14',
+      minutes: 15,
+      notes: '',
+      why: '',
+      evidence: 'hypothesis',
+      hit: 'none',
+      direction,
+    });
+    const dirs = [
+      { id: 'world', channels: ['pinterest' as const] },
+      { id: 'ua', channels: ['instagram' as const] },
+    ];
+    const r = parseIdeas(
+      {
+        ideas: [
+          idea('pinterest', 'world'),
+          idea('pinterest', 'ua'), // not a channel of "ua"
+          idea('instagram', 'ua'),
+          idea('instagram', 'ghost'), // not in focus
+        ],
+      },
+      days,
+      [],
+      dirs,
+    );
+    expect(r.map((i) => [i.channel, i.direction])).toEqual([
+      ['pinterest', 'world'],
+      ['instagram', 'ua'],
+    ]);
+    // one direction in focus: an idea without a valid direction belongs to it
+    const one = parseIdeas({ ideas: [idea('pinterest', 'x')] }, days, [], [dirs[0]!]);
+    expect(one[0]!.direction).toBe('world');
+    const item = ideasSchema(days, ['pinterest'], [], ['world', 'ua']).properties.ideas.items;
+    expect(item.properties.direction.enum).toEqual(['world', 'ua']);
   });
 
   it('the schema is strict and limited to the days and channels given', () => {

@@ -1033,6 +1033,8 @@ model CalendarItem {
   link        TrackedLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
   postId      String?      @db.Uuid
   post        SocialPost?  @relation(fields: [postId], references: [id], onDelete: SetNull)
+  /// The brief's direction the publication belongs to (its id in `project.brief`); null = none.
+  direction   String?
   /// The product the publication is about (ADR-0037): set by the AI's idea from a hit, so a product
   /// already planned is not proposed again before its pin exists.
   productId   String?      @db.Uuid
