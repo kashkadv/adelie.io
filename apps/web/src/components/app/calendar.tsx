@@ -271,7 +271,7 @@ export function Calendar() {
         <button
           type="button"
           onClick={() => setDialog({ item })}
-          className={`flex min-w-0 flex-1 items-center gap-3 py-2 pr-2.5 text-left text-sm ${
+          className={`flex min-w-0 flex-1 items-center gap-3 py-3 pr-3.5 text-left text-sm ${
             canManage ? 'pl-1' : 'pl-2.5'
           }`}
         >
@@ -317,7 +317,7 @@ export function Calendar() {
       <div
         key={date}
         {...dropZone(date, null)}
-        className={`grid gap-1 px-2 py-2 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3 ${
+        className={`grid gap-1 px-2 py-3.5 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-5 ${
           over && over.date === date && over.before === null ? 'rounded-2xl ring-2 ring-accent' : ''
         } ${past ? 'opacity-60' : ''} ${isToday ? 'rounded-2xl bg-hover/60' : ''} ${
           dragging && !past ? 'rounded-2xl outline outline-1 outline-dashed outline-line' : ''
@@ -345,14 +345,14 @@ export function Calendar() {
             </p>
           )}
         </div>
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-3">
           {list.map((i) => row(i))}
           {canManage && !past && (
             <li>
               <button
                 type="button"
                 onClick={() => setDialog({ date })}
-                className="flex h-8 w-full items-center gap-1.5 rounded-xl border border-dashed border-line px-2.5 text-xs text-muted hover:bg-hover hover:text-foreground"
+                className="flex h-9 w-full items-center gap-1.5 rounded-xl border border-dashed border-line px-2.5 text-xs text-muted hover:bg-hover hover:text-foreground"
               >
                 <Plus size={13} aria-hidden="true" />
                 {t('add')}
@@ -402,7 +402,7 @@ export function Calendar() {
     body = (
       <div className="animate-rise grid gap-4">
         {suggestions.length > 0 && (
-          <section className="card rounded-[24px] p-4">
+          <section className="card rounded-[24px] p-5">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
               <h3 className="flex items-center gap-1.5 text-sm font-semibold">
                 <Sparkles size={15} aria-hidden="true" />
@@ -486,12 +486,12 @@ export function Calendar() {
           </section>
         )}
 
-        <section className="card rounded-[24px] p-2">
+        <section className="card rounded-[24px] p-4 sm:p-5">
           {pastDays.length > 0 && (
             <button
               type="button"
               onClick={() => setShowPast(!showPast)}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs text-muted hover:bg-hover"
+              className="flex w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left text-xs text-muted hover:bg-hover"
             >
               <ChevronDown
                 size={14}
@@ -506,7 +506,7 @@ export function Calendar() {
 
         <section
           {...dropZone(null, null)}
-          className={`rounded-[24px] bg-hover p-2 ${dragging ? 'outline outline-1 outline-dashed outline-line' : ''} ${over && over.date === null && over.before === null ? 'ring-2 ring-accent' : ''}`}
+          className={`rounded-[24px] bg-hover p-4 sm:p-5 ${dragging ? 'outline outline-1 outline-dashed outline-line' : ''} ${over && over.date === null && over.before === null ? 'ring-2 ring-accent' : ''}`}
         >
           <div className="flex items-center justify-between gap-2 px-1">
             <button
@@ -537,7 +537,7 @@ export function Calendar() {
             </span>
           </div>
           {showIdeas && ideas.length > 0 && (
-            <ul className="mt-1 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            <ul className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {ideas.map((i) => row(i, true))}
             </ul>
           )}
