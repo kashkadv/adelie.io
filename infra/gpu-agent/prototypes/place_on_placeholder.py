@@ -173,7 +173,12 @@ floor = floor * (1 - shade[..., None] * np.array([1.0, 1.06, 1.15]))
 # the light is warm at most; an object is clearly coloured (saturated) or much darker than the slab's smooth light.
 sat = (F.max(2) - F.min(2)) / (F.max(2) + 1)
 smooth = ndi.gaussian_filter(lumF * m, 25 * s) / (ndi.gaussian_filter(m, 25 * s) + 1e-6)
-occ = slab & (sat > float(os.environ.get("OCC_SAT", 0.3)))     # coloured objects only; dark grey = shadow ON the product
+# warm sunlight on the grey slab is saturated too (2026-11-25: 14% of a sunlit mat taken for objects -> holes in the rug), so
+# an object must differ in COLOUR from the slab's own light around it, not just be saturated
+chrom = F / (F.sum(2, keepdims=True) + 1)
+cs = np.stack([ndi.gaussian_filter(chrom[..., k] * m, 25 * s) / (ndi.gaussian_filter(m, 25 * s) + 1e-6) for k in range(3)], 2)
+dev = np.abs(chrom - cs).sum(2)
+occ = slab & (sat > float(os.environ.get("OCC_SAT", 0.3))) & (dev > float(os.environ.get("OCC_DEV", 0.08)))
 occ = ndi.binary_opening(occ, iterations=max(1, int(2 * s)))
 occ = ndi.binary_dilation(occ, iterations=max(1, int(2 * s))) & slab
 occ_soft = ndi.gaussian_filter(occ.astype(float), 1.0 * s)
