@@ -51,6 +51,20 @@ def shadow(scene_size, c, pos, strength=1.0):
     soft = ndi.gaussian_filter(layer, w * 0.02); tight = ndi.gaussian_filter(contact, 2.5)
     return np.clip(soft * strength * 1.2 + tight * 0.9, 0, 0.92)
 
+def shadow_flat(scene_size, c, pos, light_dx=0.03, ao=0.85, cast=0.4):
+    """Shadow of a FLAT object lying on the floor: (1) ambient-occlusion rim hugging the whole contour (strongest at the bottom/right,
+    where the pile meets the floor) and (2) a soft cast shadow sideways, away from the light - never forward under the front edge
+    (that reads as floating). Everything is computed on the full scene canvas so the blur is not clipped by the bounding box."""
+    W, H = scene_size; x, y = pos
+    a = np.asarray(c.split()[3], dtype=np.float64) / 255
+    h, w = a.shape
+    full = np.zeros((H, W)); full[y:y + h, x:x + w] = a
+    grown = ndi.binary_dilation(full > 0.3, iterations=3).astype(np.float64)
+    ao_l = ndi.shift(ndi.gaussian_filter(grown, 3.5), (3, 2), order=1)
+    ao_l = np.maximum(ao_l, ndi.shift(ndi.gaussian_filter(grown, 9), (5, 3), order=1) * 0.55)
+    cast_l = ndi.shift(ndi.gaussian_filter(full, w * 0.018), (-int(h * 0.04), int(w * light_dx)), order=1)
+    return np.clip(ao_l * ao + cast_l * cast, 0, 0.92)
+
 def composite(scene, c, pos, sh):
     arr = np.asarray(scene.convert("RGB"), dtype=np.float64)
     arr = arr * (1 - sh[..., None] * 0.85)                     # the shadow darkens the floor (multiply)
@@ -67,7 +81,7 @@ if __name__ == "__main__":
     c, pos = place(scene, cut, share, cx, fy)
     c = perspective(c, float(os.environ.get("PERSP", "0")))
     dx = int(c.width * float(os.environ.get("SHDX", "0")))           # light from the window on the left -> shadow shifts right
-    sh = shadow(scene.size, c, (pos[0] + dx, pos[1]))
+    sh = shadow_flat(scene.size, c, pos, light_dx=float(os.environ.get("SHDX", "0.03")))
     comp = composite(scene, c, pos, sh)
     comp.save(out / f"{tag}_composite.png")
     json.dump({"pos": pos, "size": c.size}, open(out / f"{tag}_placement.json", "w"))
