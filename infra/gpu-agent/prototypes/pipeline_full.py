@@ -11,7 +11,7 @@ from pymatting import estimate_foreground_ml
 from safetensors.torch import load_file
 from models.birefnet import BiRefNet
 
-base = Path.home() / "ComfyUI"; out = base / "output/etap0"; arch = out / "_second_tests"
+base = Path.home() / "ComfyUI"; out = base / "output/etap0"; arch = Path(os.environ.get('MASKS', out / '_second_tests'))
 CREAM, RED = np.array((240, 232, 218)) / 255, np.array((176, 32, 42)) / 255
 SIZE, REGION_PX = 1536, 35
 CORE = int(os.environ.get('CORE', 0))   # px (of the 1500 px copy) the solid SAM core is pulled in from the edge; 0 = no core
