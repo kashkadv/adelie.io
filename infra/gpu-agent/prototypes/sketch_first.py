@@ -31,7 +31,11 @@ a = np.asarray(cut.split()[3]) / 255.0
 # 1. sketch with the real product
 sk = Image.open(work / "main.png").convert("RGBA"); sk.alpha_composite(cut); sk = sk.convert("RGB")
 sk.save(work / "sketch.png"); sk.save(INP / f"{name}_sketch.png")
-body = ndi.binary_erosion(a > 0.9, iterations=3)                         # locked: the dense body; the fringe may blend
+# locked = the TOP surface of the product only (cut_flat.png when thickness was added): the pile side and the fringe are left
+# to the model, so it renders them in the room's light (a fibrous side instead of a flat band)
+flat = work / "cut_flat.png"
+top = np.asarray(Image.open(flat).convert("RGBA").split()[3]) / 255.0 if flat.exists() else a
+body = ndi.binary_erosion(top > 0.9, iterations=3)
 Image.fromarray(((~body) * 255).astype(np.uint8)).convert("RGB").save(INP / f"{name}_lock.png")
 p1 = ("Image 1 is a rough mock-up of a room with a real rug lying on the floor. Turn the mock-up into a photorealistic interior, "
       "keeping every object exactly in its place and at its size: the large grey block becomes " + style["sofa"] + ", exactly the "
@@ -60,11 +64,21 @@ for seed in seeds:
     fb = OUT / f"sf_{name}" / [l.split()[-1] for l in o.splitlines() if l.startswith("output:")][0]
     print("seed", seed, "->", fa.name, fb.name)
 free()
-for seed in seeds:
+keep = list(seeds)
+box = work / "main_sofa_box.txt"
+if box.exists():
+    fbs = [sorted((OUT / f"sf_{name}").glob(f"b{s_}_*.png"))[-1] for s_ in seeds]
+    rep_ = run([PY, "-I", str(HERE / "gate_variants.py"), str(work / "cut_c.png"), *map(str, fbs)],
+               env={"ALIGN_MIN": "-1", "PROXY_SOFA": box.read_text().strip(), "PROXY_TOL": os.environ.get("PROXY_TOL", "0.2")})
+    (work / "gates.txt").write_text(rep_); print(rep_)
+    bad = {l.split()[0] for l in rep_.splitlines() if l.strip() and not l.rstrip().endswith(" ok")}
+    keep = [s_ for s_, fb in zip(seeds, fbs) if fb.name not in bad]
+    print("kept seeds:", keep)
+for seed in keep:
     fb = sorted((OUT / f"sf_{name}").glob(f"b{seed}_*.png"))[-1]
     x2 = work / f"sf_b{seed}_x2.png"
     run([PY, "-I", str(HERE / "scene_up2x.py"), str(fb), str(x2)])
-    run([PY, "-I", str(HERE / "blend_into_model.py"), str(x2), str(work / "cut_c.png"), str(OUT / f"{name}_sketch_{seed}.png")],
+    run([PY, "-I", str(HERE / "blend_into_model.py"), str(x2), str(flat if flat.exists() else work / "cut_c.png"), str(OUT / f"{name}_sketch_{seed}.png")],
         env={"SIG": "8", "GMIN": "0.35", "GMAX": "1.25", "IN0": "1", "IN1": "6"})
 shutil.rmtree(work / "sf_raw", ignore_errors=True); shutil.move(str(OUT / f"sf_{name}"), work / "sf_raw")
 print("done")

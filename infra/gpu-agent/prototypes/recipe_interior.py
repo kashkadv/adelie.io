@@ -147,7 +147,7 @@ def main(cfg_path):
     (work / "prompt.txt").write_text(prompt)
     W, H = Image.open(work / "main.png").size; lw, lh = latent_size(W, H)
     variants = []
-    for seed in cfg.get("seeds", list(range(901, 901 + cfg.get("n", 6)))):
+    for seed in cfg.get("seeds", list(range(901, 901 + cfg.get("n", 5)))):
         wf = work / f"wf_{seed}.json"
         run([sys.executable, "-I", str(HERE / "wf_klein.py"), str(wf), str(seed), str(work / "prompt.txt"), f"{lw}x{lh}",
              f"work_{name}/v{seed}", main_in, *refs], env={"STEPS": "8", "START": "1"}, quiet=True)
