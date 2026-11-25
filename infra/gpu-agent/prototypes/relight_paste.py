@@ -6,7 +6,8 @@ Inputs (all the same framing as the product photo):
   cutout.png   - full-frame RGBA cutout of the product from the photo
 Per colour channel, the ratio relit/base is blurred INSIDE the product (sigma 8 px, gain 0.6..1.8) and applied to the original
 pixels: the sun edge, the warm cast and the contact shade come from the model, every fibre and the pattern from the photo.
-Around the product (60 px, soft) the relit frame is taken as is (its contact shadow and bounce).
+Everything outside the product is taken from the relit frame as is: the floor's light and the product's light must come from
+ONE pass, otherwise the sun stripes on the floor and on the product do not line up.
 Usage: relight_paste.py base.png relit.png cutout.png out.png"""
 import sys
 import numpy as np
@@ -21,7 +22,5 @@ a = np.asarray(cut.split()[3]) / 255.0; m = (a > 0.5).astype(float)
 B = np.asarray(base).astype(float); R = np.asarray(relit).astype(float)
 mblur = lambda x, s: ndi.gaussian_filter(x * m, s) / (ndi.gaussian_filter(m, s) + 1e-6)
 ratio = np.stack([np.clip((mblur(R[..., c], 8) + 6) / (mblur(B[..., c], 8) + 6), 0.6, 1.8) for c in range(3)], -1)
-ring = ndi.gaussian_filter(ndi.binary_dilation(m > 0, iterations=60).astype(float), 20)
-out = B * (1 - ring[..., None]) + R * ring[..., None]
-out = out * (1 - a[..., None]) + np.clip(B * ratio, 0, 255) * a[..., None]
+out = R * (1 - a[..., None]) + np.clip(B * ratio, 0, 255) * a[..., None]
 Image.fromarray(out.astype(np.uint8)).save(out_p); print("saved", out_p)
