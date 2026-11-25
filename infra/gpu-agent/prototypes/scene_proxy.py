@@ -52,14 +52,19 @@ box(SW / 2 - arm, SW / 2, y0, y1, 10, 62, 1.0)
 ST = os.environ.get("SIDE_TABLE", "left"); STW, STH = 45.0, 50.0
 if ST in ("left", "right"):
     sx0 = -SW / 2 - 12 - STW if ST == "left" else SW / 2 + 12
-    box(sx0, sx0 + STW, y0 + 10, y0 + 10 + STW, 0, STH, 0.95)
+    # a table, not a cube: a solid block made the model draw a drum (2026-11-25) - top slab on four thin legs
+    ya_, yb_ = y0 + 10, y0 + 10 + STW
+    for lx_, ly_ in ((sx0 + 4, yb_ - 4), (sx0 + STW - 4, yb_ - 4), (sx0 + 4, ya_ + 4), (sx0 + STW - 4, ya_ + 4)):
+        box(lx_ - 1.5, lx_ + 1.5, ly_ - 1.5, ly_ + 1.5, 0, STH - 4, 0.7)
+    box(sx0, sx0 + STW, ya_, yb_, STH - 4, STH, 1.05)
 for lx in (-SW / 2 + 8, SW / 2 - 8):                                    # legs
     dr.polygon([P(lx - 3, y0 + 5, 0), P(lx + 3, y0 + 5, 0), P(lx + 3, y0 + 5, 10), P(lx - 3, y0 + 5, 10)], fill=(90, 70, 50))
 img = img.filter(ImageFilter.GaussianBlur(0.6))
 # the product slab on top (exact silhouette from the placed cutout)
 a = np.asarray(Image.open(cut_p).convert("RGBA").resize((CW, CH)).split()[3]) / 255.0
 slab = (a > 0.5).astype(float)
-arr = np.asarray(img).astype(float); arr = arr * (1 - slab[..., None]) + GREY * slab[..., None]
+MATC = np.array([float(v) for v in os.environ.get("MAT_RGB", "%d,%d,%d" % (GREY, GREY, GREY)).split(",")])   # lime: owner, 2026-11-25
+arr = np.asarray(img).astype(float); arr = arr * (1 - slab[..., None]) + MATC * slab[..., None]
 # armchair on the side of the rug, at 90 degrees to the sofa, facing across the rug (owner, 2026-11-25). Drawn after the slab:
 # it stands up next to the rug, so where they overlap in the picture the chair is in front.
 AC = os.environ.get("ARMCHAIR", "left")

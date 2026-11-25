@@ -13,6 +13,10 @@ from scipy import ndimage as ndi
 
 frame_p, cut_p, out_p = sys.argv[1:4]
 GREY = float(os.environ.get("GREY", 150)); SIG = float(os.environ.get("SIG", 6))
+# MAT_RGB: the placeholder's known colour. Owner, 2026-11-25: a lime mat - no colour like it in a room, so the model's mat is
+# found exactly even in warm sun (a grey one is not), and the product follows the model's own perspective of it
+MAT = np.array([float(v) for v in os.environ.get("MAT_RGB", "%g,%g,%g" % (GREY, GREY, GREY)).split(",")])
+GREY = MAT.mean(); COLOURED = np.ptp(MAT) > 30
 GMIN, GMAX = float(os.environ.get("GMIN", 0.35)), float(os.environ.get("GMAX", 1.25)); CAST = float(os.environ.get("CAST", 0.08))
 F = np.asarray(Image.open(frame_p).convert("RGB")).astype(float); H, W = F.shape[:2]
 cut = Image.open(cut_p).convert("RGBA").resize((W, H), Image.LANCZOS)
@@ -39,7 +43,11 @@ if os.environ.get("FIT", "1") == "1":
     a0 = np.asarray(cut.split()[3]) > 128
     satF = (F.max(2) - F.min(2)) / (F.max(2) + 1)
     near = ndi.binary_dilation(a0, iterations=int(60 * W / 1200))
-    grey = near & (satF < float(os.environ.get("FIT_SAT", 0.2)))
+    if COLOURED:                                                       # the mat's own hue, whatever the light's brightness
+        chF = F / (F.sum(2, keepdims=True) + 1); mc = MAT / MAT.sum()
+        grey = near & (np.abs(chF - mc).sum(2) < float(os.environ.get("FIT_CHROMA", 0.12))) & (F.max(2) > 25)
+    else:
+        grey = near & (satF < float(os.environ.get("FIT_SAT", 0.2)))
     grey = ndi.binary_opening(grey, iterations=3)
     lab, n = ndi.label(grey)
     if n:
@@ -57,6 +65,8 @@ if os.environ.get("FIT", "1") == "1":
             print("fitted to the model's mat: corners", qd.round().astype(int).tolist())
         else:
             print("model's mat not found reliably - planned shape kept")
+if os.environ.get("ALPHA_OUT"):                                        # the product's outline as placed (after the fit)
+    cut.split()[3].save(os.environ["ALPHA_OUT"])
 O = np.asarray(cut.convert("RGB")).astype(float); a = np.asarray(cut.split()[3]) / 255.0
 slab = a > 0.5; s = W / 1200
 inner = ndi.binary_erosion(slab, iterations=max(2, int(4 * s)))       # the slab without its edge (the model's edge shading)
@@ -78,7 +88,7 @@ lv = np.array([gx_[slab].mean(), gy_[slab].mean()]); LDIR = lv / (np.linalg.norm
 RAMP = float(os.environ.get("RAMP", 0.8))
 gain = np.clip(L * ramp ** RAMP, GMIN, GMAX)
 print("room light comes from (x %.2f, y %.2f), ramp over the product %.2f..%.2f" % (LDIR[0], LDIR[1], ramp[slab].min(), ramp[slab].max()))
-col = F[inner].mean(0); col = col / col.mean()                         # colour of the light falling on the grey slab
+col = F[inner].mean(0) / MAT; col = col / col.mean()                   # colour of the light: the slab / its known colour
 cast = np.clip(col, 1 - CAST, 1 + CAST)
 prod = np.clip(O * gain[..., None] * cast, 0, 255)
 # edge against a white halo: the sparse fibres of the edge still carry the photo's light backdrop (cream on cream cannot be
@@ -178,7 +188,10 @@ smooth = ndi.gaussian_filter(lumF * m, 25 * s) / (ndi.gaussian_filter(m, 25 * s)
 chrom = F / (F.sum(2, keepdims=True) + 1)
 cs = np.stack([ndi.gaussian_filter(chrom[..., k] * m, 25 * s) / (ndi.gaussian_filter(m, 25 * s) + 1e-6) for k in range(3)], 2)
 dev = np.abs(chrom - cs).sum(2)
-occ = slab & (sat > float(os.environ.get("OCC_SAT", 0.3))) & (dev > float(os.environ.get("OCC_DEV", 0.08)))
+if COLOURED:   # on a lime mat anything of another hue is an object (a white throw too); shadows keep the hue
+    occ = slab & (dev > float(os.environ.get("OCC_DEV", 0.08)))
+else:
+    occ = slab & (sat > float(os.environ.get("OCC_SAT", 0.3))) & (dev > float(os.environ.get("OCC_DEV", 0.08)))
 occ = ndi.binary_opening(occ, iterations=max(1, int(2 * s)))
 occ = ndi.binary_dilation(occ, iterations=max(1, int(2 * s))) & slab
 occ_soft = ndi.gaussian_filter(occ.astype(float), 1.0 * s)
