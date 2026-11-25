@@ -180,7 +180,8 @@ def boards_fill_global(F, hole):
     print("floor fill along the boards at %.0f deg" % np.degrees(np.arctan2(dy, dx)))
     return out
 
-floor = boards_fill(F, hole) if os.environ.get("FILL", "lama") == "boards" else lama_fill(F, hole)
+FILL = os.environ.get("FILL", "lama")   # none: bare floor under the product - nothing to repaint
+floor = F.copy() if FILL == "none" else boards_fill(F, hole) if FILL == "boards" else lama_fill(F, hole)
 # contact shade: the product's silhouette, softly blurred and nudged away from the light, darkens the floor at the edge and
 # behind the see-through fringe (warm-brown, not grey)
 CON = float(os.environ.get("CONTACT", 0.35))

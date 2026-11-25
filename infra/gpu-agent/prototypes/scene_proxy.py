@@ -62,7 +62,7 @@ for lx in (-SW / 2 + 8, SW / 2 - 8):                                    # legs
 img = img.filter(ImageFilter.GaussianBlur(0.6))
 # the product slab on top (exact silhouette from the placed cutout)
 a = np.asarray(Image.open(cut_p).convert("RGBA").resize((CW, CH)).split()[3]) / 255.0
-slab = (a > 0.5).astype(float)
+slab = (a > 0.5).astype(float) * (os.environ.get("SLAB", "1") == "1")   # SLAB=0: bare floor, no placeholder (owner's variant)
 MATC = np.array([float(v) for v in os.environ.get("MAT_RGB", "%d,%d,%d" % (GREY, GREY, GREY)).split(",")])   # lime: owner, 2026-11-25
 arr = np.asarray(img).astype(float); arr = arr * (1 - slab[..., None]) + MATC * slab[..., None]
 # armchair on the side of the rug, at 90 degrees to the sofa, facing across the rug (owner, 2026-11-25). Drawn after the slab:
