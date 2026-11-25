@@ -19,6 +19,7 @@
 | [plans/content-calendar.md](plans/content-calendar.md) | Календар публікацій і огляд тижня (в роботі) |
 | [plans/niche-research.md](plans/niche-research.md) | Дослідження ніш: що просувати й як писати (в роботі) |
 | [plans/pin-workshop.md](plans/pin-workshop.md) | Майстерня публікацій: візуал, шаблони Figma, текст, GPU-воркер (план) |
+| [plans/product-studio.md](plans/product-studio.md) | Студія фото виробів: «новий інтер'єр», розмір і ракурс, набір для порівняння (план) |
 | [plans/stage-2-data-model.md](plans/stage-2-data-model.md) | Етап 2: модель даних соцмереж і метрик (узгоджено) |
 | [plans/mvp-discussion.md](plans/mvp-discussion.md) | Обговорення обсягу MVP і стеку (завершено) |
 | [plans/infra-discussion.md](plans/infra-discussion.md) | Обговорення інфраструктури на домашньому Proxmox (в роботі) |
