@@ -13,9 +13,50 @@ from scipy import ndimage as ndi
 
 frame_p, cut_p, out_p = sys.argv[1:4]
 GREY = float(os.environ.get("GREY", 150)); SIG = float(os.environ.get("SIG", 6))
-GMIN, GMAX = float(os.environ.get("GMIN", 0.55)), float(os.environ.get("GMAX", 1.25)); CAST = float(os.environ.get("CAST", 0.08))
+GMIN, GMAX = float(os.environ.get("GMIN", 0.35)), float(os.environ.get("GMAX", 1.25)); CAST = float(os.environ.get("CAST", 0.08))
 F = np.asarray(Image.open(frame_p).convert("RGB")).astype(float); H, W = F.shape[:2]
 cut = Image.open(cut_p).convert("RGBA").resize((W, H), Image.LANCZOS)
+def quad_of(mask):
+    """4 corners (TL, TR, BR, BL) of a roughly quadrilateral mask: convex hull reduced to 4 points losing the least area."""
+    from scipy.spatial import ConvexHull
+    ys, xs = np.nonzero(mask); pts = np.stack([xs, ys], 1).astype(float); q = pts[ConvexHull(pts).vertices]
+    ar = lambda p: 0.5 * abs(np.dot(p[:, 0], np.roll(p[:, 1], 1)) - np.dot(p[:, 1], np.roll(p[:, 0], 1)))
+    while len(q) > 4:
+        q = np.delete(q, int(np.argmin([ar(q) - ar(np.delete(q, i, 0)) for i in range(len(q))])), 0)
+    c = q.mean(0); q = q[np.argsort(np.arctan2(q[:, 1] - c[1], q[:, 0] - c[0]))]
+    return np.roll(q, -int(np.argmin(q.sum(1))), 0)
+
+def homography(src, dst):
+    A = []
+    for (x, y), (u, v) in zip(src, dst):
+        A += [[x, y, 1, 0, 0, 0, -u * x, -u * y, -u], [0, 0, 0, x, y, 1, -v * x, -v * y, -v]]
+    _, _, vt = np.linalg.svd(np.array(A)); return vt[-1].reshape(3, 3) / vt[-1][-1]
+
+GREYMASK = None
+if os.environ.get("FIT", "1") == "1":
+    # follow the MODEL's perspective: find where it actually drew the grey mat (low saturation, near the planned place) and
+    # warp the product onto those 4 corners - the room and the product then share one perspective
+    a0 = np.asarray(cut.split()[3]) > 128
+    satF = (F.max(2) - F.min(2)) / (F.max(2) + 1)
+    near = ndi.binary_dilation(a0, iterations=int(60 * W / 1200))
+    grey = near & (satF < float(os.environ.get("FIT_SAT", 0.2)))
+    grey = ndi.binary_opening(grey, iterations=3)
+    lab, n = ndi.label(grey)
+    if n:
+        sizes = ndi.sum(grey, lab, range(1, n + 1)); grey = lab == (1 + int(np.argmax(sizes)))
+        grey = ndi.binary_closing(grey, iterations=15)
+        GREYMASK = grey
+        qs = quad_of(a0); qd = quad_of(grey) if grey.sum() > 0.5 * a0.sum() else qs
+        span = np.ptp(qs[:, 0]); move = np.abs(qd - qs).max() / span
+        ratio = grey.sum() / a0.sum()
+        if move > float(os.environ.get("FIT_MAX_MOVE", 0.12)) or not (0.75 < ratio < 1.35):
+            print("model's mat shape off (corner move %.2f, area %.2f) - planned shape kept" % (move, ratio)); qd = qs
+        if True:
+            Hm = homography(qs, qd); Hi = np.linalg.inv(Hm); Hi /= Hi[2, 2]
+            cut = cut.transform((W, H), Image.PERSPECTIVE, tuple(Hi.flatten()[:8]), Image.BICUBIC)
+            print("fitted to the model's mat: corners", qd.round().astype(int).tolist())
+        else:
+            print("model's mat not found reliably - planned shape kept")
 O = np.asarray(cut.convert("RGB")).astype(float); a = np.asarray(cut.split()[3]) / 255.0
 slab = a > 0.5; s = W / 1200
 inner = ndi.binary_erosion(slab, iterations=max(2, int(4 * s)))       # the slab without its edge (the model's edge shading)
@@ -48,7 +89,7 @@ fr = a < 0.97
 a = np.where(fr, a ** EG, a)
 prod = prod * (1 - ED * (1 - a))[..., None]
 # floor under the product: repaint the slab + a thin band from the floor around it (LaMa sees the floor only)
-hole = ndi.binary_dilation(slab | (a > 0.05), iterations=max(6, int(int(os.environ.get('BAND', 18)) * s)))   # wide enough to swallow the model's dark rim around the grey slab
+hole = ndi.binary_dilation(slab | (a > 0.05) | (GREYMASK if GREYMASK is not None else False), iterations=max(6, int(int(os.environ.get('BAND', 18)) * s)))   # wide enough to swallow the model's dark rim around the grey slab
 def lama_fill(F, hole):
     lama = torch.jit.load(str(Path.home() / "ComfyUI/models/lama/big-lama.pt"), map_location="cuda").eval()
     ys, xs = np.nonzero(hole); mg = int(80 * s)
@@ -63,6 +104,37 @@ def lama_fill(F, hole):
     out = F.copy(); out[y0:y1, x0:x1][mk] = fill[mk]; return out
 
 def boards_fill(F, hole):
+    return boards_fill_local(F, hole)
+
+def boards_fill_local(F, hole):
+    """Boards converge in perspective: the direction is taken LOCALLY (structure tensor, sigma ~40 px) from the floor around,
+    carried into the hole from the nearest floor pixel, and each hole pixel copies the floor along its own direction."""
+    ring = ndi.binary_dilation(hole, iterations=int(70 * s)) & ~hole
+    g = ndi.gaussian_filter(F.mean(2), 1.5); gy, gx = np.gradient(g); wt = ring.astype(float); S = 40 * s
+    Jxx = ndi.gaussian_filter(gx * gx * wt, S); Jyy = ndi.gaussian_filter(gy * gy * wt, S); Jxy = ndi.gaussian_filter(gx * gy * wt, S)
+    th = 0.5 * np.arctan2(2 * Jxy, Jxx - Jyy)
+    idx = ndi.distance_transform_edt(~ring, return_distances=False, return_indices=True)
+    th = th[idx[0], idx[1]]
+    need = hole & (a < 0.995)
+    ys, xs = np.nonzero(need); dx, dy = -np.sin(th[ys, xs]), np.cos(th[ys, xs])
+    acc = np.zeros((len(ys), 3)); wsum = np.zeros(len(ys))
+    for sign in (1, -1):
+        px, py = xs.astype(float), ys.astype(float); alive = np.ones(len(ys), bool)
+        for step in range(1, int(500 * s)):
+            px += sign * dx; py += sign * dy
+            ix, iy = np.round(px).astype(int), np.round(py).astype(int)
+            alive &= (ix >= 0) & (iy >= 0) & (ix < W) & (iy < H)
+            ixc, iyc = np.clip(ix, 0, W - 1), np.clip(iy, 0, H - 1)
+            hit = alive & ~hole[iyc, ixc]
+            acc[hit] += F[iyc[hit], ixc[hit]] / step; wsum[hit] += 1 / step; alive &= ~hit
+            if not alive.any(): break
+    out = F.copy(); ok = wsum > 0
+    out[ys[ok], xs[ok]] = acc[ok] / wsum[ok, None]
+    left = need.copy(); left[ys[ok], xs[ok]] = False
+    if left.any(): out = lama_fill(out, left)
+    return out
+
+def boards_fill_global(F, hole):
     """Floor boards: continue the floor ALONG its own direction (seams and grain stay straight) - each hole pixel takes the
     nearest floor pixels in both directions along the dominant orientation of the floor texture around the hole."""
     ring = ndi.binary_dilation(hole, iterations=int(60 * s)) & ~hole
@@ -101,7 +173,7 @@ floor = floor * (1 - shade[..., None] * np.array([1.0, 1.06, 1.15]))
 # the light is warm at most; an object is clearly coloured (saturated) or much darker than the slab's smooth light.
 sat = (F.max(2) - F.min(2)) / (F.max(2) + 1)
 smooth = ndi.gaussian_filter(lumF * m, 25 * s) / (ndi.gaussian_filter(m, 25 * s) + 1e-6)
-occ = slab & ((sat > float(os.environ.get("OCC_SAT", 0.3))) | (lumF < 0.55 * smooth))
+occ = slab & (sat > float(os.environ.get("OCC_SAT", 0.3)))     # coloured objects only; dark grey = shadow ON the product
 occ = ndi.binary_opening(occ, iterations=max(1, int(2 * s)))
 occ = ndi.binary_dilation(occ, iterations=max(1, int(2 * s))) & slab
 occ_soft = ndi.gaussian_filter(occ.astype(float), 1.0 * s)
