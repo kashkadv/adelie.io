@@ -78,7 +78,13 @@ def main(cfg_path):
     # 4. main image for the model
     import numpy as np
     cut = Image.open(work / "cut.png"); ph = Image.open(photo)
-    if cfg["placement"] == "floor":
+    if cfg["placement"] == "floor" and cfg.get("rectify"):
+        r = cfg["rectify"]                                   # real size + rotation on the floor + camera (rectify_place.py)
+        run([PY, "-I", str(HERE / "rectify_place.py"), str(photo), str(work / "cut.png"), str(work / "photo_c.png"), str(work / "cut_c.png")],
+            env={"SIZE": r["size_cm"], "ROT": str(r.get("rot", 0)), "ELEV": str(r.get("elev", 50)),
+                 "ROOM_CM": str(r.get("room_cm", 380)), "CANVAS": r.get("canvas", "1200x1800")})
+        run([PY, "-I", str(HERE / "neutral_base.py"), str(work / "photo_c.png"), str(work / "cut_c.png"), str(work / "main.png")])
+    elif cfg["placement"] == "floor":
         a = np.asarray(cut.split()[3]) > 128; ys, xs = np.nonzero(a)
         pw = (xs.max() - xs.min()) / cfg.get("product_share", 0.7); ar = cfg.get("aspect", 2 / 3)
         fw, fh = pw, pw / ar; cx = (xs.max() + xs.min()) / 2; cy = (ys.max() + ys.min()) / 2
