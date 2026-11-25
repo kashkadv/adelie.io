@@ -2,7 +2,9 @@
 OUTSIDE and at the very EDGE of the product (its contact shade, its edge and fringe are consistent with the room), and the
 ORIGINAL product pixels, relit by the model's light (per channel, blurred inside the product), take over a few px inside the
 edge. Pattern and texture of the body come from the photo; there is one edge only, so no halo and no 'sandwich'.
-Env: SIG (light blur, px, default 12), IN0/IN1 (fade starts/ends this many px inside the edge, default 3/15).
+Env: SIG (light blur, px, default 12), IN0/IN1 (fade starts/ends this many px inside the edge, default 3/15),
+OUTSIDE (a frame with the model's product removed - clean_leftover.py - used outside the original contour, so a product the model
+drew bigger/thicker does not peek out: the 'burger' edge), CONTACT (contact shade strength under the edge when OUTSIDE is used).
 Usage: blend_into_model.py model_frame.png cutout_full_frame.png out.png"""
 import os, sys
 import numpy as np
@@ -21,4 +23,10 @@ relit = np.clip(O * ratio, 0, 255)
 d = ndi.distance_transform_edt(body)
 w = (np.clip((d - IN0) / (IN1 - IN0), 0, 1) * a)[..., None]
 out = M * (1 - w) + relit * w
+if os.environ.get("OUTSIDE"):
+    C = np.asarray(Image.open(os.environ["OUTSIDE"]).convert("RGB").resize((W, H), Image.LANCZOS)).astype(float)
+    k = float(os.environ.get("CONTACT", 0.35))
+    shade = ndi.gaussian_filter((a > 0.4).astype(float), 2.5 * W / 1824)
+    C = C * (1 - k * shade[..., None] * np.array([1.0, 1.05, 1.12]))
+    out = C * (1 - a[..., None]) + out * a[..., None]
 Image.fromarray(out.astype(np.uint8)).save(out_p); print("saved", out_p)
