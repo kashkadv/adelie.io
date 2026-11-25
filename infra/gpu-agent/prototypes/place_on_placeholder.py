@@ -89,7 +89,7 @@ fr = a < 0.97
 a = np.where(fr, a ** EG, a)
 prod = prod * (1 - ED * (1 - a))[..., None]
 # floor under the product: repaint the slab + a thin band from the floor around it (LaMa sees the floor only)
-hole = ndi.binary_dilation(slab | (a > 0.05) | (GREYMASK if GREYMASK is not None else False), iterations=max(6, int(int(os.environ.get('BAND', 18)) * s)))   # wide enough to swallow the model's dark rim around the grey slab
+hole = ndi.binary_dilation(slab | (a > 0.05) | (GREYMASK if GREYMASK is not None else False), iterations=max(6, int(int(os.environ.get('BAND', 34)) * s)))   # wide enough to swallow the model's dark rim around the grey slab
 def lama_fill(F, hole):
     lama = torch.jit.load(str(Path.home() / "ComfyUI/models/lama/big-lama.pt"), map_location="cuda").eval()
     ys, xs = np.nonzero(hole); mg = int(80 * s)
@@ -160,7 +160,7 @@ def boards_fill_global(F, hole):
     print("floor fill along the boards at %.0f deg" % np.degrees(np.arctan2(dy, dx)))
     return out
 
-floor = boards_fill(F, hole) if os.environ.get("FILL", "boards") == "boards" else lama_fill(F, hole)
+floor = boards_fill(F, hole) if os.environ.get("FILL", "lama") == "boards" else lama_fill(F, hole)
 # contact shade: the product's silhouette, softly blurred and nudged away from the light, darkens the floor at the edge and
 # behind the see-through fringe (warm-brown, not grey)
 CON = float(os.environ.get("CONTACT", 0.35))
