@@ -33,3 +33,11 @@ BiRefNet HR-matting (1536 px, fp16) на обрізку → відсів від�
 
 Третій режим — `HARD=1.0` («різкий край»): альфа береться із суцільної маски SAM з розтушовкою 1 px, без матингу. Для виробів із
 чітким краєм, де світла облямівка лежить на світлій стіні (ткане ліжник): матинг там розмазує край шлейфом.
+
+## Нова сцена (SDXL)
+
+`wf_scene.py txt2img out.json <seed>` / `wf_scene.py img2img out.json <image_in_ComfyUI_input> <seed> <denoise>` — API-воркфлоу
+SDXL; `comfy_run.py wf.json` — виконує його на локальному ComfyUI (`127.0.0.1:8188`) і друкує час та файли;
+`compose_scene.py scene.png cutout.png tag <частка_ширини> <cx> <низ_виробу_y>` — ставить вирізку на підлогу з тінню;
+`paste_back.py harmonised.png cutout_scaled.png placement.json out.png` — повертає оригінальні пікселі виробу.
+Запускати у `~/ComfyUI/venv` (numpy/scipy/PIL).
