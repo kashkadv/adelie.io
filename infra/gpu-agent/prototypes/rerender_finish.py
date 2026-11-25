@@ -19,7 +19,13 @@ band = ndi.gaussian_filter(ndi.binary_dilation(a, iterations=EDGE + BAND).astype
 lum = lambda X: ndi.gaussian_filter(X.mean(2), SIG)
 gain = np.clip((lum(R) + 1) / (lum(B) + 1), GMIN, GMAX)[..., None]
 floor = np.clip(B * gain, 0, 255)                                      # sharp floor, the model's light and contact shadow
-out = R * (1 - band) + floor * band                                    # far away: R (= B up to the model's light)
+# take B only where it shows the same thing as R: where the model moved something (a throw lifted off the rug, a repainted
+# patch) B would leave a ghost - there R stays (2026-11-25: torn throw fringe between the sofa and the rug)
+AGREE = float(os.environ.get("AGREE", 14))
+d = ndi.gaussian_filter(np.abs(floor - R).mean(2), 4)
+agree = ndi.gaussian_filter((d < AGREE).astype(float), 3)[..., None]
+band = band * agree
+out = R * (1 - band) + floor * band                                   # far away: R (= B up to the model's light)
 out = out * (1 - rug) + R * rug                                        # the rug: the model's
 Image.fromarray(out.clip(0, 255).astype(np.uint8)).save(out_p)
 print("rug from the model, %d px floor band from the composite, saved %s" % (BAND, out_p))
