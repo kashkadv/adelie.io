@@ -37,7 +37,50 @@ def homography(src, dst):
     _, _, vt = np.linalg.svd(np.array(A)); return vt[-1].reshape(3, 3) / vt[-1][-1]
 
 GREYMASK = None
-if os.environ.get("FIT", "1") == "1":
+def boards_vp(F, a0):
+    """Vanishing point of the floorboards around the product (structure tensor on tiles, RANSAC): the product's sides that run
+    into depth must meet there too. Bare-floor mode has no mat to follow, so the floor itself gives the model's perspective."""
+    L_ = ndi.gaussian_filter(F.mean(2), 1.2); gy, gx = np.gradient(L_); H_, W_ = L_.shape
+    ys_ = np.nonzero(a0)[0]; floor = np.zeros_like(a0); floor[max(0, ys_.min() - 40):] = True
+    floor &= ~ndi.binary_dilation(a0, iterations=25); T = int(48 * W_ / 1664) or 16; S = []
+    for y in range(max(0, ys_.min() - 40), H_ - T, T // 2):
+        for x in range(0, W_ - T, T // 2):
+            if floor[y:y + T, x:x + T].mean() < 0.9: continue
+            sx, sy = gx[y:y + T, x:x + T], gy[y:y + T, x:x + T]
+            Jxx, Jyy, Jxy = (sx * sx).sum(), (sy * sy).sum(), (sx * sy).sum()
+            l0, l1 = np.linalg.eigvalsh([[Jxx, Jxy], [Jxy, Jyy]]); coh = (l1 - l0) / (l1 + l0 + 1e-9)
+            th = 0.5 * np.arctan2(2 * Jxy, Jxx - Jyy) + np.pi / 2; d = np.array([np.cos(th), np.sin(th)])
+            if d[1] < 0: d = -d
+            if coh > 0.5 and abs(d[0]) < 0.8: S.append((x + T / 2, y + T / 2, d[0], d[1], coh))
+    S = np.array(S)
+    if len(S) < 30: return None, 0
+    def solve(Q):
+        N = np.stack([Q[:, 3], -Q[:, 2]], 1); w = Q[:, 4]
+        return np.linalg.lstsq(N * w[:, None], (N * Q[:, :2]).sum(1) * w, rcond=None)[0]
+    rng = np.random.default_rng(0); best = None
+    for _ in range(400):
+        v = solve(S[rng.choice(len(S), 2, replace=False)])
+        to = v[None] - S[:, :2]; to /= np.linalg.norm(to, axis=1)[:, None] + 1e-9
+        inl = np.abs(to[:, 0] * S[:, 3] - to[:, 1] * S[:, 2]) < 0.03
+        if best is None or inl.sum() > best.sum(): best = inl
+    return solve(S[best]), best.mean()
+
+if os.environ.get("FIT") == "vp":
+    # bare floor: keep the product's depth (its near and far edge rows) and centre, turn its sides towards the boards' VP
+    a0 = np.asarray(cut.split()[3]) > 128; qs = quad_of(a0); vp, share = boards_vp(F, a0)
+    if vp is not None and share > 0.3:
+        qd = qs.copy(); ym = qs[:, 1].mean()
+        for (i, j) in ((0, 3), (1, 2)):                                  # left side TL-BL, right side TR-BR
+            p, q = qs[i], qs[j]; xm = p[0] + (q[0] - p[0]) * (ym - p[1]) / (q[1] - p[1])   # the side at mid depth
+            for k in (i, j):
+                t = (qs[k, 1] - vp[1]) / (ym - vp[1]); qd[k] = [vp[0] + t * (xm - vp[0]), qs[k, 1]]
+        Hm = homography(qs, qd); Hi = np.linalg.inv(Hm); Hi /= Hi[2, 2]
+        cut = cut.transform((W, H), Image.PERSPECTIVE, tuple(Hi.flatten()[:8]), Image.BICUBIC)
+        print("sides turned to the boards' vanishing point (%.0f, %.0f), %.0f%% of floor tiles agree; corners %s"
+              % (vp[0], vp[1], 100 * share, qd.round().astype(int).tolist()))
+    else:
+        print("boards' vanishing point not found reliably - planned shape kept")
+elif os.environ.get("FIT", "1") == "1":
     # follow the MODEL's perspective: find where it actually drew the grey mat (low saturation, near the planned place) and
     # warp the product onto those 4 corners - the room and the product then share one perspective
     a0 = np.asarray(cut.split()[3]) > 128
