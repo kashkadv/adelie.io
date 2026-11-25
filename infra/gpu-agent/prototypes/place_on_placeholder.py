@@ -32,25 +32,53 @@ cast = np.clip(col, 1 - CAST, 1 + CAST)
 prod = np.clip(O * gain[..., None] * cast, 0, 255)
 # floor under the product: repaint the slab + a thin band from the floor around it (LaMa sees the floor only)
 hole = ndi.binary_dilation(slab | (a > 0.05), iterations=max(6, int(int(os.environ.get('BAND', 18)) * s)))   # wide enough to swallow the model's dark rim around the grey slab
-lama = torch.jit.load(str(Path.home() / "ComfyUI/models/lama/big-lama.pt"), map_location="cuda").eval()
-ys, xs = np.nonzero(hole); mg = int(80 * s)
-y0, y1, x0, x1 = max(0, ys.min() - mg), min(H, ys.max() + mg), max(0, xs.min() - mg), min(W, xs.max() + mg)
-crop, mk = F[y0:y1, x0:x1] / 255, hole[y0:y1, x0:x1]
-h, w = mk.shape; ph, pw = (-h) % 8, (-w) % 8
-img = np.pad(crop.transpose(2, 0, 1), ((0, 0), (0, ph), (0, pw)), mode="reflect")
-mm = np.pad(mk.astype(np.float32)[None], ((0, 0), (0, ph), (0, pw)), mode="reflect")
-with torch.inference_mode():
-    res = lama(torch.from_numpy(img).float()[None].cuda(), (torch.from_numpy(mm)[None].cuda() > 0).float())
-fill = res[0].permute(1, 2, 0).cpu().numpy()[:h, :w].clip(0, 1) * 255
-floor = F.copy(); floor[y0:y1, x0:x1][mk] = fill[mk]
-# keep the model's contact shade right at the slab edge: darken the repainted floor by the shade the model drew there
-edge = ndi.binary_dilation(slab, iterations=max(3, int(8 * s))) & ~slab
-ref = ndi.binary_dilation(slab, iterations=max(6, int(24 * s))) & ~ndi.binary_dilation(slab, iterations=max(4, int(14 * s)))
-if edge.any() and ref.any():
-    # a soft warm contact shade under the product edge, strength from the model's own shade at the slab edge (capped)
-    k = np.clip(lumF[edge].mean() / max(lumF[ref].mean(), 1), 0.75, 1.0)
-    shade = ndi.gaussian_filter((a > 0.3).astype(float), 3 * s) * (1 - (a > 0.3)) * (1 - k) * 1.5
-    floor *= (1 - shade[..., None] * np.array([1.0, 1.05, 1.12]))
+def lama_fill(F, hole):
+    lama = torch.jit.load(str(Path.home() / "ComfyUI/models/lama/big-lama.pt"), map_location="cuda").eval()
+    ys, xs = np.nonzero(hole); mg = int(80 * s)
+    y0, y1, x0, x1 = max(0, ys.min() - mg), min(H, ys.max() + mg), max(0, xs.min() - mg), min(W, xs.max() + mg)
+    crop, mk = F[y0:y1, x0:x1] / 255, hole[y0:y1, x0:x1]
+    h, w = mk.shape; ph, pw = (-h) % 8, (-w) % 8
+    img = np.pad(crop.transpose(2, 0, 1), ((0, 0), (0, ph), (0, pw)), mode="reflect")
+    mm = np.pad(mk.astype(np.float32)[None], ((0, 0), (0, ph), (0, pw)), mode="reflect")
+    with torch.inference_mode():
+        res = lama(torch.from_numpy(img).float()[None].cuda(), (torch.from_numpy(mm)[None].cuda() > 0).float())
+    fill = res[0].permute(1, 2, 0).cpu().numpy()[:h, :w].clip(0, 1) * 255
+    out = F.copy(); out[y0:y1, x0:x1][mk] = fill[mk]; return out
+
+def boards_fill(F, hole):
+    """Floor boards: continue the floor ALONG its own direction (seams and grain stay straight) - each hole pixel takes the
+    nearest floor pixels in both directions along the dominant orientation of the floor texture around the hole."""
+    ring = ndi.binary_dilation(hole, iterations=int(60 * s)) & ~hole
+    g = ndi.gaussian_filter(F.mean(2), 1.5); gy, gx = np.gradient(g); wt = ring.astype(float)
+    Jxx, Jyy, Jxy = (gx * gx * wt).sum(), (gy * gy * wt).sum(), (gx * gy * wt).sum()
+    th = 0.5 * np.arctan2(2 * Jxy, Jxx - Jyy); dx, dy = -np.sin(th), np.cos(th)       # along the boards
+    need = hole & (a < 0.995)
+    ys, xs = np.nonzero(need); acc = np.zeros((len(ys), 3)); wsum = np.zeros(len(ys))
+    for sign in (1, -1):
+        px, py = xs.astype(float), ys.astype(float); alive = np.ones(len(ys), bool)
+        for step in range(1, int(400 * s)):
+            px += sign * dx; py += sign * dy
+            ix, iy = np.round(px).astype(int), np.round(py).astype(int)
+            alive &= (ix >= 0) & (iy >= 0) & (ix < W) & (iy < H)
+            ixc, iyc = np.clip(ix, 0, W - 1), np.clip(iy, 0, H - 1)
+            hit = alive & ~hole[iyc, ixc]
+            acc[hit] += F[iyc[hit], ixc[hit]] / step; wsum[hit] += 1 / step; alive &= ~hit
+            if not alive.any(): break
+    out = F.copy(); ok = wsum > 0
+    out[ys[ok], xs[ok]] = acc[ok] / wsum[ok, None]
+    left = need.copy(); left[ys[ok], xs[ok]] = False
+    if left.any(): out = lama_fill(out, left)
+    print("floor fill along the boards at %.0f deg" % np.degrees(np.arctan2(dy, dx)))
+    return out
+
+floor = boards_fill(F, hole) if os.environ.get("FILL", "boards") == "boards" else lama_fill(F, hole)
+# contact shade: the product's silhouette, softly blurred and nudged away from the light, darkens the floor at the edge and
+# behind the see-through fringe (warm-brown, not grey)
+CON = float(os.environ.get("CONTACT", 0.35))
+sil = ndi.gaussian_filter((a > 0.3).astype(float), 4 * s)
+sil = ndi.shift(sil, (2.5 * s, 1.5 * s), order=1)
+shade = np.clip(sil * (1 - 0.6 * a), 0, 1) * CON
+floor = floor * (1 - shade[..., None] * np.array([1.0, 1.06, 1.15]))
 out = floor * (1 - a[..., None]) + prod * a[..., None]
 Image.fromarray(out.clip(0, 255).astype(np.uint8)).save(out_p)
 print("light gain %.2f..%.2f, light colour %s, saved %s" % (gain[slab].min(), gain[slab].max(), np.round(cast, 3), out_p))
