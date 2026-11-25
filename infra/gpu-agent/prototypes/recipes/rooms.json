@@ -1,0 +1,7 @@
+{
+  "_doc": "Room sets (owner, 2026-11-25): which furniture goes together, what it is made of, where it stands relative to the product, and what may stand next to it. two_stage.py adds the chosen set (env ROOM) to the room prompt; the proxy (scene_proxy.py) carries the same layout as geometry.",
+  "living_front": {
+    "proxy": "sofa",
+    "text": "Room set - a living room with the rug in front of the sofa. All furniture shares one soft, cosy character and one material family: a soft upholstered sofa, and if there is an armchair it is also soft and upholstered in a matching or complementary fabric, never a hard wooden chair; all wood is the same warm oak tone. Layout: the sofa stands centred against the back wall; the rug lies centred in front of the sofa, parallel to it; a low coffee table stands beside the sofa on the bare floor next to one arm, not on the rug and not in front of the sofa; a side lamp stands on it or on a small table at the other arm; a sideboard or a low shelf stands against a wall; a tall plant stands in a corner. The floor around the rug stays open: no table, chair, basket or object stands on or overlaps the rug."
+  }
+}
