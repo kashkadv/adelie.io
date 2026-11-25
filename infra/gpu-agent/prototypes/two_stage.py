@@ -31,12 +31,18 @@ def klein(seed, prompt_file, image, prefix, start):
     o = run([sys.executable, "-I", HERE / "comfy_run.py", wf])
     return raw / [l.split()[-1] for l in o.splitlines() if l.startswith("output:")][0]
 
+# well-built objects (owner, 2026-11-25: furniture, walls and curtains sometimes come out broken or warped). klein runs at
+# cfg 1 - no negative prompt - so this says what correct looks like instead of what to avoid.
+STRUCTURE = ("Every object is well built and physically correct, like real manufactured furniture: straight, evenly spaced legs "
+             "standing firmly on the floor, crisp straight edges and right-angled corners, a symmetrical sofa with matching arms "
+             "and cushions, straight vertical wall corners and a straight ceiling line, rectangular picture frames, a straight "
+             "curtain rod with evenly hanging curtains in natural soft folds, plants with natural leaves and stems.")
 room = style["room"].replace("professional architectural photography, ", "").replace("35mm lens, ", "")
 pA = ("Image 1 is a rough grey block mock-up of a room seen from standing height. Turn it into a photorealistic, richly detailed "
       "interior, keeping the camera and the layout: the large grey block becomes " + style["sofa"] + " of the same size in the "
       "same place; the light area at the top becomes the wall; the floor becomes " + style["floor"] + " running in the same "
       "direction; the flat grey rectangle on the floor stays a plain flat matte grey mat in exactly the same place, size and "
-      "shape, nothing on it. " + room + " No other rugs or carpets anywhere. No people, no text, no logos.")
+      "shape, nothing on it. " + room + " " + STRUCTURE + " No other rugs or carpets anywhere. No people, no text, no logos.")
 pC = ("Keep this photograph exactly as it is: the same room, furniture, rug, colours and composition. Only make the light natural "
       "and consistent: the light and shadows of the room fall naturally across the rug lying on the floor, the rug's fluffy wool "
       "edge is lit like the room, with a soft contact shadow along its edges.")

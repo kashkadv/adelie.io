@@ -5,9 +5,13 @@ import json, os, sys
 
 def build(seed, prompt, w, h, prefix, images, steps=4, main_mp=1.0, ref_mp=0.6, start=0):
     """start > 0: begin from the MAIN image itself (its latent) and skip the first `start` steps - keeps the composition."""
+    # KLEIN=9b: the 9B model (FLUX Non-Commercial License - comparison only, not for publishing) with its Qwen3-8B encoder
+    big = os.environ.get("KLEIN", "4b") == "9b"
     g = {
-        "unet": {"class_type": "UNETLoader", "inputs": {"unet_name": "flux-2-klein-4b-fp8.safetensors", "weight_dtype": "default"}},
-        "clip": {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen_3_4b.safetensors", "type": "flux2"}},
+        "unet": {"class_type": "UNETLoader", "inputs": {"unet_name": "flux-2-klein-9b-fp8.safetensors" if big else "flux-2-klein-4b-fp8.safetensors",
+                                                         "weight_dtype": "default"}},
+        "clip": {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen_3_8b_fp8mixed.safetensors" if big else "qwen_3_4b.safetensors",
+                                                         "type": "flux2"}},
         "vae": {"class_type": "VAELoader", "inputs": {"vae_name": "flux2-vae.safetensors"}},
         "pos": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["clip", 0]}},
         "neg": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["pos", 0]}},
