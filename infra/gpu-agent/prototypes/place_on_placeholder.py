@@ -42,10 +42,13 @@ if os.environ.get("FIT", "1") == "1":
     # warp the product onto those 4 corners - the room and the product then share one perspective
     a0 = np.asarray(cut.split()[3]) > 128
     satF = (F.max(2) - F.min(2)) / (F.max(2) + 1)
-    near = ndi.binary_dilation(a0, iterations=int(60 * W / 1200))
+    near = ndi.binary_dilation(a0, iterations=int(float(os.environ.get("FIT_NEAR", 130)) * W / 1200))   # the model may draw a corner ~10% off
     if COLOURED:                                                       # the mat's own hue, whatever the light's brightness
         chF = F / (F.sum(2, keepdims=True) + 1); mc = MAT / MAT.sum()
         grey = near & (np.abs(chF - mc).sum(2) < float(os.environ.get("FIT_CHROMA", 0.12))) & (F.max(2) > 25)
+    elif GREY > 190:                                                   # off-white mat: warm sun makes it cream, but it keeps
+        brF = (F[..., 2] + 1) / (F[..., 0] + 1)                        # far more blue than the oak floor (B/R ~0.8 vs ~0.57)
+        grey = near & (brF > float(os.environ.get("FIT_BR", 0.74))) & (F.mean(2) > 120)
     else:
         grey = near & (satF < float(os.environ.get("FIT_SAT", 0.2)))
     grey = ndi.binary_opening(grey, iterations=3)
@@ -54,6 +57,13 @@ if os.environ.get("FIT", "1") == "1":
         sizes = ndi.sum(grey, lab, range(1, n + 1)); grey = lab == (1 + int(np.argmax(sizes)))
         grey = ndi.binary_closing(grey, iterations=15)
         GREYMASK = grey
+        if GREY > 190 and not COLOURED:
+            # the mat's shaded side face is less blue than its top: catch it for the repaint (not for the fit), else it stays as
+            # a white 'base layer' under the rug's edge (2026-11-25)
+            side = near & ((F[..., 2] + 1) / (F[..., 0] + 1) > float(os.environ.get("SIDE_BR", 0.64))) & (F.mean(2) > 80)
+            lab2, _ = ndi.label(side | grey)
+            keep = np.unique(lab2[ndi.binary_dilation(grey, iterations=3)]); keep = keep[keep > 0]
+            GREYMASK = np.isin(lab2, keep) | grey
         qs = quad_of(a0); qd = quad_of(grey) if grey.sum() > 0.5 * a0.sum() else qs
         span = np.ptp(qs[:, 0]); move = np.abs(qd - qs).max() / span
         ratio = grey.sum() / a0.sum()
