@@ -16,6 +16,7 @@ CREAM, RED = np.array((240, 232, 218)) / 255, np.array((176, 32, 42)) / 255
 SIZE, REGION_PX = 1536, 35
 CORE = int(os.environ.get('CORE', 0))   # px (of the 1500 px copy) the solid SAM core is pulled in from the edge; 0 = no core
 TAG = os.environ.get('TAG', '')
+HARD = float(os.environ.get('HARD', 0))   # >0: a crisp edge from the solid SAM mask (feather in px of the 1500 px copy), no matting
 SMALL = int(os.environ.get('SMALL', 0))   # fill matte holes smaller than this (px of the 1500 px copy) inside the product
 CLOSE = int(os.environ.get('CLOSE', 6)); MAXHOLE = int(os.environ.get('MAXHOLE', 1500))   # closing steps; small-hole area (px of the 1500 px copy)
 
@@ -69,6 +70,13 @@ for name in sys.argv[1:]:
     a = np.zeros((H, W)); a[box[1]:box[3], box[0]:box[2]] = matte(im.crop(box)); torch.cuda.synchronize()
     t_matte = time.time() - t1
     a *= region
+    if HARD:
+        # a hard-edged product (a woven blanket, a flat rug): the edge is the SAM edge, softened a little; matting is for hair
+        sol = ndi.binary_closing(np.pad(sam, 20), iterations=CLOSE)[20:-20, 20:-20]
+        lab_h, n_h = ndi.label(ndi.binary_fill_holes(sol) & ~sol)
+        if n_h:
+            sol |= np.isin(lab_h, 1 + np.where(ndi.sum(np.ones_like(sol), lab_h, index=np.arange(1, n_h + 1)) < MAXHOLE)[0])
+        a = np.asarray(Image.fromarray((np.clip(ndi.gaussian_filter(sol.astype(np.float64), HARD), 0, 1) * 255).astype(np.uint8)).resize((W, H), Image.BICUBIC), dtype=np.float64) / 255
     if SMALL:
         # knit gaps are small and round: fill them; fur pockets between strands are bigger and stay see-through
         solid_sam = ndi.binary_closing(np.pad(sam, 20), iterations=CLOSE)[20:-20, 20:-20]
