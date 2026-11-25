@@ -1,7 +1,7 @@
 """The whole cutout, at the ORIGINAL resolution, on the GPU:
 SAM region (+35 px) minus the neighbours -> BiRefNet HR-matting (1536 px, fp16) on the crop -> drop detached chunks ->
 colours of the edge recovered -> matte 1 px tighter -> enclosed holes filled with LaMa."""
-import sys, time, json
+import sys, time, json, os
 sys.path.insert(0, str(__import__("pathlib").Path.home() / "BiRefNet"))
 import numpy as np, torch
 from pathlib import Path
@@ -14,6 +14,10 @@ from models.birefnet import BiRefNet
 base = Path.home() / "ComfyUI"; out = base / "output/etap0"; arch = out / "_second_tests"
 CREAM, RED = np.array((240, 232, 218)) / 255, np.array((176, 32, 42)) / 255
 SIZE, REGION_PX = 1536, 35
+CORE = int(os.environ.get('CORE', 0))   # px (of the 1500 px copy) the solid SAM core is pulled in from the edge; 0 = no core
+TAG = os.environ.get('TAG', '')
+SMALL = int(os.environ.get('SMALL', 0))   # fill matte holes smaller than this (px of the 1500 px copy) inside the product
+CLOSE = int(os.environ.get('CLOSE', 6)); MAXHOLE = int(os.environ.get('MAXHOLE', 1500))   # closing steps; small-hole area (px of the 1500 px copy)
 
 model = BiRefNet(bb_pretrained=False)
 model.load_state_dict(load_file(str(Path.home() / "BiRefNet/weights/hr-matting.safetensors")), strict=True)
@@ -65,6 +69,29 @@ for name in sys.argv[1:]:
     a = np.zeros((H, W)); a[box[1]:box[3], box[0]:box[2]] = matte(im.crop(box)); torch.cuda.synchronize()
     t_matte = time.time() - t1
     a *= region
+    if SMALL:
+        # knit gaps are small and round: fill them; fur pockets between strands are bigger and stay see-through
+        solid_sam = ndi.binary_closing(np.pad(sam, 20), iterations=CLOSE)[20:-20, 20:-20]
+        solid_full = np.asarray(Image.fromarray(solid_sam.astype(np.uint8) * 255).resize((W, H), Image.NEAREST)) > 127
+        lab_l, n_l = ndi.label((a < 0.5) & solid_full)
+        if n_l:
+            sz = ndi.sum(np.ones_like(a), lab_l, index=np.arange(1, n_l + 1))
+            fillm = np.isin(lab_l, 1 + np.where(sz < SMALL * k * k)[0])
+            a = np.maximum(a, np.clip(ndi.gaussian_filter(ndi.binary_dilation(fillm, iterations=2).astype(np.float64), 1.2), 0, 1))
+    if CORE:
+        # inside the product nothing is see-through (knit gaps, fur pockets): the solid SAM mask is the floor there;
+        # only the outer CORE px of the edge are left to the matting model (the fine hairs)
+        # SAM leaves out the see-through-looking gaps of a knit: close them, and fill small enclosed holes
+        # (big ones, like the hand of the model, are kept as they are)
+        solid_sam = ndi.binary_closing(np.pad(sam, 20), iterations=CLOSE)[20:-20, 20:-20]
+        holes = ndi.binary_fill_holes(solid_sam) & ~solid_sam
+        lab_h, n_h = ndi.label(holes)
+        if n_h:
+            small = 1 + np.where(ndi.sum(holes, lab_h, index=np.arange(1, n_h + 1)) < MAXHOLE)[0]
+            solid_sam |= np.isin(lab_h, small)
+        core = (ndi.distance_transform_edt(solid_sam) > CORE).astype(np.float64)
+        core = np.asarray(Image.fromarray((ndi.gaussian_filter(core, 1.5) * 255).astype(np.uint8)).resize((W, H), Image.BILINEAR), dtype=np.float64) / 255
+        a = np.maximum(a, core)
     a, dropped = drop_detached(a, min_area=int(120 * k * k), min_gap=int(12 * k))
     a = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3)), dtype=np.float64) / 255
     rgb = np.asarray(im, dtype=np.float64) / 255
@@ -83,9 +110,9 @@ for name in sys.argv[1:]:
         fg = np.where(mk[..., None], patch * soft[..., None] + fg * (1 - soft[..., None]), fg); a = np.maximum(a, soft * mk)
     def on(bg):
         return Image.fromarray(((fg * a[..., None] + bg * (1 - a[..., None])) * 255).clip(0, 255).astype(np.uint8))
-    Image.fromarray((np.dstack([fg, a]) * 255).clip(0, 255).astype(np.uint8), "RGBA").save(out / f"{name}_cutout.png")
+    Image.fromarray((np.dstack([fg, a]) * 255).clip(0, 255).astype(np.uint8), "RGBA").save(out / f"{name}{TAG}_cutout.png")
     c, r = on(CREAM), on(RED)
-    c.save(out / f"{name}_on_cream.jpg", quality=93); r.save(out / f"{name}_on_red.jpg", quality=93)
+    c.save(out / f"{name}{TAG}_on_cream.jpg", quality=93); r.save(out / f"{name}{TAG}_on_red.jpg", quality=93)
     sheet = Image.new("RGB", (W * 3, H)); [sheet.paste(x, (i * W, 0)) for i, x in enumerate((im, c, r))]
-    sheet.thumbnail((2400, 2400)); sheet.save(out / f"{name}_full.jpg", quality=90)
+    sheet.thumbnail((2400, 2400)); sheet.save(out / f"{name}{TAG}_full.jpg", quality=90)
     print(f"{name}: {W}x{H}, matte {t_matte:.2f}s on the GPU, total {time.time() - t0:.1f}s, detached chunks dropped {dropped}, hole pixels filled {filled}", flush=True)
