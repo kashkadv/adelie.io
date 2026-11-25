@@ -28,6 +28,14 @@ PROMPTS = {
               "with a warm table lamp and a green plant in a pot. Soft, warm, diffused daylight: no direct sun, no hard shadows, no "
               "stripes of sunlight on the floor. The {noun} lies flat on the floor with a soft natural contact shadow. The other "
               "images show the same {noun} for reference. Sharp focus, crisp detail, realistic interior photography."),
+    "floor_placeholder": ("In image 1 a plain flat matte grey felt mat lies on the floor. Keep this grey mat exactly as it is: the same "
+              "position, size and shape, plain uniform grey, no pattern, no texture, nothing on it. Replace everything around it with a "
+              "warm, cozy, homely living room: a warm light oak wooden floor; a beige linen sofa with soft cushions and a knitted throw "
+              "standing right behind the mat, its front edge exactly parallel to the long side of the mat and centred on it, a symmetric "
+              "composition, the whole sofa is in the frame; a warm cream wall with a window with sheer curtains; a wooden side table "
+              "with a warm table lamp and a green plant in a pot. No other rugs or carpets anywhere. Soft, warm, diffused daylight: no "
+              "direct sun, no hard shadows. The mat lies flat on the floor with a soft natural contact shadow. Sharp focus, crisp "
+              "detail, realistic interior photography."),
     "sofa": ("Keep the {noun} in image 1 exactly as it is: the same position, size, shape, colours, pattern and fur. Turn the sofa "
              "under it into a cozy beige linen sofa of the same shape in exactly the same place, with a knitted throw; replace the "
              "plain wall with a warm, cozy, homely living room: a warm cream wall, a window with sheer curtains, a wooden side table "
@@ -83,7 +91,10 @@ def main(cfg_path):
         run([PY, "-I", str(HERE / "rectify_place.py"), str(photo), str(work / "cut.png"), str(work / "photo_c.png"), str(work / "cut_c.png")],
             env={"SIZE": r["size_cm"], "ROT": str(r.get("rot", 0)), "ELEV": str(r.get("elev", 50)),
                  "ROOM_CM": str(r.get("room_cm", 380)), "CANVAS": r.get("canvas", "1200x1800")})
-        run([PY, "-I", str(HERE / "neutral_base.py"), str(work / "photo_c.png"), str(work / "cut_c.png"), str(work / "main.png")])
+        if cfg.get("placeholder"):                           # the model sees a grey slab, never the product
+            run([PY, "-I", str(HERE / "placeholder_base.py"), str(work / "cut_c.png"), str(work / "main.png")])
+        else:
+            run([PY, "-I", str(HERE / "neutral_base.py"), str(work / "photo_c.png"), str(work / "cut_c.png"), str(work / "main.png")])
     elif cfg["placement"] == "floor":
         a = np.asarray(cut.split()[3]) > 128; ys, xs = np.nonzero(a)
         pw = (xs.max() - xs.min()) / cfg.get("product_share", 0.7); ar = cfg.get("aspect", 2 / 3)
@@ -99,12 +110,20 @@ def main(cfg_path):
     # 5. klein variants
     main_in = f"{name}_main.png"; shutil.copy(work / "main.png", INP / main_in)
     refs = []
-    for i, r in enumerate(cfg.get("refs", [])):
+    for i, r in enumerate([] if cfg.get("placeholder") else cfg.get("refs", [])):
         refs.append(f"{name}_ref{i}.png"); Image.open(src / r).convert("RGB").save(INP / refs[-1])
-    (work / "prompt.txt").write_text(PROMPTS[cfg["placement"]].format(noun=cfg["noun_en"].removeprefix("a ").removeprefix("an ")))
+    noun = cfg["noun_en"].removeprefix("a ").removeprefix("an ")
+    ph_mode = bool(cfg.get("placeholder"))
+    prompt = PROMPTS["floor_placeholder" if ph_mode else cfg["placement"]].format(noun=noun)
+    if ph_mode: noun = "mat"
+    if cfg.get("rectify"):
+        w, h = sorted(float(v) for v in cfg["rectify"]["size_cm"].split("x"))
+        prompt += (f" Real sizes: the {noun} is {w / 100:g} by {h / 100:g} metres; the sofa is a large three-seat sofa about 2.2 metres "
+                   f"wide and 0.9 metres deep, so the {noun} is almost as long as the sofa.")
+    (work / "prompt.txt").write_text(prompt)
     W, H = Image.open(work / "main.png").size; lw, lh = latent_size(W, H)
     variants = []
-    for seed in cfg.get("seeds", [901, 902, 903, 904, 905, 906]):
+    for seed in cfg.get("seeds", list(range(901, 901 + cfg.get("n", 6)))):
         wf = work / f"wf_{seed}.json"
         run([sys.executable, "-I", str(HERE / "wf_klein.py"), str(wf), str(seed), str(work / "prompt.txt"), f"{lw}x{lh}",
              f"work_{name}/v{seed}", main_in, *refs], env={"STEPS": "8", "START": "1"}, quiet=True)
@@ -113,7 +132,18 @@ def main(cfg_path):
         variants.append(OUT / f"work_{name}" / f); print("    variant", seed, out.splitlines()[0])
     free_comfy()
     # 6. reject moved products, sort
-    al = {l.split()[1]: float(l.split()[0]) for l in run([PY, "-I", str(HERE / "check_alignment.py"), str(cut_c), *map(str, variants)], quiet=True).splitlines() if l.strip()}
+    from scipy import ndimage as ndi
+    if ph_mode:
+        # the slab must stay plain grey: low saturation and no texture inside it (else the model drew something on it)
+        inner = ndi.binary_erosion(np.asarray(Image.open(cut_c).split()[3]) > 128, iterations=8)
+        def slab_ok(p):
+            im = Image.open(p).convert("RGB"); m = np.asarray(Image.fromarray(inner).resize(im.size)) > 0
+            f = np.asarray(im).astype(float); sat = (f.max(2) - f.min(2)) / (f.max(2) + 1)
+            g = f.mean(2); hp = g - ndi.gaussian_filter(g, 3)
+            return float(sat[m].mean() < 0.15 and hp[m].std() < 6)
+        al = {v.name: slab_ok(v) for v in variants}
+    else:
+        al = {l.split()[1]: float(l.split()[0]) for l in run([PY, "-I", str(HERE / "check_alignment.py"), str(cut_c), *map(str, variants)], quiet=True).splitlines() if l.strip()}
     # a variant where the model left part of the floor as a plain, texture-free patch (it happens on some seeds)
     from scipy import ndimage as ndi
     def flat_share(p):
@@ -121,7 +151,15 @@ def main(cfg_path):
         m = ndi.uniform_filter(g, 9); sd = np.sqrt(np.clip(ndi.uniform_filter(g * g, 9) - m * m, 0, None))
         return (sd[int(h * 0.7):] < 1.2).mean()
     flat = {v.name: flat_share(v) for v in variants}
-    ok = [v for v in variants if al[v.name] >= cfg.get("align_min", 0.22) and flat[v.name] < 0.2]
+    ok = [v for v in variants if al[v.name] >= cfg.get("align_min", 0.45) and flat[v.name] < 0.2]
+    if cfg["placement"] == "floor" and ok:
+        env = {"ALIGN_MIN": "-1" if ph_mode else str(cfg.get("align_min", 0.45))}
+        if cfg.get("rectify") and cfg["rectify"].get("parallel_to_sofa", True):
+            env["EXPECT"] = str(round(220 / max(float(v) for v in cfg["rectify"]["size_cm"].split("x")), 3))
+        rep = run([PY, "-I", str(HERE / "gate_variants.py"), str(cut_c), *map(str, ok)], env=env, quiet=True)
+        (work / "gates.txt").write_text(rep); print("    gates:\n" + "\n".join("      " + l for l in rep.splitlines() if l.strip()))
+        passed = {l.split()[0] for l in rep.splitlines() if l.strip().endswith(" ok")}
+        ok = [v for v in ok if v.name in passed]
     print("    flat floor:", {k[:9]: round(v, 2) for k, v in flat.items()})
     print("    alignment:", {k[:9]: round(v, 2) for k, v in al.items()}, "->", len(ok), "kept")
     if cfg["placement"] == "floor" and ok:
@@ -132,10 +170,15 @@ def main(cfg_path):
         ok = sorted(ok, key=lambda v: -al[v.name])
     # 7. finish the best K
     enh = work / "cut_enh.png"
-    run([PY, "-I", str(HERE / "enhance_product.py"), str(photo_c), str(cut_c), str(enh)])
+    if cfg.get("enhance", True):           # off for fine fluffy wool: ESRGAN + clarity make its pile coarse
+        run([PY, "-I", str(HERE / "enhance_product.py"), str(photo_c), str(cut_c), str(enh)])
+    else:
+        shutil.copy(cut_c, enh)
     for k, v in enumerate(ok[: cfg.get("keep", 2)], 1):
         x2, clean, fin = work / f"{v.stem}_x2.png", work / f"{v.stem}_clean.png", OUT / f"{name}_{k}.png"
         run([PY, "-I", str(HERE / "scene_up2x.py"), str(v), str(x2)], quiet=True)
+        if ph_mode:
+            run([PY, "-I", str(HERE / "place_on_placeholder.py"), str(x2), str(enh), str(fin)]); continue
         run([PY, "-I", str(HERE / "clean_leftover.py"), str(x2), str(cut_c), str(clean)], quiet=True)
         run([PY, "-I", str(HERE / "blend_into_model.py"), str(x2), str(enh), str(fin)],
             env={"OUTSIDE": str(clean), "IN0": "2", "IN1": "8", "CONTACT": "0.25", "SIG": "20"})

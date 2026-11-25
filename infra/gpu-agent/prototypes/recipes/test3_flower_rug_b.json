@@ -1,3 +1,20 @@
-{"name": "test3_flower_rug_b", "folder": "gushka/Test 3", "main": "Pasted image.png",
- "refs": ["Pasted image (4).png", "Pasted image (6).png"], "noun_en": "a rug", "placement": "floor",
- "rectify": {"size_cm": "150x200", "rot": 0, "elev": 45, "room_cm": 380}}
+{
+ "name": "test3_flower_rug_b",
+ "folder": "gushka/Test 3",
+ "main": "Pasted image.png",
+ "refs": [
+  "Pasted image (4).png",
+  "Pasted image (6).png"
+ ],
+ "noun_en": "a rug",
+ "placement": "floor",
+ "rectify": {
+  "size_cm": "150x200",
+  "rot": 0,
+  "elev": 45,
+  "room_cm": 380,
+  "parallel_to_sofa": false
+ },
+ "enhance": false,
+ "n": 10
+}
