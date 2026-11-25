@@ -1,2 +1,8 @@
-{"name": "test2_woven_rug", "folder": "gushka/Test 2", "main": "Pasted image (2).png",
- "refs": ["Pasted image.png", "Pasted image (3).png"], "noun_en": "a rug", "placement": "floor"}
+{
+  "name": "test2_woven_rug",
+  "folder": "gushka/Test 2",
+  "main": "Pasted image (2).png",
+  "refs": ["Pasted image.png", "Pasted image (3).png"],
+  "noun_en": "a rug",
+  "placement": "floor"
+}
