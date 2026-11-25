@@ -46,15 +46,15 @@ def shadow_flat(scene_size, c, pos, light_dx=0.03, ao=0.9, cast=0.35):
     cast_l = ndi.shift(ndi.gaussian_filter(full, w * 0.018), (-int(h * 0.03), int(w * light_dx)), order=1)
     return np.clip(ao_l * ao + cast_l * cast, 0, 0.92)
 
-def relight(c, ramp=0.05, black=6, desat=0.05, soften=0.6):
+def relight(c, ramp=0.05, black=6, desat=0.05, sharpen=60):
     """Gentle tone match to the airy scene: light falls off left->right (window on the left), blacks lifted a little, colour
-    slightly less saturated, pile softened to the scene's grain. Kept small: the product colour must stay true."""
+    slightly less saturated, finally a mild unsharp mask to keep the pile crisp after the downscale. Kept small: the product colour must stay true."""
     rgb = np.asarray(c.convert("RGB"), dtype=np.float64); a = c.split()[3]
     w = rgb.shape[1]
     rgb = rgb * (1 + ramp - 2 * ramp * np.linspace(0, 1, w))[None, :, None]
     g = rgb.mean(axis=2, keepdims=True); rgb = g + (rgb - g) * (1 - desat)
     rgb = black + rgb * (255 - black) / 255
-    im = Image.fromarray(rgb.clip(0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(soften))
+    im = Image.fromarray(rgb.clip(0, 255).astype(np.uint8)).filter(ImageFilter.UnsharpMask(radius=1.0, percent=sharpen, threshold=2))
     im.putalpha(a); return im
 
 def bounce(scene_arr, c, pos, strength=0.10, sigma=16):
@@ -83,8 +83,8 @@ if __name__ == "__main__":
     share, cx, fy = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
     scene = Image.open(scene_path).convert("RGB")
     cut = load_cutout(cut_path)
+    cut = perspective(cut, float(os.environ.get("PERSP", "0")))      # warp at the native resolution, then ONE downscale
     c, pos = place(scene, cut, share, cx, fy)
-    c = perspective(c, float(os.environ.get("PERSP", "0")))
     if os.environ.get("RELIGHT", "1") == "1":
         c = relight(c)
     arr = np.asarray(scene, dtype=np.float64)
