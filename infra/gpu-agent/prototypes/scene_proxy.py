@@ -72,7 +72,9 @@ if AC in ("left", "right"):
     img = Image.fromarray(arr.clip(0, 255).astype(np.uint8)); dr = ImageDraw.Draw(img)
     rx = corners[:, 0].max(); AW, AD, AH, AG = 78.0, 75.0, 78.0, float(os.environ.get("ARM_GAP", 15))   # width (along y), depth (along x), height, gap
     sgn = -1 if AC == "left" else 1
-    xi = sgn * (rx + AG); xo = sgn * (rx + AG + AD)                     # inner (towards the rug) and outer x
+    # beside the rug AND beyond the sofa end: a rug narrower than the sofa would put the chair in front of the sofa arm
+    xin = max(rx + AG, SW / 2 + float(os.environ.get("ARM_SOFA_GAP", 15)))
+    xi = sgn * xin; xo = sgn * (xin + AD)                               # inner (towards the rug) and outer x
     xa, xb = min(xi, xo), max(xi, xo); yc = float(os.environ.get("ARM_Y", 35)); ya, yb = yc - AW / 2, yc + AW / 2
     back = (xa, xa + 18) if AC == "left" else (xb - 18, xb)
     box(back[0], back[1], ya, yb, 10, AH, 1.05)                         # backrest on the outer side
