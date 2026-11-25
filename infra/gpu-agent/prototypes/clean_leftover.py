@@ -28,9 +28,12 @@ print("leftover pixels: %d (%.2f%% of the frame)" % (left.sum(), left.mean() * 1
 if dbg: Image.fromarray((left * 255).astype(np.uint8)).save(dbg)
 if left.sum():
     lama = torch.jit.load(str(Path.home() / "ComfyUI/models/lama/big-lama.pt"), map_location="cuda").eval()
-    ys, xs = np.nonzero(left); m = int(64 * s)
+    ys, xs = np.nonzero(left | (a > 0.05)); m = int(64 * s)
     y0, y1, x0, x1 = max(0, ys.min() - m), min(H, ys.max() + m), max(0, xs.min() - m), min(W, xs.max() + m)
-    crop, mk = F[y0:y1, x0:x1], left[y0:y1, x0:x1]
+    # the product area is masked too, so LaMa fills the leftovers from the FLOOR only (otherwise it smears the light
+    # product colour outwards as a pale halo); the product is pasted over this area afterwards anyway
+    hide = left | (a > 0.05)
+    crop, mk = F[y0:y1, x0:x1], hide[y0:y1, x0:x1]
     h, w = mk.shape; ph, pw = (-h) % 8, (-w) % 8
     img = np.pad(crop.transpose(2, 0, 1), ((0, 0), (0, ph), (0, pw)), mode="reflect")
     mm = np.pad(mk.astype(np.float32)[None], ((0, 0), (0, ph), (0, pw)), mode="reflect")
