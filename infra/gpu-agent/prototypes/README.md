@@ -42,4 +42,5 @@ SDXL; `comfy_run.py wf.json` — виконує його на локальном
 з перспективою (`PERSP`), тінню (зсув `SHDX`) і маскою смуги підлоги `tag_floor_mask.png`;
 `paste_back.py composite.png harmonised.png floor_mask.png cutout_scaled.png placement.json out.png` — гармонізація лише у смузі
 підлоги, потім повертає оригінальні пікселі виробу.
+`scene_up2x.py in.png out.png` — апскейл порожньої сцени ×2 (тайли); далі `compose_scene.py … 0 …` (частка 0 = виріб 1:1).
 Запускати у `~/ComfyUI/venv` (numpy/scipy/PIL).

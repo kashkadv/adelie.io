@@ -37,16 +37,16 @@ def shadow_flat(scene_size, c, pos, light_dx=0.03, ao=0.9, cast=0.35):
     """Shadow of a FLAT object lying on the floor, light from the left window: (1) contact occlusion offset down-right, so it shows
     mostly along the bottom and right edges and hardly at all on top/left; (2) a soft cast shadow sideways (right), never forward.
     Computed on the full scene canvas so the blur is not clipped."""
-    W, H = scene_size; x, y = pos
+    W, H = scene_size; x, y = pos; s = W / 832                   # shadow sizes below were tuned for an 832 px wide scene
     a = np.asarray(c.split()[3], dtype=np.float64) / 255
     h, w = a.shape
     full = np.zeros((H, W)); full[y:y + h, x:x + w] = a
-    ao_l = ndi.shift(ndi.gaussian_filter(full, 2.6), (5, 4), order=1)
-    ao_l = np.maximum(ao_l, ndi.shift(ndi.gaussian_filter(full, 7), (7, 6), order=1) * 0.5)
+    ao_l = ndi.shift(ndi.gaussian_filter(full, 2.6 * s), (5 * s, 4 * s), order=1)
+    ao_l = np.maximum(ao_l, ndi.shift(ndi.gaussian_filter(full, 7 * s), (7 * s, 6 * s), order=1) * 0.5)
     cast_l = ndi.shift(ndi.gaussian_filter(full, w * 0.018), (-int(h * 0.03), int(w * light_dx)), order=1)
     return np.clip(ao_l * ao + cast_l * cast, 0, 0.92)
 
-def relight(c, ramp=0.05, black=6, desat=0.05, sharpen=60):
+def relight(c, ramp=0.03, black=0, desat=0.0, sharpen=0):
     """Gentle tone match to the airy scene: light falls off left->right (window on the left), blacks lifted a little, colour
     slightly less saturated, finally a mild unsharp mask to keep the pile crisp after the downscale. Kept small: the product colour must stay true."""
     rgb = np.asarray(c.convert("RGB"), dtype=np.float64); a = c.split()[3]
@@ -54,10 +54,11 @@ def relight(c, ramp=0.05, black=6, desat=0.05, sharpen=60):
     rgb = rgb * (1 + ramp - 2 * ramp * np.linspace(0, 1, w))[None, :, None]
     g = rgb.mean(axis=2, keepdims=True); rgb = g + (rgb - g) * (1 - desat)
     rgb = black + rgb * (255 - black) / 255
-    im = Image.fromarray(rgb.clip(0, 255).astype(np.uint8)).filter(ImageFilter.UnsharpMask(radius=1.0, percent=sharpen, threshold=2))
+    im = Image.fromarray(rgb.clip(0, 255).astype(np.uint8))
+    if sharpen: im = im.filter(ImageFilter.UnsharpMask(radius=1.0, percent=sharpen, threshold=2))
     im.putalpha(a); return im
 
-def bounce(scene_arr, c, pos, strength=0.10, sigma=16):
+def bounce(scene_arr, c, pos, strength=0.10, sigma=32):
     """Faint warm colour bounce: the product's mean colour tints the floor right around it."""
     W, H = scene_arr.shape[1], scene_arr.shape[0]; x, y = pos
     a = np.asarray(c.split()[3], dtype=np.float64) / 255; rgb = np.asarray(c.convert("RGB"), dtype=np.float64)
@@ -66,7 +67,7 @@ def bounce(scene_arr, c, pos, strength=0.10, sigma=16):
     glow = ndi.gaussian_filter(full, sigma) * strength
     return scene_arr * (1 - glow[..., None]) + mean[None, None, :] * glow[..., None]
 
-def product_layer(scene_size, c, pos, wall=3):
+def product_layer(scene_size, c, pos, wall=5):
     """RGBA layer of the product on the full canvas, with a thin darkened 'pile wall' under the front edge (thickness)."""
     W, H = scene_size; x, y = pos
     L = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -84,6 +85,7 @@ if __name__ == "__main__":
     scene = Image.open(scene_path).convert("RGB")
     cut = load_cutout(cut_path)
     cut = perspective(cut, float(os.environ.get("PERSP", "0")))      # warp at the native resolution, then ONE downscale
+    if share <= 0: share = cut.width / scene.width              # 1:1 - no resampling of the product at all
     c, pos = place(scene, cut, share, cx, fy)
     if os.environ.get("RELIGHT", "1") == "1":
         c = relight(c)
@@ -99,6 +101,6 @@ if __name__ == "__main__":
     json.dump({"pos": [0, 0], "size": list(scene.size)}, open(out / f"{tag}_placement.json", "w"))
     layer.save(out / f"{tag}_cutout_scaled.png")
     a = np.asarray(layer.split()[3]) > 8
-    ring = ndi.binary_dilation(a, iterations=70); ring[: max(0, pos[1] - 30)] = False
-    Image.fromarray((ndi.gaussian_filter(ring.astype(float), 18) * 255).astype(np.uint8)).save(out / f"{tag}_floor_mask.png")
+    ring = ndi.binary_dilation(a, iterations=int(70 * scene.width / 832)); ring[: max(0, pos[1] - 60)] = False
+    Image.fromarray((ndi.gaussian_filter(ring.astype(float), 36) * 255).astype(np.uint8)).save(out / f"{tag}_floor_mask.png")
     print("composite", comp.size, "product at", pos, "size", c.size)
