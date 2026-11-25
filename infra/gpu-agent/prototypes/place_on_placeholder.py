@@ -97,6 +97,17 @@ SHIFT = float(os.environ.get('SHADOW_SHIFT', 6))
 sil = ndi.shift(sil, (-LDIR[1] * SHIFT * s, -LDIR[0] * SHIFT * s), order=1)   # away from the room's light
 shade = np.clip(sil * (1 - 0.6 * a), 0, 1) * CON
 floor = floor * (1 - shade[..., None] * np.array([1.0, 1.06, 1.15]))
+# occluders: things the model put ON the slab (a chair leg, a table edge) must stay in front of the product. On the grey slab
+# the light is warm at most; an object is clearly coloured (saturated) or much darker than the slab's smooth light.
+sat = (F.max(2) - F.min(2)) / (F.max(2) + 1)
+smooth = ndi.gaussian_filter(lumF * m, 25 * s) / (ndi.gaussian_filter(m, 25 * s) + 1e-6)
+occ = slab & ((sat > float(os.environ.get("OCC_SAT", 0.3))) | (lumF < 0.55 * smooth))
+occ = ndi.binary_opening(occ, iterations=max(1, int(2 * s)))
+occ = ndi.binary_dilation(occ, iterations=max(1, int(2 * s))) & slab
+occ_soft = ndi.gaussian_filter(occ.astype(float), 1.0 * s)
+print("occluders on the slab: %.1f%% of it" % (100 * occ[slab].mean()))
+a = a * (1 - occ_soft)
+floor = np.where(occ_soft[..., None] > 0, F * occ_soft[..., None] + floor * (1 - occ_soft[..., None]), floor)
 out = floor * (1 - a[..., None]) + prod * a[..., None]
 Image.fromarray(out.clip(0, 255).astype(np.uint8)).save(out_p)
 print("light gain %.2f..%.2f, light colour %s, saved %s" % (gain[slab].min(), gain[slab].max(), np.round(cast, 3), out_p))

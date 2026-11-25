@@ -127,6 +127,16 @@ def main(cfg_path):
     noun = cfg["noun_en"].removeprefix("a ").removeprefix("an ")
     ph_mode = bool(cfg.get("placeholder") or cfg.get("proxy"))
     prompt = PROMPTS["floor_proxy" if cfg.get("proxy") else "floor_placeholder" if ph_mode else cfg["placement"]].format(noun=noun)
+    if cfg.get("proxy") and cfg.get("style"):
+        # an interior style written by the owner; the model still only dresses the block mock-up and keeps the grey mat
+        st = cfg["style"]
+        prompt = ("Image 1 is a rough grey block mock-up of a room. Turn it into a photorealistic interior, keeping every object "
+                  "exactly in its place and at its size: the large grey block becomes " + st["sofa"] + ", exactly the same size, "
+                  "shape and position; the light area at the top becomes the wall; the floor becomes " + st["floor"] + " running "
+                  "in the same direction; the flat grey rectangle on the floor stays a plain flat matte grey mat in exactly the "
+                  "same place, size and shape, plain uniform grey, no pattern, nothing on it - light and shadows of the room fall "
+                  "on it naturally. " + st["room"] + " No other rugs or carpets anywhere. No people, no text, no logos.")
+        cfg["placeholder"] = True
     if ph_mode: noun = "mat"
     if cfg.get("rectify") and not cfg.get("proxy"):
         w, h = sorted(float(v) for v in cfg["rectify"]["size_cm"].split("x"))
@@ -152,7 +162,7 @@ def main(cfg_path):
             im = Image.open(p).convert("RGB"); m = np.asarray(Image.fromarray(inner).resize(im.size)) > 0
             f = np.asarray(im).astype(float); sat = (f.max(2) - f.min(2)) / (f.max(2) + 1)
             g = f.mean(2); hp = g - ndi.gaussian_filter(g, 3)
-            return float(sat[m].mean() < 0.15 and hp[m].std() < 6)
+            return float(sat[m].mean() < 0.25 and hp[m].std() < 9)    # warm sun and window shadows on the slab are fine
         al = {v.name: slab_ok(v) for v in variants}
     else:
         al = {l.split()[1]: float(l.split()[0]) for l in run([PY, "-I", str(HERE / "check_alignment.py"), str(cut_c), *map(str, variants)], quiet=True).splitlines() if l.strip()}
