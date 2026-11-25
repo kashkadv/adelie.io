@@ -11,6 +11,7 @@
 # env: KLEIN (4b|9b, default 9b - 9B is non-commercial: comparison only), ROT 90, ELEV 35, ROOM_CM 380, CY 0.72,
 #      FRINGE_CM (fringe on the short ends, not part of the size; drawn by the model). Not given: fringe_check.py looks
 #      for a fringe on every photo of the product and sets it (length from the main photo, else 5 cm).
+#      ROOM_IMG: a room already generated and chosen (skips step 4)
 set -e
 NAME=$1; FOLDER=$2; MAIN=$3; SIZE=$4; THICK=$5; SEED=${6:-904}; REF=$7
 CUI=~/ComfyUI; P="$(cd "$(dirname "$0")" && pwd)"; PY=$CUI/venv/bin/python; PYM=~/birefnet-test/bin/python
@@ -65,8 +66,9 @@ if [ -n "$REF" ]; then $PY -I -c "from PIL import Image; Image.open('$CUI/input/
 
 echo "== 4. room"
 sed "s/150 x 200/${SIZE/x/ x }/" "$P/recipes/prompt_living_bare_v1.txt" > $WK/p_room.txt
-START=1 klein $SEED $WK/p_room.txt room ${NAME}_proxy.png
-free; $PY -I "$P/scene_up2x.py" $CUI/output/$NAME/room_00001_.png $WK/room_x2.png | tail -1
+if [ -n "$ROOM_IMG" ]; then cp "$ROOM_IMG" $WK/room.png; echo "   using the chosen room $ROOM_IMG"   # owner picked a room
+else START=1 klein $SEED $WK/p_room.txt room ${NAME}_proxy.png; cp $CUI/output/$NAME/room_00001_.png $WK/room.png; fi
+free; $PY -I "$P/scene_up2x.py" $WK/room.png $WK/room_x2.png | tail -1
 
 echo "== 5. rug on the floor, boards' perspective"
 FIT=vp FILL=none CONTACT=0.12 ALPHA_OUT=$WK/alpha.png $PY -I "$P/place_on_placeholder.py" $WK/room_x2.png $WK/cut_flat.png $WK/placed.png | grep -iE "vanish|planned"
@@ -98,5 +100,5 @@ echo "== 7. finish"
 GMIN=0.85 $PY -I "$P/rerender_finish.py" $WK/placed.png $WK/rug_x2.png $WK/alpha_rgba.png $WK/finished.png
 ORIG=$WK/cut_flat.png $PY -I "$P/final_look.py" $WK/finished.png $WK/placed.png $WK/alpha.png $OUTD/${NAME}_${SEED}.png | grep -v "^pattern match"
 mkdir -p $WK/raw; mv $CUI/output/$NAME/*_0000*.png $WK/raw/ 2>/dev/null || true
-cp $WK/raw/room_00001_.png $OUTD/${NAME}_${SEED}_room.png
+cp $WK/room.png $OUTD/${NAME}_${SEED}_room.png
 echo "done: $OUTD/${NAME}_${SEED}.png"
