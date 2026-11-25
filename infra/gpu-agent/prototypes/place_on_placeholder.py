@@ -30,6 +30,13 @@ gain = np.clip(L, GMIN, GMAX)
 col = F[inner].mean(0); col = col / col.mean()                         # colour of the light falling on the grey slab
 cast = np.clip(col, 1 - CAST, 1 + CAST)
 prod = np.clip(O * gain[..., None] * cast, 0, 255)
+# edge against a white halo: the sparse fibres of the edge still carry the photo's light backdrop (cream on cream cannot be
+# separated by colour). Thin them (alpha ** EDGE_GAMMA where the product is see-through) and shade them like fibres that lie
+# next to the floor (darker towards the outer tip).
+EG = float(os.environ.get("EDGE_GAMMA", 1.8)); ED = float(os.environ.get("EDGE_DARK", 0.3))
+fr = a < 0.97
+a = np.where(fr, a ** EG, a)
+prod = prod * (1 - ED * (1 - a))[..., None]
 # floor under the product: repaint the slab + a thin band from the floor around it (LaMa sees the floor only)
 hole = ndi.binary_dilation(slab | (a > 0.05), iterations=max(6, int(int(os.environ.get('BAND', 18)) * s)))   # wide enough to swallow the model's dark rim around the grey slab
 def lama_fill(F, hole):
