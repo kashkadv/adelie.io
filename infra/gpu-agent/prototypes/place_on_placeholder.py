@@ -26,7 +26,17 @@ L = mblur(lumF) / GREY
 # outside the inner slab (edge, fringe) the light continues from the nearest slab pixel
 idx = ndi.distance_transform_edt(~inner, return_distances=False, return_indices=True)
 L = L[idx[0], idx[1]]
-gain = np.clip(L, GMIN, GMAX)
+# light of the ROOM: the floor around the product, heavily blurred (boards and knots gone), extended under the product.
+# Its gradient gives the light direction (for the shadow) and a smooth ramp of light across the product.
+ringF = ndi.binary_dilation(slab, iterations=int(160 * s)) & ~ndi.binary_dilation(slab, iterations=int(25 * s))
+rf = ringF.astype(float); SB = 70 * s
+Lroom = ndi.gaussian_filter(lumF * rf, SB) / (ndi.gaussian_filter(rf, SB) + 1e-6)
+ramp = Lroom / Lroom[slab].mean()
+gy_, gx_ = np.gradient(ndi.gaussian_filter(Lroom, SB))
+lv = np.array([gx_[slab].mean(), gy_[slab].mean()]); LDIR = lv / (np.linalg.norm(lv) + 1e-9)   # towards the light (x, y)
+RAMP = float(os.environ.get("RAMP", 0.8))
+gain = np.clip(L * ramp ** RAMP, GMIN, GMAX)
+print("room light comes from (x %.2f, y %.2f), ramp over the product %.2f..%.2f" % (LDIR[0], LDIR[1], ramp[slab].min(), ramp[slab].max()))
 col = F[inner].mean(0); col = col / col.mean()                         # colour of the light falling on the grey slab
 cast = np.clip(col, 1 - CAST, 1 + CAST)
 prod = np.clip(O * gain[..., None] * cast, 0, 255)
@@ -83,7 +93,8 @@ floor = boards_fill(F, hole) if os.environ.get("FILL", "boards") == "boards" els
 # behind the see-through fringe (warm-brown, not grey)
 CON = float(os.environ.get("CONTACT", 0.35))
 sil = ndi.gaussian_filter((a > 0.3).astype(float), 4 * s)
-sil = ndi.shift(sil, (2.5 * s, 1.5 * s), order=1)
+SHIFT = float(os.environ.get('SHADOW_SHIFT', 6))
+sil = ndi.shift(sil, (-LDIR[1] * SHIFT * s, -LDIR[0] * SHIFT * s), order=1)   # away from the room's light
 shade = np.clip(sil * (1 - 0.6 * a), 0, 1) * CON
 floor = floor * (1 - shade[..., None] * np.array([1.0, 1.06, 1.15]))
 out = floor * (1 - a[..., None]) + prod * a[..., None]
