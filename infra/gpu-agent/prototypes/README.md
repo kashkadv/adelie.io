@@ -16,3 +16,10 @@
 
 Етапи 1–2 — у `~/ComfyUI/venv` (transformers 5, torch cu128, GPU); етап 3 — в окремому оточенні з `rembg[cpu]`
 (BiRefNet через ONNX, `pymatting`).
+
+## Повний конвеєр (актуальний)
+
+`pipeline_full.py p2 p5 p4` — усе в одному проході на оригінальній роздільності й на GPU: ділянка SAM (+35 px) мінус «чуже» →
+BiRefNet HR-matting (1536 px, fp16) на обрізку → відсів відірваних шматків → відновлення кольору краю → стиснення маски
+1 px → LaMa для замкнутих отворів. Маски SAM беруться з файлів етапів 1–2. Оточення — `~/birefnet-test` (CUDA-PyTorch,
+`numpy<2`, `pymatting`); ≈ 4–5 с на фото (2000×3000). `hr_alpha.py`, `hr_gpu.py`, `hr_compare.py` — перевірки HR-matting.
