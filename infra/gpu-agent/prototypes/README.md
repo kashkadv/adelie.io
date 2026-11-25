@@ -38,6 +38,8 @@ BiRefNet HR-matting (1536 px, fp16) на обрізку → відсів від�
 
 `wf_scene.py txt2img out.json <seed>` / `wf_scene.py img2img out.json <image_in_ComfyUI_input> <seed> <denoise>` — API-воркфлоу
 SDXL; `comfy_run.py wf.json` — виконує його на локальному ComfyUI (`127.0.0.1:8188`) і друкує час та файли;
-`compose_scene.py scene.png cutout.png tag <частка_ширини> <cx> <низ_виробу_y>` — ставить вирізку на підлогу з тінню;
-`paste_back.py harmonised.png cutout_scaled.png placement.json out.png` — повертає оригінальні пікселі виробу.
+`PERSP=0.10 SHDX=0.02 compose_scene.py scene.png cutout.png tag <частка_ширини> <cx> <низ_виробу_y>` — ставить вирізку на підлогу
+з перспективою (`PERSP`), тінню (зсув `SHDX`) і маскою смуги підлоги `tag_floor_mask.png`;
+`paste_back.py composite.png harmonised.png floor_mask.png cutout_scaled.png placement.json out.png` — гармонізація лише у смузі
+підлоги, потім повертає оригінальні пікселі виробу.
 Запускати у `~/ComfyUI/venv` (numpy/scipy/PIL).

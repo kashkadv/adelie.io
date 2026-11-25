@@ -22,6 +22,17 @@ def place(scene, cut, width_share, cx, floor_y):
     x = int(W * cx - w / 2); y = int(H * floor_y - h)
     return c, (x, y)
 
+def perspective(c, inset):
+    """Trapezoid: the far (top) edge is narrower by `inset` (fraction of width) on each side, as the floor recedes to the vanishing point."""
+    w, h = c.size; d = w * inset
+    src = [(0, 0), (w, 0), (w, h), (0, h)]
+    dst = [(d, 0), (w - d, 0), (w, h), (0, h)]
+    A = []
+    for (x, y), (u, v) in zip(dst, src):
+        A.append([x, y, 1, 0, 0, 0, -u * x, -u * y]); A.append([0, 0, 0, x, y, 1, -v * x, -v * y])
+    coef = np.linalg.solve(np.array(A, dtype=np.float64), np.array([s for p in src for s in p], dtype=np.float64))
+    return c.transform((w, h), Image.PERSPECTIVE, tuple(coef), Image.BICUBIC)
+
 def shadow(scene_size, c, pos, strength=1.0):
     """A soft shadow on the floor: the product's silhouette squashed and blurred under its bottom edge + a tight dark line at the contact."""
     W, H = scene_size; x, y = pos
@@ -30,15 +41,15 @@ def shadow(scene_size, c, pos, strength=1.0):
     sh_h = max(6, int(h * 0.38))
     squashed = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).resize((w, sh_h), Image.BILINEAR), dtype=np.float64) / 255
     layer = np.zeros((H, W)); contact = np.zeros((H, W))
-    y0 = y + h - int(sh_h * 0.55)
+    y0 = y + h - int(sh_h * 0.85)
     ys, xe = slice(max(0, y0), min(H, y0 + sh_h)), slice(max(0, x), min(W, x + w))
     sq = squashed[: ys.stop - ys.start, : xe.stop - xe.start]
     layer[ys, xe] = sq
     bottom = np.zeros_like(a); bottom[-max(2, h // 40):, :] = a[-max(2, h // 40):, :]
-    cy0 = y + h - max(2, h // 40)
+    cy0 = y + h - max(2, h // 25)
     contact[max(0, cy0): min(H, cy0 + bottom.shape[0]), xe] = bottom[: min(H, cy0 + bottom.shape[0]) - max(0, cy0), : xe.stop - xe.start]
     soft = ndi.gaussian_filter(layer, w * 0.02); tight = ndi.gaussian_filter(contact, 2.5)
-    return np.clip(soft * strength * 1.2 + tight * 0.7, 0, 0.9)
+    return np.clip(soft * strength * 1.2 + tight * 0.9, 0, 0.92)
 
 def composite(scene, c, pos, sh):
     arr = np.asarray(scene.convert("RGB"), dtype=np.float64)
@@ -52,10 +63,18 @@ if __name__ == "__main__":
     share, cx, fy = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
     scene = Image.open(scene_path).convert("RGB")
     cut = load_cutout(cut_path)
+    import os
     c, pos = place(scene, cut, share, cx, fy)
-    sh = shadow(scene.size, c, pos)
+    c = perspective(c, float(os.environ.get("PERSP", "0")))
+    dx = int(c.width * float(os.environ.get("SHDX", "0")))           # light from the window on the left -> shadow shifts right
+    sh = shadow(scene.size, c, (pos[0] + dx, pos[1]))
     comp = composite(scene, c, pos, sh)
     comp.save(out / f"{tag}_composite.png")
     json.dump({"pos": pos, "size": c.size}, open(out / f"{tag}_placement.json", "w"))
     c.save(out / f"{tag}_cutout_scaled.png")
+    # floor strip around the product: the only region the harmonising pass may change
+    a = np.asarray(c.split()[3]) > 8; m = np.zeros((comp.height, comp.width), bool)
+    m[pos[1]: pos[1] + c.height, pos[0]: pos[0] + c.width] = a
+    ring = ndi.binary_dilation(m, iterations=70); ring[: max(0, pos[1] - 30)] = False
+    Image.fromarray((ndi.gaussian_filter(ring.astype(float), 18) * 255).astype(np.uint8)).save(out / f"{tag}_floor_mask.png")
     print("composite", comp.size, "cutout at", pos, "size", c.size)
