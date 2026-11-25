@@ -47,6 +47,13 @@ for p in sys.argv[2:]:
     if sofas:
         sb = max(sofas, key=lambda t: t[1])[0]; scale = (sb[2] - sb[0]) / (pb[2] - pb[0])
     why = []
+    # the model must keep the mock-up room: its sofa box vs the proxy's sofa block (PROXY_SOFA="x0,y0,x1,y1" in the frame of
+    # the cutout canvas, scaled to this image); a different camera moves and resizes the sofa
+    if os.environ.get("PROXY_SOFA") and sofas:
+        px = np.array([float(v) for v in os.environ["PROXY_SOFA"].split(",")]) * np.array([W, H, W, H]) / np.array(cut.size * 2)
+        sb = max(sofas, key=lambda t: t[1])[0]
+        dev = max(abs(sb[0] - px[0]), abs(sb[2] - px[2]), abs(sb[3] - px[3])) / (px[2] - px[0])
+        if dev > float(os.environ.get("PROXY_TOL", 0.2)): why.append("room changed (%.2f)" % dev)
     if align < ALIGN_MIN: why.append("pattern changed")
     if extra: why.append("second rug")
     if EXPECT and (scale is None or not (0.75 * EXPECT <= scale <= 1.25 * EXPECT)): why.append("scale")

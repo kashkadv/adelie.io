@@ -135,7 +135,9 @@ def main(cfg_path):
                   "shape and position; the light area at the top becomes the wall; the floor becomes " + st["floor"] + " running "
                   "in the same direction; the flat grey rectangle on the floor stays a plain flat matte grey mat in exactly the "
                   "same place, size and shape, plain uniform grey, no pattern, nothing on it - light and shadows of the room fall "
-                  "on it naturally. " + st["room"] + " No other rugs or carpets anywhere. No people, no text, no logos.")
+                  "on it naturally. Keep the camera exactly as in image 1 (the same high viewpoint looking down at the floor). "
+                  + st["room"].replace("professional architectural photography, ", "").replace("35mm lens, ", "")
+                  + " No other rugs or carpets anywhere. No people, no text, no logos.")
         cfg["placeholder"] = True
     if ph_mode: noun = "mat"
     if cfg.get("rectify") and not cfg.get("proxy"):
@@ -178,6 +180,8 @@ def main(cfg_path):
         env = {"ALIGN_MIN": "-1" if ph_mode else str(cfg.get("align_min", 0.45))}
         if cfg.get("rectify") and cfg["rectify"].get("parallel_to_sofa", True) and not cfg.get("proxy"):
             env["EXPECT"] = str(round(220 / max(float(v) for v in cfg["rectify"]["size_cm"].split("x")), 3))
+        sb = work / "main_sofa_box.txt"
+        if cfg.get("proxy") and sb.exists(): env["PROXY_SOFA"] = sb.read_text().strip()
         rep = run([PY, "-I", str(HERE / "gate_variants.py"), str(cut_c), *map(str, ok)], env=env, quiet=True)
         (work / "gates.txt").write_text(rep); print("    gates:\n" + "\n".join("      " + l for l in rep.splitlines() if l.strip()))
         passed = {l.split()[0] for l in rep.splitlines() if l.strip().endswith(" ok")}

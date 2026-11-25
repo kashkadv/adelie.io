@@ -1,7 +1,7 @@
 """FLUX.2 [klein] 4B (Apache 2.0) multi-reference edit workflow for ComfyUI (API format).
 The MAIN reference goes first (it is "image 1" in the prompt); extra references follow in order.
 Usage: wf_klein.py out.json seed prompt.txt WxH prefix main.png [ref2.png ...]"""
-import json, sys
+import json, os, sys
 
 def build(seed, prompt, w, h, prefix, images, steps=4, main_mp=1.0, ref_mp=0.6, start=0):
     """start > 0: begin from the MAIN image itself (its latent) and skip the first `start` steps - keeps the composition."""
@@ -34,6 +34,12 @@ def build(seed, prompt, w, h, prefix, images, steps=4, main_mp=1.0, ref_mp=0.6, 
     })
     if start:
         g["split"] = {"class_type": "SplitSigmas", "inputs": {"sigmas": ["sigmas", 0], "step": start}}
+    if start and os.environ.get("MASK"):
+        # regenerate only where the mask is white; black (the product) is never changed by the model
+        g["mload"] = {"class_type": "LoadImage", "inputs": {"image": os.environ["MASK"]}}
+        g["mconv"] = {"class_type": "ImageToMask", "inputs": {"image": ["mload", 0], "channel": "red"}}
+        g["nmask"] = {"class_type": "SetLatentNoiseMask", "inputs": {"samples": ["enc0", 0], "mask": ["mconv", 0]}}
+        g["sample"]["inputs"]["latent_image"] = ["nmask", 0]
     return g
 
 if __name__ == "__main__":

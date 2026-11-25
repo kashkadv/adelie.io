@@ -29,9 +29,10 @@ y_back = corners[:, 1].max()
 y0 = y_back + GAP; y1 = y0 + SD; yw = y1 + WALLD                       # sofa front, sofa back, wall
 img = Image.new("RGB", (CW, CH), (214, 184, 146)); dr = ImageDraw.Draw(img)
 # wall (a big vertical plane) and floor boards along x
-dr.polygon([P(-2000, yw, 0), P(2000, yw, 0), P(2000, yw, 600), P(-2000, yw, 600)], fill=(236, 226, 210))
+y_near = C[1] + 80                                                     # floor lines only in front of the camera
 for x in range(-1000, 1001, 20):
-    dr.line([P(x, -600, 0), P(x, yw, 0)], fill=(200, 170, 132), width=1)
+    dr.line([P(x, y_near, 0), P(x, yw, 0)], fill=(200, 170, 132), width=1)
+dr.polygon([P(-2000, yw, 0), P(2000, yw, 0), P(2000, yw, 600), P(-2000, yw, 600)], fill=(236, 226, 210))
 # sofa: back block, seat block, two arms (flat-shaded faces, painter's order: back -> front)
 def box(x0, x1, ya, yb, z0, z1, shade):
     top = [P(x0, ya, z1), P(x1, ya, z1), P(x1, yb, z1), P(x0, yb, z1)]
@@ -54,4 +55,7 @@ a = np.asarray(Image.open(cut_p).convert("RGBA").resize((CW, CH)).split()[3]) / 
 slab = (a > 0.5).astype(float)
 arr = np.asarray(img).astype(float); arr = arr * (1 - slab[..., None]) + GREY * slab[..., None]
 Image.fromarray(arr.clip(0, 255).astype(np.uint8)).save(out_p)
+sx = [P(x, y, z)[0] for x in (-SW / 2, SW / 2) for y in (y0, y1) for z in (0, SH)]
+sy = [P(x, y, z)[1] for x in (-SW / 2, SW / 2) for y in (y0, y1) for z in (0, SH)]
+open(os.path.splitext(out_p)[0] + "_sofa_box.txt", "w").write("%d,%d,%d,%d" % (min(sx), min(sy), max(sx), max(sy)))
 print("proxy: sofa %gx%gx%g cm at %g cm behind the product, saved %s" % (SW, SD, SH, GAP, out_p))
