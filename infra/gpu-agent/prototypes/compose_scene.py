@@ -1,4 +1,4 @@
-"""Puts a cutout (RGBA) onto a generated scene: scale, place on the floor, a contact shadow under it. Optionally pastes the ORIGINAL
+"""v2. Puts a cutout (RGBA) onto a generated scene: scale, place on the floor, a contact shadow under it. Optionally pastes the ORIGINAL
 product pixels back over a harmonised image, so the product itself is never generated or altered."""
 import sys, json
 import numpy as np
@@ -33,62 +33,72 @@ def perspective(c, inset):
     coef = np.linalg.solve(np.array(A, dtype=np.float64), np.array([s for p in src for s in p], dtype=np.float64))
     return c.transform((w, h), Image.PERSPECTIVE, tuple(coef), Image.BICUBIC)
 
-def shadow(scene_size, c, pos, strength=1.0):
-    """A soft shadow on the floor: the product's silhouette squashed and blurred under its bottom edge + a tight dark line at the contact."""
-    W, H = scene_size; x, y = pos
-    a = np.asarray(c.split()[3], dtype=np.float64) / 255
-    h, w = a.shape
-    sh_h = max(6, int(h * 0.38))
-    squashed = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).resize((w, sh_h), Image.BILINEAR), dtype=np.float64) / 255
-    layer = np.zeros((H, W)); contact = np.zeros((H, W))
-    y0 = y + h - int(sh_h * 0.85)
-    ys, xe = slice(max(0, y0), min(H, y0 + sh_h)), slice(max(0, x), min(W, x + w))
-    sq = squashed[: ys.stop - ys.start, : xe.stop - xe.start]
-    layer[ys, xe] = sq
-    bottom = np.zeros_like(a); bottom[-max(2, h // 40):, :] = a[-max(2, h // 40):, :]
-    cy0 = y + h - max(2, h // 25)
-    contact[max(0, cy0): min(H, cy0 + bottom.shape[0]), xe] = bottom[: min(H, cy0 + bottom.shape[0]) - max(0, cy0), : xe.stop - xe.start]
-    soft = ndi.gaussian_filter(layer, w * 0.02); tight = ndi.gaussian_filter(contact, 2.5)
-    return np.clip(soft * strength * 1.2 + tight * 0.9, 0, 0.92)
-
-def shadow_flat(scene_size, c, pos, light_dx=0.03, ao=0.85, cast=0.4):
-    """Shadow of a FLAT object lying on the floor: (1) ambient-occlusion rim hugging the whole contour (strongest at the bottom/right,
-    where the pile meets the floor) and (2) a soft cast shadow sideways, away from the light - never forward under the front edge
-    (that reads as floating). Everything is computed on the full scene canvas so the blur is not clipped by the bounding box."""
+def shadow_flat(scene_size, c, pos, light_dx=0.03, ao=0.9, cast=0.35):
+    """Shadow of a FLAT object lying on the floor, light from the left window: (1) contact occlusion offset down-right, so it shows
+    mostly along the bottom and right edges and hardly at all on top/left; (2) a soft cast shadow sideways (right), never forward.
+    Computed on the full scene canvas so the blur is not clipped."""
     W, H = scene_size; x, y = pos
     a = np.asarray(c.split()[3], dtype=np.float64) / 255
     h, w = a.shape
     full = np.zeros((H, W)); full[y:y + h, x:x + w] = a
-    grown = ndi.binary_dilation(full > 0.3, iterations=3).astype(np.float64)
-    ao_l = ndi.shift(ndi.gaussian_filter(grown, 3.5), (3, 2), order=1)
-    ao_l = np.maximum(ao_l, ndi.shift(ndi.gaussian_filter(grown, 9), (5, 3), order=1) * 0.55)
-    cast_l = ndi.shift(ndi.gaussian_filter(full, w * 0.018), (-int(h * 0.04), int(w * light_dx)), order=1)
+    ao_l = ndi.shift(ndi.gaussian_filter(full, 2.6), (5, 4), order=1)
+    ao_l = np.maximum(ao_l, ndi.shift(ndi.gaussian_filter(full, 7), (7, 6), order=1) * 0.5)
+    cast_l = ndi.shift(ndi.gaussian_filter(full, w * 0.018), (-int(h * 0.03), int(w * light_dx)), order=1)
     return np.clip(ao_l * ao + cast_l * cast, 0, 0.92)
 
-def composite(scene, c, pos, sh):
-    arr = np.asarray(scene.convert("RGB"), dtype=np.float64)
-    arr = arr * (1 - sh[..., None] * 0.85)                     # the shadow darkens the floor (multiply)
-    out_im = Image.fromarray(arr.clip(0, 255).astype(np.uint8)).convert("RGBA")
-    out_im.alpha_composite(c, pos)
-    return out_im.convert("RGB")
+def relight(c, ramp=0.05, black=6, desat=0.05, soften=0.6):
+    """Gentle tone match to the airy scene: light falls off left->right (window on the left), blacks lifted a little, colour
+    slightly less saturated, pile softened to the scene's grain. Kept small: the product colour must stay true."""
+    rgb = np.asarray(c.convert("RGB"), dtype=np.float64); a = c.split()[3]
+    w = rgb.shape[1]
+    rgb = rgb * (1 + ramp - 2 * ramp * np.linspace(0, 1, w))[None, :, None]
+    g = rgb.mean(axis=2, keepdims=True); rgb = g + (rgb - g) * (1 - desat)
+    rgb = black + rgb * (255 - black) / 255
+    im = Image.fromarray(rgb.clip(0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(soften))
+    im.putalpha(a); return im
+
+def bounce(scene_arr, c, pos, strength=0.10, sigma=16):
+    """Faint warm colour bounce: the product's mean colour tints the floor right around it."""
+    W, H = scene_arr.shape[1], scene_arr.shape[0]; x, y = pos
+    a = np.asarray(c.split()[3], dtype=np.float64) / 255; rgb = np.asarray(c.convert("RGB"), dtype=np.float64)
+    mean = (rgb * a[..., None]).sum((0, 1)) / max(a.sum(), 1)
+    full = np.zeros((H, W)); full[y:y + a.shape[0], x:x + a.shape[1]] = a
+    glow = ndi.gaussian_filter(full, sigma) * strength
+    return scene_arr * (1 - glow[..., None]) + mean[None, None, :] * glow[..., None]
+
+def product_layer(scene_size, c, pos, wall=3):
+    """RGBA layer of the product on the full canvas, with a thin darkened 'pile wall' under the front edge (thickness)."""
+    W, H = scene_size; x, y = pos
+    L = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    a = np.asarray(c.split()[3]); rgb = np.asarray(c.convert("RGB"), dtype=np.float64) * 0.5
+    wall_im = Image.fromarray(rgb.astype(np.uint8)).convert("RGBA"); wall_im.putalpha(Image.fromarray(a))
+    for d in range(1, wall + 1):
+        L.alpha_composite(wall_im, (x + (1 if d > 1 else 0), y + d))
+    L.alpha_composite(c, (x, y))
+    return L
 
 if __name__ == "__main__":
+    import os
     scene_path, cut_path, tag = sys.argv[1], sys.argv[2], sys.argv[3]
     share, cx, fy = float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
     scene = Image.open(scene_path).convert("RGB")
     cut = load_cutout(cut_path)
-    import os
     c, pos = place(scene, cut, share, cx, fy)
     c = perspective(c, float(os.environ.get("PERSP", "0")))
-    dx = int(c.width * float(os.environ.get("SHDX", "0")))           # light from the window on the left -> shadow shifts right
+    if os.environ.get("RELIGHT", "1") == "1":
+        c = relight(c)
+    arr = np.asarray(scene, dtype=np.float64)
+    arr = bounce(arr, c, pos)
     sh = shadow_flat(scene.size, c, pos, light_dx=float(os.environ.get("SHDX", "0.03")))
-    comp = composite(scene, c, pos, sh)
+    arr = arr * (1 - sh[..., None] * 0.85)
+    base = Image.fromarray(arr.clip(0, 255).astype(np.uint8)).convert("RGBA")
+    layer = product_layer(scene.size, c, pos)
+    base.alpha_composite(layer); comp = base.convert("RGB")
     comp.save(out / f"{tag}_composite.png")
-    json.dump({"pos": pos, "size": c.size}, open(out / f"{tag}_placement.json", "w"))
-    c.save(out / f"{tag}_cutout_scaled.png")
-    # floor strip around the product: the only region the harmonising pass may change
-    a = np.asarray(c.split()[3]) > 8; m = np.zeros((comp.height, comp.width), bool)
-    m[pos[1]: pos[1] + c.height, pos[0]: pos[0] + c.width] = a
-    ring = ndi.binary_dilation(m, iterations=70); ring[: max(0, pos[1] - 30)] = False
+    # the product layer is full-canvas, so paste_back uses pos (0, 0)
+    json.dump({"pos": [0, 0], "size": list(scene.size)}, open(out / f"{tag}_placement.json", "w"))
+    layer.save(out / f"{tag}_cutout_scaled.png")
+    a = np.asarray(layer.split()[3]) > 8
+    ring = ndi.binary_dilation(a, iterations=70); ring[: max(0, pos[1] - 30)] = False
     Image.fromarray((ndi.gaussian_filter(ring.astype(float), 18) * 255).astype(np.uint8)).save(out / f"{tag}_floor_mask.png")
-    print("composite", comp.size, "cutout at", pos, "size", c.size)
+    print("composite", comp.size, "product at", pos, "size", c.size)
