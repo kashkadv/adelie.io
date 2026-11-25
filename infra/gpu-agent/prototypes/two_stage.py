@@ -36,7 +36,13 @@ def klein(seed, prompt_file, image, prefix, start):
 STRUCTURE = ("Every object is well built and physically correct, like real manufactured furniture: straight, evenly spaced legs "
              "standing firmly on the floor, crisp straight edges and right-angled corners, a symmetrical sofa with matching arms "
              "and cushions, straight vertical wall corners and a straight ceiling line, rectangular picture frames, a straight "
-             "curtain rod with evenly hanging curtains in natural soft folds, plants with natural leaves and stems.")
+             "curtain rod with evenly hanging curtains in natural soft folds, plants with natural leaves and stems. "
+             # owner, 2026-11-25: true-to-life sizes (a record player smaller than the records), a sensible layout (an
+             # armchair facing into the sofa), no animals
+             "Real-world proportions: every object has its true everyday size relative to the furniture and to each other. "
+             "Sensible furniture arrangement like in a real home: armchairs are angled towards the centre of the room, never "
+             "facing into the side of the sofa; side tables stand within reach; nothing blocks the walkway. "
+             "Curtains hang only at windows. No animals or pets anywhere.")
 room = style["room"].replace("professional architectural photography, ", "").replace("35mm lens, ", "")
 pA = ("Image 1 is a rough grey block mock-up of a room seen from standing height. Turn it into a photorealistic, richly detailed "
       "interior, keeping the camera and the layout: the large grey block becomes " + style["sofa"] + " of the same size in the "
