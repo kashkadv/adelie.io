@@ -12,7 +12,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent; CUI = Path.home() / "ComfyUI"; INP = CUI / "input"; OUT = CUI / "output"
 PY = str(CUI / "venv/bin/python")
-work = Path(sys.argv[1]); style = json.load(open(sys.argv[2]))["style"]; seeds = [int(x) for x in sys.argv[3:]]
+work = Path(sys.argv[1]); cfg = json.load(open(sys.argv[2])); style = cfg["style"]; seeds = [int(x) for x in sys.argv[3:]]
+SIZE_CM = cfg.get("rectify", {}).get("size_cm", "")
 name = work.name; RELIGHT = os.environ.get("RELIGHT", "5"); raw = OUT / f"ts_{name}"
 
 def run(cmd, env=None):
@@ -36,8 +37,8 @@ ARRANGE = ("Furniture is arranged the way an interior designer would arrange a r
            "the room or the seating area so people could talk, never a wall, the back or the side of another piece; each piece "
            "either stands parallel to a wall or is deliberately angled towards the centre; there is comfortable walking space "
            "around every piece, nothing is squeezed into a gap, pressed against or overlapping another piece; lamps and small "
-           "tables stand within reach of a seat; tall storage and sideboards stand against the walls; the layout is balanced "
-           "on both sides of the sofa.")
+           "tables stand within reach of a seat; tall storage and sideboards stand against the walls; only the furniture "
+           "named for the room is there, no extra seats or tables.")
 # well-built objects (owner, 2026-11-25: furniture, walls and curtains sometimes come out broken or warped). klein runs at
 # cfg 1 - no negative prompt - so this says what correct looks like instead of what to avoid.
 STRUCTURE = ("Every object is well built and physically correct, like real manufactured furniture: straight, evenly spaced legs "
@@ -49,14 +50,23 @@ STRUCTURE = ("Every object is well built and physically correct, like real manuf
              "Real-world proportions: every object has its true everyday size relative to the furniture and to each other. "
              + ARRANGE +
              " Curtains hang only at windows, never on a blank wall. Nothing touches, overlaps or hangs onto the grey mat: "
-             "throws stay on the sofa, slippers and baskets stand on the bare floor away from it. No animals or pets anywhere.")
+             "throws stay on the sofa, baskets stand on the bare floor away from it. No animals or pets anywhere.")
 ROOMSET = json.load(open(HERE / "recipes/rooms.json"))[os.environ.get("ROOM", "living_front")]["text"]
+# the product's real size (owner: the right size of the rug matters most) - the mat in the mock-up is drawn at this size, the
+# model must keep it and build the furniture at real scale around it
+SIZE_TXT = ""
+if SIZE_CM:
+    a_, b_ = sorted(float(v) for v in SIZE_CM.split("x"))
+    SIZE_TXT = ("MOST IMPORTANT - true size: the grey mat is a rug of exactly %g x %g cm, drawn in image 1 at its real size "
+                "next to a 220 cm wide sofa. Keep the mat exactly that size and shape, never larger or smaller, and build every "
+                "piece of furniture at its real-world size around it, so the rug reads as %g x %g cm in the photo. "
+                % (a_, b_, a_, b_))
 room = style["room"].replace("professional architectural photography, ", "").replace("35mm lens, ", "")
 pA = ("Image 1 is a rough grey block mock-up of a room seen from standing height. Turn it into a photorealistic, richly detailed "
       "interior, keeping the camera and the layout: the large grey block becomes " + style["sofa"] + " of the same size in the "
       "same place; the light area at the top becomes the wall; the floor becomes " + style["floor"] + " running in the same "
       "direction; the flat grey rectangle on the floor stays a plain flat matte grey mat in exactly the same place, size and "
-      "shape, nothing on it. " + room + " " + ROOMSET + " " + STRUCTURE + " No other rugs or carpets anywhere. No people, no text, no logos.")
+      "shape, nothing on it. " + SIZE_TXT + room + " " + ROOMSET + " " + STRUCTURE + " No other rugs or carpets anywhere. No people, no text, no logos.")
 pC = ("Keep this photograph exactly as it is: the same room, furniture, rug, colours and composition. Only make the light natural "
       "and consistent: the light and shadows of the room fall naturally across the rug lying on the floor, the rug's fluffy wool "
       "edge is lit like the room, with a soft contact shadow along its edges.")
