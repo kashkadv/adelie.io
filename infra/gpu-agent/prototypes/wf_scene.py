@@ -2,9 +2,14 @@
 import json, sys
 
 CKPT = "sd_xl_base_1.0.safetensors"
-POS = ("interior photography, minimalist scandinavian living room, light oak wooden floor in the foreground with a large empty free area of floor, "
+POS_DEFAULT = ("interior photography, minimalist scandinavian living room, light oak wooden floor in the foreground with a large empty free area of floor, "
        "soft diffused daylight from a window on the left, warm white walls, a linen sofa far in the background slightly out of focus, "
        "shallow depth of field, photorealistic, natural light, 35mm lens, camera at low height looking straight ahead")
+POS_LOW = ("photograph taken from a very low camera height just above the floor, looking along the floor with a shallow grazing angle, "
+           "large empty area of smooth grey microcement floor in the foreground, soft neutral studio-like daylight, dark modern interior, "
+           "a sofa on black legs far in the background out of focus, muted neutral colours, photorealistic, 50mm lens, shallow depth of field")
+import os
+POS = POS_LOW if os.environ.get("SCENE") == "low" else POS_DEFAULT
 NEG = "rug, carpet, mat, furniture in the foreground, people, text, watermark, logo, clutter, cartoon, painting, oversaturated"
 
 def txt2img(seed, prefix, w=832, h=1216):
