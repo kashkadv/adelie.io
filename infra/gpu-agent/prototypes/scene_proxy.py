@@ -47,6 +47,12 @@ box(-SW / 2, SW / 2, y1 - 22, y1, 10, SH, 1.05)                         # back r
 box(-SW / 2 + arm, SW / 2 - arm, y0, y1 - 22, 10, 45, 1.15)             # seat
 box(-SW / 2, -SW / 2 + arm, y0, y1, 10, 62, 1.0)                        # arms
 box(SW / 2 - arm, SW / 2, y0, y1, 10, 62, 1.0)
+# small side table beside the sofa arm (owner: the table goes beside the sofa, never on the rug); drawn after the sofa only
+# when it is in front of it, so painter's order holds for this camera
+ST = os.environ.get("SIDE_TABLE", "left"); STW, STH = 45.0, 50.0
+if ST in ("left", "right"):
+    sx0 = -SW / 2 - 12 - STW if ST == "left" else SW / 2 + 12
+    box(sx0, sx0 + STW, y0 + 10, y0 + 10 + STW, 0, STH, 0.95)
 for lx in (-SW / 2 + 8, SW / 2 - 8):                                    # legs
     dr.polygon([P(lx - 3, y0 + 5, 0), P(lx + 3, y0 + 5, 0), P(lx + 3, y0 + 5, 10), P(lx - 3, y0 + 5, 10)], fill=(90, 70, 50))
 img = img.filter(ImageFilter.GaussianBlur(0.6))
@@ -54,6 +60,21 @@ img = img.filter(ImageFilter.GaussianBlur(0.6))
 a = np.asarray(Image.open(cut_p).convert("RGBA").resize((CW, CH)).split()[3]) / 255.0
 slab = (a > 0.5).astype(float)
 arr = np.asarray(img).astype(float); arr = arr * (1 - slab[..., None]) + GREY * slab[..., None]
+# armchair on the side of the rug, at 90 degrees to the sofa, facing across the rug (owner, 2026-11-25). Drawn after the slab:
+# it stands up next to the rug, so where they overlap in the picture the chair is in front.
+AC = os.environ.get("ARMCHAIR", "left")
+if AC in ("left", "right"):
+    img = Image.fromarray(arr.clip(0, 255).astype(np.uint8)); dr = ImageDraw.Draw(img)
+    rx = corners[:, 0].max(); AW, AD, AH, AG = 78.0, 75.0, 78.0, float(os.environ.get("ARM_GAP", 15))   # width (along y), depth (along x), height, gap
+    sgn = -1 if AC == "left" else 1
+    xi = sgn * (rx + AG); xo = sgn * (rx + AG + AD)                     # inner (towards the rug) and outer x
+    xa, xb = min(xi, xo), max(xi, xo); yc = float(os.environ.get("ARM_Y", 35)); ya, yb = yc - AW / 2, yc + AW / 2
+    back = (xa, xa + 18) if AC == "left" else (xb - 18, xb)
+    box(back[0], back[1], ya, yb, 10, AH, 1.05)                         # backrest on the outer side
+    box(xa, xb, ya, yb, 10, 42, 1.15)                                   # seat
+    box(xa, xb, ya, ya + 14, 10, 58, 1.0); box(xa, xb, yb - 14, yb, 10, 58, 1.0)   # arms
+    arr = np.asarray(img).astype(float)
+    print("proxy: armchair %s of the product, facing it" % AC)
 Image.fromarray(arr.clip(0, 255).astype(np.uint8)).save(out_p)
 sx = [P(x, y, z)[0] for x in (-SW / 2, SW / 2) for y in (y0, y1) for z in (0, SH)]
 sy = [P(x, y, z)[1] for x in (-SW / 2, SW / 2) for y in (y0, y1) for z in (0, SH)]
