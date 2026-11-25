@@ -90,9 +90,9 @@ Cloudflare — [plans/link-builder.md](plans/link-builder.md).
 ## На чому зупинились
 
 **2026-11-24 — Майстерня публікацій, проєктування** ([ADR-0040](decisions/0040-publication-workshop.md),
-[ADR-0041](decisions/0041-gpu-worker-on-demand.md), [plans/pin-workshop.md](plans/pin-workshop.md); запропоновано, коду немає):
+[ADR-0041](decisions/0041-gpu-worker-on-demand.md), [plans/pin-workshop.md](plans/pin-workshop.md); **ADR прийнято 2026-11-25** (можливі правки), коду немає):
 майстерня — режим запису календаря (ідея = план); шаблони з Figma через REST API; пакетні дії для 20+ публікацій на тиждень;
-GPU-воркер на ПК власника (pull-модель, перемикач, heartbeat; 3060 Ti 8 ГБ). **Власнику:** прийняти ADR; етап 0 — поставити ComfyUI
+GPU-воркер на ПК власника (pull-модель, перемикач, heartbeat; 3060 Ti 8 ГБ). **Власнику:** етап 0 — поставити ComfyUI
 на ПК й перевірити якість на реальних фото; створити токен Figma.
 
 **2026-11-24 — Ручна прив'язка товарів до допису:** у картці допису «Прив'язати товар» (пошук по каталогу всіх каналів),

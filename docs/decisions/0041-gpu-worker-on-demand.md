@@ -1,6 +1,6 @@
 # ADR-0041: GPU-воркер на ПК за потреби (pull-модель)
 
-- **Статус:** запропоновано
+- **Статус:** прийнято (2026-11-25; можливі правки згодом)
 - **Дата:** 2026-11-24
 - **Пов'язані:** [ADR-0040](0040-publication-workshop.md), [ADR-0024](0024-promotion-strategy-module.md),
   [infra/local-llm.md](../infra/local-llm.md)

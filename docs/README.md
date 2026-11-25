@@ -70,5 +70,5 @@
 - [ADR-0037](decisions/0037-direction-hits.md) — Хіти напряму: що просувати, не повторюючись (прийнято)
 - [ADR-0038](decisions/0038-brief-context.md) — Бриф: лише те, чого Adelie не бачить; згортувані напрями (прийнято)
 - [ADR-0039](decisions/0039-calendar-direction.md) — Напрям у записах календаря; фокус фільтрує картки (прийнято)
-- [ADR-0040](decisions/0040-publication-workshop.md) — Майстерня публікацій: візуал і текст у записі календаря (запропоновано)
-- [ADR-0041](decisions/0041-gpu-worker-on-demand.md) — GPU-воркер на ПК за потреби, pull-модель (запропоновано)
+- [ADR-0040](decisions/0040-publication-workshop.md) — Майстерня публікацій: візуал і текст у записі календаря (прийнято)
+- [ADR-0041](decisions/0041-gpu-worker-on-demand.md) — GPU-воркер на ПК за потреби, pull-модель (прийнято)
