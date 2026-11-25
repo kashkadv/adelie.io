@@ -1,0 +1,21 @@
+{
+ "name": "test3_flower_rug_proxy",
+ "folder": "gushka/Test 3",
+ "main": "Pasted image.png",
+ "refs": [
+  "Pasted image (4).png",
+  "Pasted image (6).png"
+ ],
+ "noun_en": "a rug",
+ "placement": "floor",
+ "rectify": {
+  "size_cm": "150x200",
+  "rot": 90,
+  "elev": 65,
+  "room_cm": 380
+ },
+ "enhance": false,
+ "n": 10,
+ "placeholder": true,
+ "proxy": true
+}

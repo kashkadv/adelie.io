@@ -36,6 +36,14 @@ PROMPTS = {
               "with a warm table lamp and a green plant in a pot. No other rugs or carpets anywhere. Soft, warm, diffused daylight: no "
               "direct sun, no hard shadows. The mat lies flat on the floor with a soft natural contact shadow. Sharp focus, crisp "
               "detail, realistic interior photography."),
+    "floor_proxy": ("Image 1 is a rough grey block mock-up of a room. Turn it into a photorealistic warm, cozy, homely living room, "
+              "keeping every object exactly in its place and at its size: the large grey block becomes a beige linen three-seat sofa "
+              "with soft cushions and a knitted throw, exactly the same size, shape and position; the light area at the top becomes a "
+              "warm cream wall; the floor becomes warm light oak wooden boards running in the same direction; the flat grey rectangle "
+              "on the floor stays a plain flat matte grey mat in exactly the same place, size and shape, plain uniform grey, no "
+              "pattern, nothing on it. Add a wooden side table with a warm lamp and a green plant beside the sofa. No other rugs or "
+              "carpets anywhere. Soft, warm, diffused daylight, no hard shadows. The mat lies flat on the floor with a soft contact "
+              "shadow. Sharp focus, crisp detail, realistic interior photography."),
     "sofa": ("Keep the {noun} in image 1 exactly as it is: the same position, size, shape, colours, pattern and fur. Turn the sofa "
              "under it into a cozy beige linen sofa of the same shape in exactly the same place, with a knitted throw; replace the "
              "plain wall with a warm, cozy, homely living room: a warm cream wall, a window with sheer curtains, a wooden side table "
@@ -91,7 +99,11 @@ def main(cfg_path):
         run([PY, "-I", str(HERE / "rectify_place.py"), str(photo), str(work / "cut.png"), str(work / "photo_c.png"), str(work / "cut_c.png")],
             env={"SIZE": r["size_cm"], "ROT": str(r.get("rot", 0)), "ELEV": str(r.get("elev", 50)),
                  "ROOM_CM": str(r.get("room_cm", 380)), "CANVAS": r.get("canvas", "1200x1800")})
-        if cfg.get("placeholder"):                           # the model sees a grey slab, never the product
+        geo = {"SIZE": r["size_cm"], "ROT": str(r.get("rot", 0)), "ELEV": str(r.get("elev", 50)),
+               "ROOM_CM": str(r.get("room_cm", 380)), "CANVAS": r.get("canvas", "1200x1800")}
+        if cfg.get("proxy"):                                 # a block room in real cm: the furniture scale is fixed by geometry
+            run([PY, "-I", str(HERE / "scene_proxy.py"), str(work / "cut_c.png"), str(work / "main.png")], env=geo)
+        elif cfg.get("placeholder"):                         # the model sees a grey slab, never the product
             run([PY, "-I", str(HERE / "placeholder_base.py"), str(work / "cut_c.png"), str(work / "main.png")])
         else:
             run([PY, "-I", str(HERE / "neutral_base.py"), str(work / "photo_c.png"), str(work / "cut_c.png"), str(work / "main.png")])
@@ -113,10 +125,10 @@ def main(cfg_path):
     for i, r in enumerate([] if cfg.get("placeholder") else cfg.get("refs", [])):
         refs.append(f"{name}_ref{i}.png"); Image.open(src / r).convert("RGB").save(INP / refs[-1])
     noun = cfg["noun_en"].removeprefix("a ").removeprefix("an ")
-    ph_mode = bool(cfg.get("placeholder"))
-    prompt = PROMPTS["floor_placeholder" if ph_mode else cfg["placement"]].format(noun=noun)
+    ph_mode = bool(cfg.get("placeholder") or cfg.get("proxy"))
+    prompt = PROMPTS["floor_proxy" if cfg.get("proxy") else "floor_placeholder" if ph_mode else cfg["placement"]].format(noun=noun)
     if ph_mode: noun = "mat"
-    if cfg.get("rectify"):
+    if cfg.get("rectify") and not cfg.get("proxy"):
         w, h = sorted(float(v) for v in cfg["rectify"]["size_cm"].split("x"))
         prompt += (f" Real sizes: the {noun} is {w / 100:g} by {h / 100:g} metres; the sofa is a large three-seat sofa about 2.2 metres "
                    f"wide and 0.9 metres deep, so the {noun} is almost as long as the sofa.")
@@ -154,7 +166,7 @@ def main(cfg_path):
     ok = [v for v in variants if al[v.name] >= cfg.get("align_min", 0.45) and flat[v.name] < 0.2]
     if cfg["placement"] == "floor" and ok:
         env = {"ALIGN_MIN": "-1" if ph_mode else str(cfg.get("align_min", 0.45))}
-        if cfg.get("rectify") and cfg["rectify"].get("parallel_to_sofa", True):
+        if cfg.get("rectify") and cfg["rectify"].get("parallel_to_sofa", True) and not cfg.get("proxy"):
             env["EXPECT"] = str(round(220 / max(float(v) for v in cfg["rectify"]["size_cm"].split("x")), 3))
         rep = run([PY, "-I", str(HERE / "gate_variants.py"), str(cut_c), *map(str, ok)], env=env, quiet=True)
         (work / "gates.txt").write_text(rep); print("    gates:\n" + "\n".join("      " + l for l in rep.splitlines() if l.strip()))
