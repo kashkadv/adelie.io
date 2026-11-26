@@ -1270,16 +1270,16 @@ model GpuJob {
   @@map("gpu_job")
 }
 
-/// A location of the scene library (ADR-0042): a category the owner creates (living room, bedroom…), with a base
-/// description the generator builds on.
+/// A location of the scene library (ADR-0042): the place of a photoshoot (a hotel, a chalet) with its style; rooms of
+/// any type are generated in it.
 model SceneLocation {
   id          String   @id @default(uuid(7)) @db.Uuid
   workspaceId String   @db.Uuid
   projectId   String   @db.Uuid
   name        String
-  /// The room type the generator lays out: living | bedroom | hall | reading | kids | chalet | other
-  kind        String   @default("living")
-  /// What the room is like, in the owner's words (goes into the prompt).
+  /// Unused since rooms are chosen per scene (kept for old rows).
+  kind        String   @default("other")
+  /// The style of the whole location (a hotel, a chalet), in the owner's words; goes into every room's prompt.
   description String?
   position    Int      @default(0)
   createdAt   DateTime @default(now())
@@ -1302,6 +1302,8 @@ model Scene {
   name         String?
   /// Number among the candidates of its job (the owner picks by number).
   number       Int           @default(1)
+  /// The room of the location it shows (ADR-0042 rev.): living | bedroom | hall | reading | kids | hotel_room | lobby | kitchen | other
+  room         String?
   style        String?
   /// sun | evening
   light        String?

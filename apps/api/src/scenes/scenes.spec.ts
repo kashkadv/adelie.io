@@ -9,6 +9,7 @@ describe('parseCandidateRequest', () => {
   it('accepts a full request and drops unknown product types', () => {
     const r = parseCandidateRequest({
       locationId: LOC,
+      room: 'bedroom',
       style: '  warm scandinavian ',
       light: 'evening',
       angle: 'side',
@@ -20,6 +21,7 @@ describe('parseCandidateRequest', () => {
       ok: true,
       request: {
         locationId: LOC,
+        room: 'bedroom',
         style: 'warm scandinavian',
         light: 'evening',
         angle: 'side',
@@ -45,6 +47,10 @@ describe('parseCandidateRequest', () => {
     expect(parseCandidateRequest({ ...base, productTypes: [] })).toEqual({
       ok: false,
       error: 'productTypes',
+    });
+    expect(parseCandidateRequest({ ...base, room: 'garage' })).toEqual({
+      ok: false,
+      error: 'room',
     });
     expect(parseCandidateRequest({ ...base, count: 9 })).toEqual({ ok: false, error: 'count' });
     expect(parseCandidateRequest({ ...base, light: 'noon' })).toEqual({

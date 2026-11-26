@@ -10,10 +10,9 @@ import { Select } from '../ui/select';
 import {
   ANGLES,
   LIGHTS,
-  LOCATION_KINDS,
   PRODUCT_TYPES,
+  ROOMS,
   SIZE_CLASSES,
-  type LocationKind,
   type SceneLocation,
 } from './scenes-data';
 
@@ -119,7 +118,6 @@ export function LocationDialog({
 }) {
   const t = useTranslations('Scenes');
   const [name, setName] = useState(location?.name ?? '');
-  const [kind, setKind] = useState<LocationKind>(location?.kind ?? 'living');
   const [description, setDescription] = useState(location?.description ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,7 +131,7 @@ export function LocationDialog({
     try {
       await api(location ? `${base}/scene-locations/${location.id}` : `${base}/scene-locations`, {
         method: location ? 'PATCH' : 'POST',
-        json: { name, kind, description },
+        json: { name, description },
       });
       onSaved();
     } catch {
@@ -178,15 +176,6 @@ export function LocationDialog({
             onChange={(e) => setName(e.target.value)}
           />
         </label>
-        <div>
-          <Label text={t('locationKind')} hint={t('locationKindHint')} />
-          <Select
-            ariaLabel={t('locationKind')}
-            value={kind}
-            onChange={(v) => setKind(v as LocationKind)}
-            options={LOCATION_KINDS.map((k) => ({ value: k, label: t(`kinds.${k}`) }))}
-          />
-        </div>
         <label className="block">
           <Label text={t('locationDescription')} hint={t('locationDescriptionHint')} />
           <textarea
@@ -219,6 +208,7 @@ export function GenerateDialog({
 }) {
   const t = useTranslations('Scenes');
   const [location, setLocation] = useState(locationId ?? locations[0]?.id ?? '');
+  const [room, setRoom] = useState<string>('living');
   const [style, setStyle] = useState('');
   const [light, setLight] = useState<string>('sun');
   const [angle, setAngle] = useState<string>('front');
@@ -240,6 +230,7 @@ export function GenerateDialog({
         method: 'POST',
         json: {
           locationId: location,
+          room,
           style,
           light,
           angle,
@@ -294,11 +285,16 @@ export function GenerateDialog({
             ariaLabel={t('location')}
             value={location}
             onChange={setLocation}
-            options={locations.map((l) => ({
-              value: l.id,
-              label: l.name,
-              hint: t(`kinds.${l.kind}`),
-            }))}
+            options={locations.map((l) => ({ value: l.id, label: l.name }))}
+          />
+        </div>
+        <div>
+          <Label text={t('room')} hint={t('roomHint')} />
+          <Select
+            ariaLabel={t('room')}
+            value={room}
+            onChange={setRoom}
+            options={ROOMS.map((r) => ({ value: r, label: t(`rooms.${r}`) }))}
           />
         </div>
         <label className="block">

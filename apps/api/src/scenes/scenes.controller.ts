@@ -28,13 +28,7 @@ import {
   WorkspaceRoles,
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
-import {
-  LOCATION_KINDS,
-  parseCandidateRequest,
-  REJECTED_KEEP_MS,
-  seedsFor,
-  STATUSES,
-} from './scenes.js';
+import { parseCandidateRequest, REJECTED_KEEP_MS, seedsFor, STATUSES } from './scenes.js';
 
 type Ctx = { workspace: WorkspaceRequestContext };
 
@@ -44,6 +38,7 @@ const SCENE_SELECT = {
   status: true,
   name: true,
   number: true,
+  room: true,
   style: true,
   light: true,
   angle: true,
@@ -195,8 +190,6 @@ export class ScenesController {
     await this.project(ctx, projectId);
     const name = typeof body?.['name'] === 'string' ? body['name'].trim().slice(0, 80) : '';
     if (!name) throw new BadRequestException({ errors: { name: 'required' } });
-    const rawKind = typeof body?.['kind'] === 'string' ? body['kind'] : '';
-    const kind = (LOCATION_KINDS as readonly string[]).includes(rawKind) ? rawKind : 'other';
     const description =
       typeof body?.['description'] === 'string' ? body['description'].trim().slice(0, 1000) : '';
     const last = await this.prisma.client.sceneLocation.aggregate({
@@ -208,7 +201,6 @@ export class ScenesController {
         workspaceId: ctx.workspaceId,
         projectId,
         name,
-        kind,
         description: description || null,
         position: (last._max.position ?? -1) + 1,
       },
@@ -231,13 +223,6 @@ export class ScenesController {
       const name = body['name'].trim().slice(0, 80);
       if (!name) throw new BadRequestException({ errors: { name: 'required' } });
       data.name = name;
-    }
-    if (body?.['kind'] !== undefined) {
-      const kind = typeof body['kind'] === 'string' ? body['kind'] : '';
-      if (!(LOCATION_KINDS as readonly string[]).includes(kind)) {
-        throw new BadRequestException({ errors: { kind: 'invalid' } });
-      }
-      data.kind = kind;
     }
     if (typeof body?.['description'] === 'string')
       data.description = body['description'].trim().slice(0, 1000) || null;

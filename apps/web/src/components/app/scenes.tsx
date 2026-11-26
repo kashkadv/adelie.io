@@ -136,6 +136,7 @@ export function Scenes() {
 
   const sceneLabel = (s: Scene) =>
     [
+      s.room && t(`rooms.${s.room}` as 'rooms.living'),
       s.light && t(`lights.${s.light}` as 'lights.sun'),
       s.angle && t(`angles.${s.angle}` as 'angles.front'),
       s.sizeClass && t(`sizes.${s.sizeClass}` as 'sizes.small'),
@@ -241,10 +242,7 @@ export function Scenes() {
 
           {current && (
             <div className="animate-rise mb-4 flex items-start gap-2 px-1 text-sm text-muted">
-              <p className="min-w-0 flex-1">
-                {t(`kinds.${current.kind}`)}
-                {current.description ? ` · ${current.description}` : ''}
-              </p>
+              <p className="min-w-0 flex-1">{current.description}</p>
               {canManage && (
                 <button
                   type="button"

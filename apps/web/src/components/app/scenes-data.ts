@@ -1,11 +1,14 @@
 // Scene library of the Workshop (ADR-0042): what the API returns and the choices the forms offer.
-export const LOCATION_KINDS = [
+/** Rooms generated inside a location (a hotel, a chalet…). */
+export const ROOMS = [
   'living',
   'bedroom',
+  'hotel_room',
+  'lobby',
   'hall',
   'reading',
   'kids',
-  'chalet',
+  'kitchen',
   'other',
 ] as const;
 export const LIGHTS = ['sun', 'evening'] as const;
@@ -14,13 +17,12 @@ export const SIZE_CLASSES = ['small', 'medium', 'large', 'runner'] as const;
 export const PRODUCT_TYPES = ['lizhnyk', 'rug', 'runner', 'panel', 'pillow', 'pouf'] as const;
 export const STATUS_VIEWS = ['library', 'candidate', 'archived'] as const;
 
-export type LocationKind = (typeof LOCATION_KINDS)[number];
+export type Room = (typeof ROOMS)[number];
 export type GpuState = 'ready' | 'busy' | 'offline';
 
 export interface SceneLocation {
   id: string;
   name: string;
-  kind: LocationKind;
   description: string | null;
   position: number;
   /** Scenes per status. */
@@ -33,6 +35,7 @@ export interface Scene {
   status: 'candidate' | 'library' | 'archived' | 'rejected';
   name: string | null;
   number: number;
+  room: string | null;
   style: string | null;
   light: string | null;
   angle: string | null;
@@ -54,7 +57,7 @@ export interface GpuJob {
   status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
   progress: number;
   error: string | null;
-  params: { count?: number; location?: { name: string } };
+  params: { count?: number; room?: string; location?: { name: string } };
   createdAt: string;
   finishedAt: string | null;
 }

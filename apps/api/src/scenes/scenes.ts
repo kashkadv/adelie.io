@@ -2,13 +2,16 @@
  * Scene library (ADR-0042): the choices of a scene and how a request for new candidates is checked.
  * The agent on the PC turns the parameters into a block mock-up in centimetres and a prompt.
  */
-export const LOCATION_KINDS = [
+/** Rooms generated inside a location (a hotel, a chalet…). */
+export const ROOMS = [
   'living',
   'bedroom',
+  'hotel_room',
+  'lobby',
   'hall',
   'reading',
   'kids',
-  'chalet',
+  'kitchen',
   'other',
 ] as const;
 export const LIGHTS = ['sun', 'evening'] as const;
@@ -37,6 +40,7 @@ const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slic
 
 export interface CandidateRequest {
   locationId: string;
+  room: (typeof ROOMS)[number];
   style: string;
   light: (typeof LIGHTS)[number];
   angle: (typeof ANGLES)[number];
@@ -53,6 +57,8 @@ export function parseCandidateRequest(
 ): { ok: true; request: CandidateRequest } | { ok: false; error: string } {
   const locationId = typeof body['locationId'] === 'string' ? body['locationId'] : '';
   if (!/^[0-9a-f-]{36}$/i.test(locationId)) return { ok: false, error: 'locationId' };
+  const room = pick(ROOMS, body['room'] ?? 'living');
+  if (!room) return { ok: false, error: 'room' };
   const light = pick(LIGHTS, body['light'] ?? 'sun');
   if (!light) return { ok: false, error: 'light' };
   const angle = pick(ANGLES, body['angle'] ?? 'front');
@@ -76,6 +82,7 @@ export function parseCandidateRequest(
     ok: true,
     request: {
       locationId,
+      room,
       style: text(body['style'], 300),
       light,
       angle,

@@ -2099,26 +2099,15 @@
     "generate": "New candidates",
     "allLocations": "All",
     "emptyTitle": "No locations yet",
-    "emptyText": "Start with a location, like a place for a photoshoot: a living room, a bedroom, a hallway. Rooms are generated in it and you pick the best.",
+    "emptyText": "Start with a location, the place of a photoshoot: a hotel, a chalet, a flat. Rooms are generated inside it and you pick the best.",
     "locationNew": "New location",
     "locationEdit": "Edit location",
-    "locationLead": "A place where products are 'photographed'. Its description goes into every room generated for it.",
+    "locationLead": "A photoshoot place: a hotel, a chalet, a flat. Describe its style here; rooms (living room, bedroom, lobby) are chosen when generating candidates.",
     "locationName": "Name",
-    "locationNamePlaceholder": "Living room",
-    "locationKind": "Room type",
-    "locationKindHint": "The room type sets how the furniture is laid out in the mock-up.",
+    "locationNamePlaceholder": "Carpathian chalet",
     "locationDescription": "Description",
-    "locationDescriptionHint": "What the room should be like: style, materials, mood. Goes into the model's description.",
-    "locationDescriptionPlaceholder": "Warm Scandinavian living room: light oak, bouclé, linen, lots of daylight",
-    "kinds": {
-      "living": "Living room",
-      "bedroom": "Bedroom",
-      "hall": "Hallway",
-      "reading": "Reading corner",
-      "kids": "Kids' room",
-      "chalet": "Chalet",
-      "other": "Other"
-    },
+    "locationDescriptionHint": "The style of the whole place: materials, palette, mood, 2–3 telling details. Best in English, up to 300 characters.",
+    "locationDescriptionPlaceholder": "Carpathian chalet: old spruce beams, stone fireplace, wool throws, linen, warm wood tones",
     "generateTitle": "New candidates",
     "generateLead": "The PC generates rooms with these settings. You choose which go into the library.",
     "generateSubmit": "Generate",
@@ -2221,6 +2210,19 @@
       "light": "Choose the light",
       "angle": "Choose the angle",
       "location": "The location has scenes in the library"
+    },
+    "room": "Room",
+    "roomHint": "Which room of this location to generate. It sets how the furniture is laid out.",
+    "rooms": {
+      "living": "Living room",
+      "bedroom": "Bedroom",
+      "hotel_room": "Hotel room",
+      "lobby": "Lobby",
+      "hall": "Hallway",
+      "reading": "Reading corner",
+      "kids": "Kids' room",
+      "kitchen": "Kitchen / dining",
+      "other": "Other"
     }
   }
 }

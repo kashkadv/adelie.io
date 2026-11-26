@@ -87,25 +87,34 @@ SIZE_MOCK = {"small": "100x150", "medium": "160x230", "large": "200x300", "runne
 KIND = {
     "living": ("a soft upholstered sofa", "220x90x80", True),
     "reading": ("a soft upholstered sofa", "200x90x80", True),
-    "chalet": ("a sofa with wool throws", "220x95x85", True),
+    "lobby": ("a long upholstered lounge sofa", "240x95x80", True),
     "other": ("a sofa", "220x90x80", True),
     "bedroom": ("a bed with an upholstered headboard and linen bedding, its foot towards the open floor", "180x210x95", False),
+    "hotel_room": ("a hotel bed with an upholstered headboard and crisp bedding, its foot towards the open floor",
+                   "180x210x100", False),
     "kids": ("a low daybed with cushions", "190x90x70", False),
     "hall": ("a low wooden bench", "120x40x45", False),
+    "kitchen": ("a long wooden dining table with chairs", "200x90x75", False),
 }
-ROOM_NAME = {"living": "living room", "reading": "reading corner", "chalet": "mountain chalet living room",
-             "other": "room", "bedroom": "bedroom", "kids": "kids' room", "hall": "hallway"}
+ROOM_NAME = {"living": "living room", "reading": "reading corner", "lobby": "hotel lobby", "other": "room",
+             "bedroom": "bedroom", "hotel_room": "hotel room", "kids": "kids' room", "hall": "hallway",
+             "kitchen": "dining room"}
 LIGHT = {
     "sun": "Warm late-afternoon sunlight through sheer linen curtains, long soft shadows across the floor.",
     "evening": "Evening: soft warm light from table and floor lamps switched on, gentle shadows, cosy and calm.",
 }
 
 
+def room_of(p):
+    """The room to generate: chosen per job inside a location (a hotel, a chalet); old jobs used the location's kind."""
+    return p.get("room") or (p.get("location") or {}).get("kind") or "living"
+
+
 def scene_prompt(p):
     loc = p.get("location") or {}
-    kind = loc.get("kind", "living"); what, _, armchair = KIND.get(kind, KIND["other"])
+    kind = room_of(p); what, _, armchair = KIND.get(kind, KIND["other"])
     size = SIZE_MOCK[p["sizeClass"]].replace("x", " x ")
-    room = (loc.get("description") or "").strip()
+    place = (loc.get("description") or "").strip()
     style = (p.get("style") or "").strip()
     notes = (p.get("notes") or "").strip()
     parts = [
@@ -128,7 +137,7 @@ def scene_prompt(p):
         "Throws and blankets lie folded on the seats, nothing hangs down to the floor. Curtains only at windows. "
         "No animals, no people, no rugs or carpets, no text.",
     ]
-    if room: parts.append(room)
+    if place: parts.append(f"The place: {place}")
     if style: parts.append(f"Style: {style}.")
     parts.append(LIGHT.get(p.get("light", "sun"), LIGHT["sun"]))
     if notes: parts.append(notes)
@@ -139,7 +148,7 @@ def scene_prompt(p):
 
 def scene_candidates(job):
     p = job["params"]; jid = job["id"]
-    loc = p.get("location") or {}; kind = loc.get("kind", "living")
+    kind = room_of(p)
     _, sofa, armchair = KIND.get(kind, KIND["other"])
     work = COMFY_DIR / "work" / "adelie" / jid; work.mkdir(parents=True, exist_ok=True)
     blank = work / "blank.png"
