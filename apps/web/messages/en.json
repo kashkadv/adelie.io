@@ -2264,7 +2264,9 @@
       "angle": "Choose the angle",
       "sceneType": "Choose a scene",
       "location": "The location has scenes",
-      "ruleInUse": "Scenes use this type — it cannot be deleted"
+      "ruleInUse": "Scenes use this type — it cannot be deleted",
+      "reference": "Could not upload the photo",
+      "references": "A reference was not found — add it again"
     },
     "stages": {
       "mockup": "building the mock-up",
@@ -2282,6 +2284,11 @@
     "refinePlaceholder": "remove the floor lamp on the left; darker walls",
     "refineCount": "How many versions",
     "refineSubmit": "Refine",
-    "refineJob": "Refining №{n}: {what}"
+    "refineJob": "Refining №{n}: {what}",
+    "references": "References",
+    "referencesHint": "Up to 3 photos: interiors, materials, mood. The model takes their style, colours and materials; the layout comes only from the mock-up.",
+    "referenceAdd": "Drop photos here or choose files",
+    "referenceMore": "More photos",
+    "referenceRemove": "Remove the reference"
   }
 }

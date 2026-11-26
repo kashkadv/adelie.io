@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Copy,
   Cpu,
+  ImagePlus,
   MapPin,
   PencilLine,
   Plus,
@@ -20,6 +21,8 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api, ApiError } from '@/lib/api';
+import { apiUrl } from '@/lib/auth-client';
+import { resizeToBlob } from '@/lib/resize-image';
 import { InfoTip } from '../ui/info-tip';
 import { Select } from '../ui/select';
 import {
@@ -34,6 +37,9 @@ import {
   type LocationDetail,
   type SceneRule,
 } from './scenes-data';
+
+/** References one request may carry. */
+const MAX_REFS = 3;
 
 const subtle =
   'rounded-xl px-3.5 py-2 text-sm text-muted hover:bg-hover hover:text-foreground disabled:opacity-50';
@@ -292,12 +298,44 @@ export function AddScenesDialog({
   const [types, setTypes] = useState<string[]>(['lizhnyk', 'rug']);
   const [count, setCount] = useState('4');
   const [notes, setNotes] = useState('');
+  const [refs, setRefs] = useState<{ id: string | null; preview: string }[]>([]);
+  const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const uploading = refs.some((r) => r.id === null);
+
+  // Each picked image is scaled down in the browser and uploaded at once; the request then names the uploads.
+  async function addFiles(files: FileList | File[]) {
+    const room = MAX_REFS - refs.length;
+    for (const file of [...files].filter((f) => f.type.startsWith('image/')).slice(0, room)) {
+      const preview = URL.createObjectURL(file);
+      setRefs((r) => [...r, { id: null, preview }]);
+      try {
+        const blob = await resizeToBlob(file);
+        const res = await fetch(`${apiUrl}${base}/scene-locations/${locationId}/references`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'image/jpeg' },
+          body: blob,
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const { id } = (await res.json()) as { id: string };
+        setRefs((r) => r.map((x) => (x.preview === preview ? { ...x, id } : x)));
+      } catch {
+        setRefs((r) => r.filter((x) => x.preview !== preview));
+        URL.revokeObjectURL(preview);
+        setError(t('errors.reference'));
+      }
+    }
+  }
+  const removeRef = (preview: string) => {
+    setRefs((r) => r.filter((x) => x.preview !== preview));
+    URL.revokeObjectURL(preview);
+  };
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || uploading) return;
     if (!types.length) return setError(t('errors.productTypes'));
     setBusy(true);
     setError(null);
@@ -313,6 +351,7 @@ export function AddScenesDialog({
           productTypes: types,
           count: Number(count),
           notes,
+          referenceIds: refs.map((r) => r.id).filter(Boolean),
         },
       });
       onQueued();
@@ -339,7 +378,11 @@ export function AddScenesDialog({
           <button type="button" onClick={onClose} disabled={busy} className={subtle}>
             {t('cancel')}
           </button>
-          <button type="submit" disabled={busy || !sceneType} className="btn-primary w-auto px-5">
+          <button
+            type="submit"
+            disabled={busy || !sceneType || uploading}
+            className="btn-primary w-auto px-5"
+          >
             {t('addScenesSubmit')}
           </button>
         </>
@@ -429,6 +472,59 @@ export function AddScenesDialog({
                 </button>
               );
             })}
+          </div>
+        </div>
+        <div>
+          <Label text={t('references')} hint={t('referencesHint')} />
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              void addFiles(e.dataTransfer.files);
+            }}
+            className={`flex flex-wrap items-center gap-2 rounded-2xl border border-dashed p-2 transition-colors ${
+              dragging ? 'border-accent bg-hover' : 'border-line'
+            }`}
+          >
+            {refs.map((r) => (
+              <div key={r.preview} className="relative h-20 w-20 overflow-hidden rounded-xl">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a local preview (object URL) */}
+                <img
+                  src={r.preview}
+                  alt=""
+                  className={`h-full w-full object-cover ${r.id ? '' : 'opacity-50'}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeRef(r.preview)}
+                  aria-label={t('referenceRemove')}
+                  className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
+                >
+                  <X size={12} aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            {refs.length < MAX_REFS && (
+              <label className="flex h-20 min-w-20 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl px-3 text-sm text-muted hover:text-foreground">
+                <ImagePlus size={18} aria-hidden="true" />
+                {refs.length ? t('referenceMore') : t('referenceAdd')}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="sr-only"
+                  onChange={(e) => {
+                    if (e.target.files) void addFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            )}
           </div>
         </div>
         <label className="block">

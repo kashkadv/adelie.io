@@ -29,3 +29,23 @@ export async function resizeToSquare(file: File, size = 256): Promise<string> {
   // Browsers without a WebP encoder (older Safari) silently return PNG — use JPEG then.
   return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.85);
 }
+
+/**
+ * Scales an image down so its long side is at most `max` px, keeping its proportions; JPEG blob for upload
+ * (references for scene generation, ADR-0042: the model sees ~1 MP anyway).
+ */
+export async function resizeToBlob(file: File, max = 1600): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const k = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * k);
+  canvas.height = Math.round(bitmap.height * k);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas is not available');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return new Promise((ok, fail) =>
+    canvas.toBlob((b) => (b ? ok(b) : fail(new Error('encode'))), 'image/jpeg', 0.9),
+  );
+}

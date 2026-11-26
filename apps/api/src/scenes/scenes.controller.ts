@@ -15,9 +15,9 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { Prisma } from '@adelie/db';
-import { assetFile } from '../assets/storage.js';
+import { assetFile, MIME_EXT, readBinary, saveAsset } from '../assets/storage.js';
 import { bestState, workerState } from '../gpu/gpu.js';
 import { CONNECT_ROLES } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
@@ -37,6 +37,9 @@ import {
 } from './scenes.js';
 
 type Ctx = { workspace: WorkspaceRequestContext };
+
+/** References one request may carry (the model takes up to 10 images; the mock-up is image 1). */
+const MAX_REFS = 3;
 
 const SCENE_SELECT = {
   id: true,
@@ -404,7 +407,53 @@ export class ScenesController {
     await this.project(ctx, projectId);
     const parsed = parseCandidateRequest({ ...body, locationId: id });
     if (!parsed.ok) throw new BadRequestException({ errors: { [parsed.error]: 'invalid' } });
-    return this.queue(ctx, projectId, { ...parsed.request });
+    const refs = await this.references(projectId, body?.['referenceIds']);
+    return this.queue(ctx, projectId, { ...parsed.request, refAssetIds: refs });
+  }
+
+  /** Reference images of a request: the project's uploaded references, at most MAX_REFS, in the given order. */
+  private async references(projectId: string, raw: unknown): Promise<string[]> {
+    const ids = (Array.isArray(raw) ? raw : []).filter(isId).slice(0, MAX_REFS);
+    if (!ids.length) return [];
+    const found = await this.prisma.client.asset.findMany({
+      where: { id: { in: ids }, projectId, role: 'scene_reference' },
+      select: { id: true },
+    });
+    if (found.length !== ids.length)
+      throw new BadRequestException({ errors: { references: 'invalid' } });
+    return ids;
+  }
+
+  /**
+   * A reference for "Add scenes" (an interior, a material, a mood): the image as the body (image/jpeg, png or webp),
+   * stored in the project's library; the request then names it.
+   */
+  @Post('scene-locations/:id/references')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async upload(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: Ctx & Request,
+  ) {
+    const ctx = request.workspace;
+    await this.project(ctx, projectId);
+    await this.location(ctx, projectId, id);
+    const mime = String(request.headers['content-type'] ?? '')
+      .split(';')[0]!
+      .trim();
+    if (!MIME_EXT[mime]) throw new BadRequestException({ errors: { file: 'type' } });
+    const data = await readBinary(request, 15 * 1024 * 1024);
+    if (!data?.length) throw new BadRequestException({ errors: { file: 'size' } });
+    const asset = await saveAsset(this.prisma.client, {
+      workspaceId: ctx.workspaceId,
+      projectId,
+      role: 'scene_reference',
+      origin: 'upload',
+      mime,
+      data,
+      recipe: { locationId: id },
+    });
+    return { id: asset.id };
   }
 
   private async queue(
@@ -434,12 +483,18 @@ export class ScenesController {
       style: r.style,
       notes: r.notes,
     });
+    const refs = (r['refAssetIds'] as string[] | undefined) ?? [];
     const params = {
       ...r,
+      refAssetIds: refs,
       location: { id: loc.id, name: loc.name, direction: loc.direction },
       sceneTypeLabel: typeRule.label,
       mockup: (typeRule.mockup as Mockup | null) ?? null,
-      prompt,
+      prompt: refs.length
+        ? `${prompt} ${refs.length > 1 ? `Images 2 to ${refs.length + 1} are` : 'Image 2 is'} style ` +
+          'references: take their materials, colours, furniture style and atmosphere; do not copy their layout, ' +
+          'objects placement or camera - the layout and camera come only from image 1.'
+        : prompt,
       seeds: seedsFor(r.count),
     };
     return this.prisma.client.gpuJob.create({
@@ -477,7 +532,8 @@ export class ScenesController {
       count: body?.count ?? 4,
     });
     if (!parsed.ok) throw new BadRequestException({ errors: { [parsed.error]: 'invalid' } });
-    return this.queue(ctx, projectId, { ...parsed.request });
+    const refs = Array.isArray(p['refAssetIds']) ? (p['refAssetIds'] as string[]) : [];
+    return this.queue(ctx, projectId, { ...parsed.request, refAssetIds: refs });
   }
 
   /**

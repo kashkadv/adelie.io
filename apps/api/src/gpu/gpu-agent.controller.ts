@@ -171,14 +171,32 @@ export class GpuAgentController {
     return res.json({ sceneId: scene.id, assetId: asset.id });
   }
 
-  /** The image a refine job edits (the scene the owner asked to refine). */
+  /** The image a refine job edits (the scene the owner asked to refine), or reference n (1..) of a request. */
   @Get('jobs/:id/source')
   async source(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request, @Res() res: Response) {
     const job = await this.ownJob(req, id);
     const assetId = (job?.params as { sourceAssetId?: unknown } | undefined)?.sourceAssetId;
     if (!job || typeof assetId !== 'string') return res.status(404).json({ error: 'job' });
+    return this.sendAsset(job.projectId, assetId, res);
+  }
+
+  @Get('jobs/:id/refs/:n')
+  async reference(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('n') n: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const job = await this.ownJob(req, id);
+    const refs = (job?.params as { refAssetIds?: unknown } | undefined)?.refAssetIds;
+    const assetId = Array.isArray(refs) ? refs[Number(n) - 1] : undefined;
+    if (!job || typeof assetId !== 'string') return res.status(404).json({ error: 'job' });
+    return this.sendAsset(job.projectId, assetId, res);
+  }
+
+  private async sendAsset(projectId: string, assetId: string, res: Response) {
     const asset = await this.prisma.client.asset.findFirst({
-      where: { id: assetId, projectId: job.projectId },
+      where: { id: assetId, projectId },
       select: { path: true, mime: true, bytes: true },
     });
     const file = asset && assetFile(asset.path);

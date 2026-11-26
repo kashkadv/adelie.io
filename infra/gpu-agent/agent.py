@@ -239,6 +239,11 @@ def scene_candidates(job):
     run([PY, "-I", PROTO / "scene_proxy.py", blank, proxy], env=geo)
     inp = COMFY_DIR / "input" / f"adelie_{jid}_proxy.png"; shutil.copy(proxy, inp)
     prompt = p.get("prompt") or scene_prompt(p); (work / "prompt.txt").write_text(prompt)
+    # the owner's references (interiors, materials, mood) go to the model after the mock-up: images 2..
+    refs = []
+    for i, _ in enumerate(p.get("refAssetIds") or [], 1):
+        ref = COMFY_DIR / "input" / f"adelie_{jid}_ref{i}.png"; ref.write_bytes(fetch(f"/gpu/jobs/{jid}/refs/{i}"))
+        refs.append(ref)
     seeds = p.get("seeds") or [1]
     comfy_free()
     for n, seed in enumerate(seeds, 1):
@@ -246,15 +251,15 @@ def scene_candidates(job):
         wf = work / f"wf_{n}.json"
         if AGENT_MODEL == "flux3":
             run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}",
-                 inp.name], env={"START": "2", "STEPS": "16"})
+                 inp.name, *[r.name for r in refs]], env={"START": "2", "STEPS": "16", "REF_MP": "0.6"})
         else:   # FLUX.2 klein for comparisons: 8 steps, the first skipped (the same share)
             run([PY, "-I", PROTO / "wf_klein.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}",
-                 inp.name], env={"START": "1", "STEPS": "8", "KLEIN": AGENT_MODEL[-2:]})
+                 inp.name, *[r.name for r in refs]], env={"START": "1", "STEPS": "8", "KLEIN": AGENT_MODEL[-2:]})
         out = run([PY, "-I", PROTO / "comfy_run.py", wf], env={"PROGRESS_FILE": str(prog.file)})
         prog.set(stage="uploading")
         name = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")][0]
         img = COMFY_DIR / "output" / "adelie" / name
-        meta = {"prompt": prompt, "seed": seed, "model": MODEL, "size": "832x1248",
+        meta = {"prompt": prompt, "seed": seed, "model": MODEL, "size": "832x1248", "refAssetIds": p.get("refAssetIds") or [],
                 "proxy": geo, "mock": SIZE_MOCK[p["sizeClass"]], "kind": kind}
         call(f"/gpu/jobs/{jid}/scenes", data=img.read_bytes(), timeout=300,
              headers={"Content-Type": "image/png", "X-Number": str(n),
@@ -266,6 +271,8 @@ def scene_candidates(job):
     prog.close()
     comfy_free()
     inp.unlink(missing_ok=True)
+    for r in refs:
+        r.unlink(missing_ok=True)
 
 
 def scene_refine(job):
