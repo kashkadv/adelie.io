@@ -40,6 +40,7 @@
     "research": "Research",
     "products": "Products",
     "orders": "Orders",
+    "scenes": "Scenes",
     "reports": "Reports",
     "connections": "Connections",
     "settings": "Settings",
@@ -54,6 +55,7 @@
     "closeMenu": "Close menu",
     "groups": {
       "promotion": "Promotion",
+      "workshop": "Workshop",
       "sales": "Sales",
       "site": "Site"
     },
@@ -2082,6 +2084,143 @@
         "quantity": "quantity",
         "sku": "SKU"
       }
+    }
+  },
+  "Scenes": {
+    "title": "Scenes",
+    "subtitle": "Locations for product photos: rooms to place blankets, rugs, runners and wall hangings in",
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "done": "Done",
+    "copy": "Copy",
+    "open": "Open",
+    "delete": "Delete",
+    "generate": "New candidates",
+    "allLocations": "All",
+    "emptyTitle": "No locations yet",
+    "emptyText": "Start with a location, like a place for a photoshoot: a living room, a bedroom, a hallway. Rooms are generated in it and you pick the best.",
+    "locationNew": "New location",
+    "locationEdit": "Edit location",
+    "locationLead": "A place where products are 'photographed'. Its description goes into every room generated for it.",
+    "locationName": "Name",
+    "locationNamePlaceholder": "Living room",
+    "locationKind": "Room type",
+    "locationKindHint": "The room type sets how the furniture is laid out in the mock-up.",
+    "locationDescription": "Description",
+    "locationDescriptionHint": "What the room should be like: style, materials, mood. Goes into the model's description.",
+    "locationDescriptionPlaceholder": "Warm Scandinavian living room: light oak, bouclé, linen, lots of daylight",
+    "kinds": {
+      "living": "Living room",
+      "bedroom": "Bedroom",
+      "hall": "Hallway",
+      "reading": "Reading corner",
+      "kids": "Kids' room",
+      "chalet": "Chalet",
+      "other": "Other"
+    },
+    "generateTitle": "New candidates",
+    "generateLead": "The PC generates rooms with these settings. You choose which go into the library.",
+    "generateSubmit": "Generate",
+    "location": "Location",
+    "style": "Style",
+    "styleHint": "A few words on the style of this series; adds to the location's description.",
+    "stylePlaceholder": "warm Scandinavian, honey and cream tones",
+    "light": "Light",
+    "angle": "Angle",
+    "count": "How many",
+    "sizeClass": "Product size",
+    "sizeClassHint": "How much free floor: the room is built around a product of this size.",
+    "productTypes": "For which products",
+    "productTypesHint": "Which products can be placed in these scenes.",
+    "notes": "Wishes",
+    "notesHint": "What the room must or must not have.",
+    "notesPlaceholder": "no coffee table; more plants",
+    "lights": {
+      "sun": "Sun",
+      "evening": "Evening, lamps"
+    },
+    "angles": {
+      "front": "Front",
+      "side": "Side"
+    },
+    "sizes": {
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large",
+      "runner": "Runner"
+    },
+    "sizeRanges": {
+      "small": "up to 150 cm",
+      "medium": "120–230 cm",
+      "large": "180–300 cm",
+      "runner": "150–300 cm, narrow"
+    },
+    "types": {
+      "lizhnyk": "Lizhnyk blanket",
+      "rug": "Rug",
+      "runner": "Runner",
+      "panel": "Wall hanging",
+      "pillow": "Pillow",
+      "pouf": "Pouf"
+    },
+    "gpu": {
+      "ready": "PC ready",
+      "busy": "PC busy",
+      "offline": "PC offline"
+    },
+    "gpuHint": {
+      "ready": "Generation runs on your PC: it takes new jobs right away.",
+      "busy": "The PC is online but not taking jobs now (switched off or low on video memory). Jobs wait.",
+      "offline": "The PC is off or the agent is not running. Jobs wait in the queue.",
+      "none": "No PC connected yet: use the processor button next to this."
+    },
+    "pcTitle": "Connect a PC",
+    "pcLead": "An agent on your PC takes jobs from Adelie itself and generates on the graphics card.",
+    "pcName": "PC name",
+    "pcNamePlaceholder": "Work PC",
+    "pcCreate": "Get a key",
+    "pcKeyOnce": "The key is shown only once. Copy it now.",
+    "pcHowTo": "On the PC: ADELIE_GPU_KEY=<key> ADELIE_API=<API address> python infra/gpu-agent/agent.py",
+    "jobLine": "{count, plural, one {# candidate} other {# candidates}} · {location}",
+    "jobRunning": "generating, {progress}%",
+    "jobQueued": "queued",
+    "jobWaitingPc": "waiting for the PC",
+    "jobCancel": "Cancel the job",
+    "jobFailed": "Generation failed ({location})",
+    "view": "Show",
+    "views": {
+      "library": "Library",
+      "candidate": "Candidates",
+      "archived": "Archive"
+    },
+    "noCandidates": "No candidates. Use 'New candidates'.",
+    "noLibrary": "The library is empty: pick the best among the candidates.",
+    "noArchived": "The archive is empty.",
+    "toLibrary": "To library",
+    "reject": "Reject",
+    "archive": "Archive",
+    "restore": "Back to library",
+    "more": "More like this",
+    "details": {
+      "look": "Light · angle · size",
+      "style": "Style",
+      "products": "Products",
+      "sizes": "Product size",
+      "sizesValue": "{min}–{max} cm long side",
+      "model": "Model",
+      "created": "Created"
+    },
+    "errors": {
+      "name": "Enter a name",
+      "failed": "Could not save. Please try again.",
+      "productTypes": "Choose at least one product",
+      "locationId": "Choose a location",
+      "count": "From 1 to 8",
+      "sizeClass": "Choose a size",
+      "light": "Choose the light",
+      "angle": "Choose the angle",
+      "location": "The location has scenes in the library"
     }
   }
 }

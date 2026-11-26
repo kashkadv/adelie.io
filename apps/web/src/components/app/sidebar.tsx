@@ -5,6 +5,7 @@ import {
   FileChartColumn,
   Waves,
   Images,
+  Sofa,
   ChartColumn,
   House,
   Link2,
@@ -40,6 +41,7 @@ type NavKey =
   | 'products'
   | 'orders'
   | 'flipper'
+  | 'scenes'
   | 'reports'
   | 'connections'
   | 'settings';
@@ -49,7 +51,7 @@ type NavItem = { key: NavKey; href: string; icon: LucideIcon };
  * Sections by the question they answer (ADR-0018): Promotion — "where am I seen and what comes of
  * it?", Sales — "what do people buy?". Connections are set-up, not a place for analysis.
  */
-const NAV: { group?: 'promotion' | 'sales' | 'site'; items: NavItem[] }[] = [
+const NAV: { group?: 'promotion' | 'workshop' | 'sales' | 'site'; items: NavItem[] }[] = [
   {
     items: [
       { key: 'home', href: '/', icon: House },
@@ -68,6 +70,8 @@ const NAV: { group?: 'promotion' | 'sales' | 'site'; items: NavItem[] }[] = [
       { key: 'research', href: '/research', icon: Telescope },
     ],
   },
+  // Workshop: making the visuals (ADR-0040); scenes for products first (ADR-0042).
+  { group: 'workshop', items: [{ key: 'scenes', href: '/scenes', icon: Sofa }] },
   {
     group: 'sales',
     items: [
