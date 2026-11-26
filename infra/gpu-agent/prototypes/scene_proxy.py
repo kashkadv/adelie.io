@@ -2,7 +2,8 @@
 sofa (W x D x H) behind the product and the grey product slab. The model only 'dresses' these blocks (START=1 keeps the
 layout), so the furniture cannot come out at another scale than the product - the size cue the prompt alone could not give.
 Usage: scene_proxy.py cutout_canvas.png out.png
-env (same as rectify_place.py): SIZE ROT ELEV ROOM_CM CANVAS CY; LIGHT=evening (darker) / TONE; YAW (camera around, degrees); SOFA=220x90x80 (cm), GAP=30 (cm between product and sofa),
+env (same as rectify_place.py): SIZE ROT ELEV ROOM_CM CANVAS CY; v2: CAM_H PITCH CAM_DIST FOV (eye-height camera),
+ROOM_H (ceiling + baseboard), WINDOWS=x1,x2 (window centres on the back wall, cm) WIN_W WIN_SILL WIN_HEAD, SOFT (blur); LIGHT=evening (darker) / TONE; YAW (camera around, degrees); SOFA=220x90x80 (cm), GAP=30 (cm between product and sofa),
 WALL=40 (cm between sofa and wall), GREY=150"""
 import os, sys
 import numpy as np
@@ -18,6 +19,15 @@ GAP = float(os.environ.get("GAP", 30)); WALLD = float(os.environ.get("WALL", 40)
 
 C = np.array([0, -D * np.cos(ELEV), D * np.sin(ELEV)]); f = -C / np.linalg.norm(C)
 r = np.cross(f, [0, 0, 1.0]); r /= np.linalg.norm(r); u = np.cross(r, f); fpx = CW * D / ROOM
+# CAM_H (v2, owner 2026-11-26: the old camera looked down from ~2.5 m - half the frame was empty floor): a camera at a
+# person's eye height, CAM_DIST cm in front of the product's centre, tilted PITCH degrees down, FOV horizontal degrees.
+if os.environ.get("CAM_H"):
+    p_ = np.radians(float(os.environ.get("PITCH", 18)))
+    C = np.array([0.0, -float(os.environ.get("CAM_DIST", 330)), float(os.environ["CAM_H"])])
+    f = np.array([0.0, np.cos(p_), -np.sin(p_)])
+    r = np.cross(f, [0, 0, 1.0]); r /= np.linalg.norm(r); u = np.cross(r, f)
+    fpx = CW / 2 / np.tan(np.radians(float(os.environ.get("FOV", 62))) / 2)
+    CY = float(os.environ.get("CY", 0.5))
 # YAW: the camera walks around the product (degrees, + = from the right) - the "side" angle of a scene (ADR-0042)
 YAW = np.radians(float(os.environ.get("YAW", 0))); cy_, sy_ = np.cos(YAW), np.sin(YAW)
 def P(x, y, z):
@@ -46,6 +56,19 @@ if YAW:   # turned camera: a room corner - the back wall plus the side wall it t
     dr.polygon([P(xa, yw, 0), P(xb, yw, 0), P(xb, yw, 600), P(xa, yw, 600)], fill=tone((236, 226, 210)))
 else:
     dr.polygon([P(-2000, yw, 0), P(2000, yw, 0), P(2000, yw, 600), P(-2000, yw, 600)], fill=tone((236, 226, 210)))
+# v2 architecture: ceiling, baseboard and windows at real heights - without them the model put windows at any height
+ROOM_H = float(os.environ.get("ROOM_H", 0))
+if ROOM_H:
+    dr.polygon([P(-2000, y_near, ROOM_H), P(2000, y_near, ROOM_H), P(2000, yw, ROOM_H), P(-2000, yw, ROOM_H)],
+               fill=tone((242, 238, 230)))
+    dr.polygon([P(-2000, yw, 0), P(2000, yw, 0), P(2000, yw, 10), P(-2000, yw, 10)], fill=tone((205, 198, 186)))
+for wx in [float(v) for v in os.environ.get("WINDOWS", "").split(",") if v.strip()]:   # window centres on the back wall, cm
+    WW, SILL, HEAD = float(os.environ.get("WIN_W", 110)), float(os.environ.get("WIN_SILL", 85)), float(os.environ.get("WIN_HEAD", 235))
+    dr.polygon([P(wx - WW / 2 - 6, yw, SILL - 6), P(wx + WW / 2 + 6, yw, SILL - 6), P(wx + WW / 2 + 6, yw, HEAD + 6),
+                P(wx - WW / 2 - 6, yw, HEAD + 6)], fill=tone((214, 208, 198)))
+    dr.polygon([P(wx - WW / 2, yw, SILL), P(wx + WW / 2, yw, SILL), P(wx + WW / 2, yw, HEAD), P(wx - WW / 2, yw, HEAD)],
+               fill=tone((250, 251, 252)))
+    dr.line([P(wx, yw, SILL), P(wx, yw, HEAD)], fill=tone((214, 208, 198)), width=4)
 # sofa: back block, seat block, two arms (flat-shaded faces, painter's order: back -> front)
 def box(x0, x1, ya, yb, z0, z1, shade):
     top = [P(x0, ya, z1), P(x1, ya, z1), P(x1, yb, z1), P(x0, yb, z1)]
@@ -72,7 +95,9 @@ if ST in ("left", "right"):
     box(sx0, sx0 + STW, ya_, yb_, STH - 4, STH, 1.05)
 for lx in (-SW / 2 + 8, SW / 2 - 8):                                    # legs
     dr.polygon([P(lx - 3, y0 + 5, 0), P(lx + 3, y0 + 5, 0), P(lx + 3, y0 + 5, 10), P(lx - 3, y0 + 5, 10)], fill=(90, 70, 50))
-img = img.filter(ImageFilter.GaussianBlur(0.6))
+# SOFT (v2): blur the whole mock-up - only "a big soft thing here" is left, the model designs the furniture itself
+# (sharp grey boxes came back as boxy furniture)
+img = img.filter(ImageFilter.GaussianBlur(float(os.environ.get("SOFT", 0.6))))
 # the product slab on top (exact silhouette from the placed cutout)
 a = np.asarray(Image.open(cut_p).convert("RGBA").resize((CW, CH)).split()[3]) / 255.0
 slab = (a > 0.5).astype(float) * (os.environ.get("SLAB", "1") == "1")   # SLAB=0: bare floor, no placeholder (owner's variant)
@@ -93,6 +118,7 @@ if AC in ("left", "right"):
     box(back[0], back[1], ya, yb, 10, AH, 1.05)                         # backrest on the outer side
     box(xa, xb, ya, yb, 10, 42, 1.15)                                   # seat
     box(xa, xb, ya, ya + 14, 10, 58, 1.0); box(xa, xb, yb - 14, yb, 10, 58, 1.0)   # arms
+    img = img.filter(ImageFilter.GaussianBlur(float(os.environ.get("SOFT", 0))))
     arr = np.asarray(img).astype(float)
     print("proxy: armchair %s of the product, facing it" % AC)
 Image.fromarray(arr.clip(0, 255).astype(np.uint8)).save(out_p)

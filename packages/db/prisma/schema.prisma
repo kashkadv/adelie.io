@@ -1275,26 +1275,27 @@ model GpuJob {
 /// A location of the scene library (ADR-0042): the place of a photoshoot (a hotel, a chalet) with its style; rooms of
 /// any type are generated in it.
 model SceneLocation {
-  id           String    @id @default(uuid(7)) @db.Uuid
-  workspaceId  String    @db.Uuid
-  projectId    String    @db.Uuid
-  name         String
+  id            String        @id @default(uuid(7)) @db.Uuid
+  workspaceId   String        @db.Uuid
+  projectId     String        @db.Uuid
+  name          String
   /// Unused since rooms are chosen per scene (kept for old rows).
-  kind         String    @default("other")
+  kind          String        @default("other")
   /// The style of the whole location (a hotel, a chalet), in the owner's words; goes first in every scene's prompt.
-  description  String?
+  description   String?
   /// interior | studio | outdoor - which scene types the location offers (ADR-0042, owner 2026-11-26).
-  direction    String    @default("interior")
+  direction     String        @default("interior")
   /// 1-3 things every scene of this location must have ("a panoramic window"), right after the style in the prompt.
-  mustHave     String?
+  mustHave      String?
   /// The scene on the location's card (owner's choice; none = its first scene).
-  coverSceneId String?   @db.Uuid
+  coverSceneId  String?       @db.Uuid
   /// Archived locations are hidden from the list; their scenes stay.
-  archivedAt   DateTime?
-  position     Int       @default(0)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  scenes       Scene[]
+  archivedAt    DateTime?
+  position      Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  scenes        Scene[]
+  sceneSketches SceneSketch[]
 
   @@index([projectId, position])
   @@map("scene_location")
@@ -1368,4 +1369,25 @@ model SceneRule {
 
   @@unique([projectId, key])
   @@map("scene_rule")
+}
+
+/// The owner's sketch of a room in a location (owner, 2026-11-27): the PC turns it into a photograph keeping its
+/// composition and architecture - far better rooms than the block mock-up. Pencil, line or coloured; the PC detects which.
+model SceneSketch {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  workspaceId String        @db.Uuid
+  projectId   String        @db.Uuid
+  locationId  String        @db.Uuid
+  location    SceneLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  assetId     String        @db.Uuid
+  /// The scene type it shows (a rule's key: living, bedroom…).
+  sceneType   String
+  name        String?
+  /// Where the product lies (4 corners on the sketch) and its size in cm - for placing a product later.
+  zone        Json?
+  position    Int           @default(0)
+  createdAt   DateTime      @default(now())
+
+  @@index([locationId, position])
+  @@map("scene_sketch")
 }

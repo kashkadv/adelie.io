@@ -2,7 +2,8 @@
 ComfyUI (API format) - a drop-in twin of wf_klein.py: same CLI, same START (begin from the MAIN image's latent, skip the
 first START of STEPS) and MASK (latent noise mask) semantics. Wiring follows BFL's flux3_klein_int8_mi2i workflow:
 Qwen3-VL-4B encoder, ModelSamplingFlux with shift log(16), ReferenceMultiLatent, euler/simple, cfg 1, 16 steps.
-Usage: wf_flux3.py out.json seed prompt.txt WxH prefix main.png [ref2.png ...]   env: STEPS 16, START 0, MASK, REF_MP 1.0, NO_MAIN_REF"""
+Usage: wf_flux3.py out.json seed prompt.txt WxH prefix main.png [ref2.png ...]   env: STEPS 16, START 0, MASK, REF_MP 1.0, NO_MAIN_REF,
+FLUX3_UNET (the Base: flux3-image-klein-base-int8-convrot.safetensors, STEPS 50, CFG 4), CFG 1, NEG (negative prompt)"""
 import json, math, os, sys
 
 UNET = os.environ.get("FLUX3_UNET", "flux3-image-klein-int8-convrot.safetensors")
@@ -16,7 +17,8 @@ def build(seed, prompt, w, h, prefix, images, steps=16, start=0):
         "msf": {"class_type": "ModelSamplingFlux", "inputs": {"model": ["unet", 0], "max_shift": math.log(16), "base_shift": math.log(16),
                                                               "width": 1024, "height": 1024}},
         "pos": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["clip", 0]}},
-        "neg": {"class_type": "CLIPTextEncode", "inputs": {"text": "", "clip": ["clip", 0]}},
+        # NEG: a negative prompt - it only works with CFG > 1 (the Base model; the distilled one runs at cfg 1)
+        "neg": {"class_type": "CLIPTextEncode", "inputs": {"text": os.environ.get("NEG", ""), "clip": ["clip", 0]}},
     }
     ref = {"positive": ["pos", 0], "negative": ["neg", 0], "vae": ["vae", 0],
            "resolution": "resize", "resolution.megapixels": float(os.environ.get("REF_MP", 1.0))}
@@ -37,7 +39,7 @@ def build(seed, prompt, w, h, prefix, images, steps=16, start=0):
         lat = ["nmask", 0]
     g["sample"] = {"class_type": "KSamplerAdvanced", "inputs": {
         "model": ["msf", 0], "positive": ["ref", 0], "negative": ["ref", 1], "latent_image": lat,
-        "add_noise": "enable", "noise_seed": seed, "steps": steps, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple",
+        "add_noise": "enable", "noise_seed": seed, "steps": steps, "cfg": float(os.environ.get("CFG", 1.0)), "sampler_name": "euler", "scheduler": "simple",
         "start_at_step": start, "end_at_step": 10000, "return_with_leftover_noise": "disable"}}
     g["decode"] = {"class_type": "VAEDecode", "inputs": {"samples": ["sample", 0], "vae": ["vae", 0]}}
     g["save"] = {"class_type": "SaveImage", "inputs": {"images": ["decode", 0], "filename_prefix": prefix}}

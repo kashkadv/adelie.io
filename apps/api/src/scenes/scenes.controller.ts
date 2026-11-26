@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
@@ -27,7 +28,13 @@ import {
   WorkspaceRoles,
   type WorkspaceRequestContext,
 } from '../workspaces/workspace-access.guard.js';
-import { composePrompt, DEFAULT_RULES, DIRECTIONS, type Mockup } from './rules.js';
+import {
+  composePrompt,
+  composeSketchPrompt,
+  DEFAULT_RULES,
+  DIRECTIONS,
+  type Mockup,
+} from './rules.js';
 import {
   MAX_CANDIDATES,
   parseCandidateRequest,
@@ -63,6 +70,15 @@ const SCENE_SELECT = {
   decidedAt: true,
   createdAt: true,
 } satisfies Prisma.SceneSelect;
+
+const SKETCH_SELECT = {
+  id: true,
+  assetId: true,
+  sceneType: true,
+  name: true,
+  zone: true,
+  position: true,
+} satisfies Prisma.SceneSketchSelect;
 
 const LOCATION_SELECT = {
   id: true,
@@ -237,7 +253,7 @@ export class ScenesController {
     await this.cleanUp(projectId);
     const loc = await this.location(ctx, projectId, id);
     const db = this.prisma.client;
-    const [scenes, jobs, rules] = await Promise.all([
+    const [scenes, jobs, rules, sketches] = await Promise.all([
       db.scene.findMany({
         where: { locationId: id, status: { not: 'rejected' } },
         orderBy: [{ createdAt: 'desc' }, { number: 'asc' }],
@@ -270,10 +286,16 @@ export class ScenesController {
         },
       }),
       this.rules(ctx, projectId),
+      db.sceneSketch.findMany({
+        where: { locationId: id },
+        orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+        select: SKETCH_SELECT,
+      }),
     ]);
     return {
       location: loc,
       scenes,
+      sketches,
       jobs: jobs.map((j) => {
         // the prompt stays on the server side of the page: long, and only for the recipe
         const { prompt: _p, ...params } = j.params as Record<string, unknown>;
@@ -408,7 +430,115 @@ export class ScenesController {
     const parsed = parseCandidateRequest({ ...body, locationId: id });
     if (!parsed.ok) throw new BadRequestException({ errors: { [parsed.error]: 'invalid' } });
     const refs = await this.references(projectId, body?.['referenceIds']);
-    return this.queue(ctx, projectId, { ...parsed.request, refAssetIds: refs });
+    let sketchId: string | null = null;
+    if (body?.['sketchId'] !== undefined && body['sketchId'] !== null) {
+      if (!isId(body['sketchId']))
+        throw new BadRequestException({ errors: { sketchId: 'invalid' } });
+      const sk = await this.prisma.client.sceneSketch.findFirst({
+        where: { id: body['sketchId'], locationId: id },
+        select: { id: true, sceneType: true },
+      });
+      if (!sk) throw new BadRequestException({ errors: { sketchId: 'invalid' } });
+      sketchId = sk.id;
+      parsed.request.sceneType = sk.sceneType;
+    }
+    return this.queue(ctx, projectId, { ...parsed.request, refAssetIds: refs, sketchId });
+  }
+
+  /** The owner's sketch of a room: the image as the body; scene type and name in the query. */
+  @Post('scene-locations/:id/sketches')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async uploadSketch(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('sceneType') sceneType: string | undefined,
+    @Query('name') name: string | undefined,
+    @Req() request: Ctx & Request,
+  ) {
+    const ctx = request.workspace;
+    await this.project(ctx, projectId);
+    await this.location(ctx, projectId, id);
+    const rules = await this.rules(ctx, projectId);
+    const type = rules.find((r) => r.key === sceneType && r.key !== 'general');
+    if (!type) throw new BadRequestException({ errors: { sceneType: 'invalid' } });
+    const mime = String(request.headers['content-type'] ?? '')
+      .split(';')[0]!
+      .trim();
+    if (!MIME_EXT[mime]) throw new BadRequestException({ errors: { file: 'type' } });
+    const data = await readBinary(request, 20 * 1024 * 1024);
+    if (!data?.length) throw new BadRequestException({ errors: { file: 'size' } });
+    const asset = await saveAsset(this.prisma.client, {
+      workspaceId: ctx.workspaceId,
+      projectId,
+      role: 'scene_sketch',
+      origin: 'upload',
+      mime,
+      data,
+      recipe: { locationId: id },
+    });
+    const last = await this.prisma.client.sceneSketch.aggregate({
+      where: { locationId: id },
+      _max: { position: true },
+    });
+    return this.prisma.client.sceneSketch.create({
+      data: {
+        workspaceId: ctx.workspaceId,
+        projectId,
+        locationId: id,
+        assetId: asset.id,
+        sceneType: type.key,
+        name: str(name, 80) || null,
+        position: (last._max.position ?? -1) + 1,
+      },
+      select: SKETCH_SELECT,
+    });
+  }
+
+  @Patch('scene-sketches/:id')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async updateSketch(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: Record<string, unknown> | undefined,
+    @Req() request: Ctx,
+  ) {
+    const ctx = request.workspace;
+    await this.project(ctx, projectId);
+    const data: Prisma.SceneSketchUpdateManyMutationInput = {};
+    if (body?.['sceneType'] !== undefined) {
+      const rules = await this.rules(ctx, projectId);
+      const key = typeof body['sceneType'] === 'string' ? body['sceneType'] : '';
+      if (!rules.some((r) => r.key === key && r.key !== 'general')) {
+        throw new BadRequestException({ errors: { sceneType: 'invalid' } });
+      }
+      data.sceneType = key;
+    }
+    if (body?.['name'] !== undefined) data.name = str(body['name'], 80) || null;
+    const res = await this.prisma.client.sceneSketch.updateMany({
+      where: { id, projectId, workspaceId: ctx.workspaceId },
+      data,
+    });
+    if (!res.count) throw new NotFoundException();
+    return { ok: true };
+  }
+
+  @Delete('scene-sketches/:id')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async deleteSketch(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: Ctx,
+  ) {
+    const ctx = request.workspace;
+    await this.project(ctx, projectId);
+    const sk = await this.prisma.client.sceneSketch.findFirst({
+      where: { id, projectId, workspaceId: ctx.workspaceId },
+      select: { id: true },
+    });
+    if (!sk) throw new NotFoundException();
+    // the file stays: scenes made from it keep their recipe
+    await this.prisma.client.sceneSketch.delete({ where: { id } });
+    return { ok: true };
   }
 
   /** Reference images of a request: the project's uploaded references, at most MAX_REFS, in the given order. */
@@ -474,15 +604,31 @@ export class ScenesController {
     const typeRule = rules.find((x) => x.key === r.sceneType && x.key !== 'general');
     const general = rules.find((x) => x.key === 'general');
     if (!typeRule || !general) throw new BadRequestException({ errors: { sceneType: 'invalid' } });
-    const prompt = composePrompt({
-      location: loc,
-      typeRule,
-      general,
-      sizeClass: r.sizeClass,
-      light: r.light,
-      style: r.style,
-      notes: r.notes,
-    });
+    const sketch = r['sketchId']
+      ? await this.prisma.client.sceneSketch.findFirst({
+          where: { id: r['sketchId'] as string, locationId: r.locationId },
+          select: { id: true, assetId: true },
+        })
+      : null;
+    const prompt = sketch
+      ? composeSketchPrompt({
+          location: loc,
+          typeLabel: typeRule.label,
+          general,
+          sizeClass: r.sizeClass,
+          light: r.light,
+          style: r.style,
+          notes: r.notes,
+        })
+      : composePrompt({
+          location: loc,
+          typeRule,
+          general,
+          sizeClass: r.sizeClass,
+          light: r.light,
+          style: r.style,
+          notes: r.notes,
+        });
     const refs = (r['refAssetIds'] as string[] | undefined) ?? [];
     // References described before (by the PC, kept on the file) go as words at once; the PC describes the rest.
     const described = refs.length
@@ -503,6 +649,18 @@ export class ScenesController {
       location: { id: loc.id, name: loc.name, direction: loc.direction },
       sceneTypeLabel: typeRule.label,
       mockup: (typeRule.mockup as Mockup | null) ?? null,
+      sketchId: sketch?.id ?? null,
+      // the agent downloads the sketch as the job's source image
+      sourceAssetId: sketch?.assetId ?? null,
+      // a short description for the photographic second pass (RealVisXL)
+      photoPrompt: [
+        `a real photograph of a ${typeRule.label} interior`,
+        loc.description?.trim().slice(0, 220),
+        r.light === 'evening' ? 'evening, warm lamp light' : 'warm natural daylight',
+        'shot on a full-frame camera, natural textures, subtle film grain',
+      ]
+        .filter(Boolean)
+        .join(', '),
       prompt,
       seeds: seedsFor(r.count),
     };
@@ -542,7 +700,8 @@ export class ScenesController {
     });
     if (!parsed.ok) throw new BadRequestException({ errors: { [parsed.error]: 'invalid' } });
     const refs = Array.isArray(p['refAssetIds']) ? (p['refAssetIds'] as string[]) : [];
-    return this.queue(ctx, projectId, { ...parsed.request, refAssetIds: refs });
+    const sketchId = typeof p['sketchId'] === 'string' ? p['sketchId'] : null;
+    return this.queue(ctx, projectId, { ...parsed.request, refAssetIds: refs, sketchId });
   }
 
   /**

@@ -82,7 +82,18 @@ export interface LocationDetail {
   sceneTypes: { key: string; label: string }[];
   /** Every type's label (scenes made under another direction keep their name). */
   allTypes: { key: string; label: string }[];
+  /** The owner's sketches of rooms in this location. */
+  sketches: SceneSketch[];
   gpu: Gpu;
+}
+
+export interface SceneSketch {
+  id: string;
+  assetId: string;
+  sceneType: string;
+  name: string | null;
+  zone: unknown;
+  position: number;
 }
 
 export interface SceneRule {
@@ -105,7 +116,7 @@ export const LOCATION_TEMPLATES: {
     key: 'chalet',
     direction: 'interior',
     description:
-      'Carpathian chalet: exposed old spruce beams, wood-panelled walls, a stone fireplace, wool throws and sheepskins, linen curtains, warm honey wood tones',
+      'Carpathian chalet: exposed old spruce beams, wood-panelled walls, a stone fireplace, wool throws on the sofa, linen curtains, warm honey wood tones',
     mustHave: 'exposed wooden ceiling beams',
   },
   {

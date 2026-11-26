@@ -37,7 +37,7 @@ export const DEFAULT_RULES: RuleDefault[] = [
       'The floor area of about {size} cm in front stays open and bare: nothing stands on it, touches it or hangs over it, ' +
       'no rug or carpet anywhere. Everything at real-world size and well built, like real products from a good store: ' +
       'straight evenly spaced legs, clean edges, square corners, true proportions between objects, a sensible layout like ' +
-      "an interior designer's. Throws lie folded on the seats, nothing hangs down to the floor. Curtains only at windows, on " +
+      "an interior designer's. Throws and sheepskins lie only on sofas and armchairs, never on walls, shelves or the fireplace; nothing hangs down to the floor. Curtains only at windows, on " +
       'a straight rod. Rectangular picture frames, plants with natural leaves. No animals, no people, no text. ' +
       'A real photograph: an unedited photo from an interior magazine, true-to-life colours, natural textures, subtle film ' +
       'grain; not a 3D render, not an illustration.',
@@ -137,6 +137,42 @@ export function composePrompt(a: {
     a.style.trim() && `Style of this series: ${a.style.trim()}.`,
     LIGHT_TEXT[a.light] ?? LIGHT_TEXT['sun'],
     a.notes.trim(),
+  ];
+  return parts.filter(Boolean).join(' ');
+}
+
+/**
+ * A scene made from the owner's sketch (owner, 2026-11-27): the sketch gives the camera, the architecture and the
+ * furniture, so the scene type's mock-up text is not used; the location's style still goes first.
+ */
+export function composeSketchPrompt(a: {
+  location: { description: string | null; mustHave: string | null };
+  typeLabel: string;
+  general: { text: string };
+  sizeClass: string;
+  light: string;
+  style: string;
+  notes: string;
+}): string {
+  const size = (SIZE_MOCK[a.sizeClass] ?? SIZE_MOCK['medium']!).replace('x', ' x ');
+  const general = a.general.text
+    .replaceAll('{size}', size)
+    // the general rule speaks of the block mock-up's layout; the sketch is image 1 here
+    .replace(/the floor boards run in the same direction as its lines\. /, '')
+    .trim();
+  const parts = [
+    a.location.description?.trim() && `The place: ${a.location.description.trim()}`,
+    a.location.mustHave?.trim() && `Always in this place: ${a.location.mustHave.trim()}`,
+    'Image 1 is a sketch of this room. Turn it into a real photograph of exactly this room: keep the camera, the ' +
+      'composition, the architecture (walls, ceiling, beams, windows, doors, fireplace, niches, shelves) and every ' +
+      'piece of furniture and decor in the same place and shape. Replace the lines and shading with real materials ' +
+      'and true colours. A rug, mat or table drawn on the open floor in front is removed: the floor there is plain, ' +
+      'bare and empty.',
+    general,
+    a.style.trim() && `Style of this series: ${a.style.trim()}.`,
+    LIGHT_TEXT[a.light] ?? LIGHT_TEXT['sun'],
+    a.notes.trim(),
+    'No pencil lines, not an illustration.',
   ];
   return parts.filter(Boolean).join(' ');
 }

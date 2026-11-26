@@ -21,6 +21,7 @@ import { api } from '@/lib/api';
 import { apiUrl } from '@/lib/auth-client';
 import { CONNECT_ROLES } from './accounts-data';
 import { GpuPill } from './scenes';
+import { SceneSketches } from './scene-sketches';
 import { AddScenesDialog, LocationDialog, RefineDialog, SceneViewer } from './scenes-dialogs';
 import { TABS, type LocationDetail, type Scene } from './scenes-data';
 import { useWorkspace } from './workspace-context';
@@ -50,6 +51,7 @@ export function SceneLocation({ locationId }: { locationId: string }) {
   const [focus, setFocus] = useState(0);
   const [viewer, setViewer] = useState<number | null>(null);
   const [dialog, setDialog] = useState<'edit' | 'add' | null>(null);
+  const [useSketch, setUseSketch] = useState<string | null>(null);
   const [refining, setRefining] = useState<Scene | null>(null);
   const reload = () => setVersion((v) => v + 1);
 
@@ -265,11 +267,13 @@ export function SceneLocation({ locationId }: { locationId: string }) {
         ? t('stages.mockup')
         : j.stage === 'describing'
           ? t('stages.describing')
-          : j.stage === 'loading'
-            ? t('stages.loading')
-            : j.stage === 'uploading' || j.stage === 'saved'
-              ? t('stages.uploading')
-              : t('stages.generating', { n, total });
+          : j.stage === 'refining'
+            ? t('stages.refining')
+            : j.stage === 'loading'
+              ? t('stages.loading')
+              : j.stage === 'uploading' || j.stage === 'saved'
+                ? t('stages.uploading')
+                : t('stages.generating', { n, total });
     const started = j.claimedAt ? new Date(j.claimedAt).getTime() : 0;
     const left =
       started && j.progress >= 5
@@ -485,6 +489,22 @@ export function SceneLocation({ locationId }: { locationId: string }) {
             </p>
           ))}
         </section>
+      )}
+
+      {base && (
+        <SceneSketches
+          base={base}
+          locationId={locationId}
+          sketches={data.sketches ?? []}
+          sceneTypes={data.sceneTypes}
+          typeLabel={typeLabel}
+          canManage={canManage}
+          onChanged={reload}
+          onUse={(id) => {
+            setUseSketch(id);
+            setDialog('add');
+          }}
+        />
       )}
 
       <div className="animate-rise mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -745,8 +765,14 @@ export function SceneLocation({ locationId }: { locationId: string }) {
           base={base}
           locationId={locationId}
           sceneTypes={data.sceneTypes}
+          sketches={data.sketches ?? []}
+          typeLabel={typeLabel}
+          initialSketchId={useSketch}
           gpu={data.gpu.state}
-          onClose={() => setDialog(null)}
+          onClose={() => {
+            setDialog(null);
+            setUseSketch(null);
+          }}
           onQueued={() => {
             setDialog(null);
             setTab('candidate');

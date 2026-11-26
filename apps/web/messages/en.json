@@ -2266,14 +2266,17 @@
       "location": "The location has scenes",
       "ruleInUse": "Scenes use this type — it cannot be deleted",
       "reference": "Could not upload the photo",
-      "references": "A reference was not found — add it again"
+      "references": "A reference was not found — add it again",
+      "sketch": "Could not upload the sketch",
+      "sketchId": "Sketch not found"
     },
     "stages": {
       "mockup": "building the mock-up",
       "loading": "loading the model",
       "generating": "generating scene {n} of {total}",
       "uploading": "saving",
-      "describing": "describing the references"
+      "describing": "describing the references",
+      "refining": "photo finish"
     },
     "etaMinutes": "~{count} min",
     "etaUnderMinute": "under a minute",
@@ -2290,6 +2293,14 @@
     "referencesHint": "Up to 3 photos: interiors, materials, mood. The PC describes each photo in words (the first time ~5 min per photo, then the description is kept), and the model takes the style, materials and colours from it. The layout comes only from the mock-up; the picture itself is not copied.",
     "referenceAdd": "Drop photos here or choose files",
     "referenceMore": "More photos",
-    "referenceRemove": "Remove the reference"
+    "referenceRemove": "Remove the reference",
+    "sketches": "Sketches",
+    "sketchesLead": "rooms of this location: the PC turns a sketch into a photo keeping its composition",
+    "sketchAdd": "Add a sketch",
+    "sketchAddHint": "Drop or choose. Pencil, line or coloured; best leave the floor for the product empty.",
+    "sketchUse": "Scenes from this sketch",
+    "sketch": "Sketch",
+    "sketchHint": "The room from the sketch: composition, architecture and furniture as drawn. Without a sketch — the scene type's mock-up.",
+    "noSketch": "No sketch (mock-up)"
   }
 }

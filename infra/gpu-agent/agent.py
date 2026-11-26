@@ -238,6 +238,55 @@ def describe_refs(jid, work, refs, prog):
         return None
 
 
+# Scenes are generated at ~2 MP (owner, 2026-11-27: real texture instead of the 1 MP upscale's smoothness)
+SIZE_HI = "1152x1728"
+REALVIS = "RealVisXL_V5.0_fp16.safetensors"
+
+# Reads the sketch, decides pencil / line / colour, blurs a pencil sketch's hatching, prints {"kind", "size"} where size
+# is the sketch's aspect at ~2 MP in multiples of 16.
+SKETCH_PREP = r"""
+import sys, json
+import numpy as np
+from PIL import Image, ImageFilter
+p = sys.argv[1]; im = Image.open(p).convert("RGB"); a = np.asarray(im).astype(float)
+sat = ((a.max(2) - a.min(2)) / (a.max(2) + 1)).mean()
+dark = (a.mean(2) < 200).mean()
+kind = "colour" if sat > 0.12 else ("line" if dark < 0.12 else "pencil")
+if kind == "pencil":
+    g = im.convert("L").filter(ImageFilter.GaussianBlur(2.2)).point(lambda v: min(255, int(v * 1.08)))
+    g.convert("RGB").save(p)
+else:
+    im.save(p)
+w, h = im.size; k = (2_000_000 / (w * h)) ** 0.5
+print(json.dumps({"kind": kind, "size": "%dx%d" % (round(w * k / 16) * 16, round(h * k / 16) * 16)}))
+"""
+
+
+def photo_pass(jid, work, n, seed, img, prompt, prog):
+    """The photographic second pass (owner, 2026-11-27): RealVisXL re-photographs the scene at low denoise - matte real
+    textures, natural colours - keeping the composition. Skipped if the checkpoint is not installed."""
+    if not prompt or not (COMFY_DIR / "models/checkpoints" / REALVIS).exists():
+        return img, False
+    prog.set(stage="refining")
+    src = COMFY_DIR / "input" / f"adelie_{jid}_photo{n}.png"; shutil.copy(img, src)
+    (work / "photo.txt").write_text(prompt)
+    wf = work / f"photo_{n}.json"
+    try:
+        comfy_free()
+        run([PY, "-I", PROTO / "wf_sdxl_refine.py", wf, seed, work / "photo.txt", src.name, f"adelie/{jid}_{n}_photo"],
+            env={"DENOISE": "0.3", "CKPT": REALVIS})
+        out = run([PY, "-I", PROTO / "comfy_run.py", wf])
+        comfy_free()
+        name = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")][0]
+        img.unlink(missing_ok=True)
+        return COMFY_DIR / "output" / "adelie" / name, True
+    except Exception as e:
+        print("  photo pass failed:", e, flush=True)
+        return img, False
+    finally:
+        src.unlink(missing_ok=True)
+
+
 def scene_candidates(job):
     p = job["params"]; jid = job["id"]
     kind = room_of(p)
@@ -256,8 +305,18 @@ def scene_candidates(job):
            "LIGHT": p.get("light", "sun")}
     proxy = work / "proxy.png"
     prog = Progress(jid, len(p.get("seeds") or [1]))
-    run([PY, "-I", PROTO / "scene_proxy.py", blank, proxy], env=geo)
-    inp = COMFY_DIR / "input" / f"adelie_{jid}_proxy.png"; shutil.copy(proxy, inp)
+    inp = COMFY_DIR / "input" / f"adelie_{jid}_proxy.png"
+    sketch = None
+    if p.get("sketchId"):
+        # the owner's sketch instead of the block mock-up (owner, 2026-11-27); a pencil sketch with hatching is blurred
+        # first - the hatching otherwise comes back as a drawn, rendered look
+        inp.write_bytes(fetch(f"/gpu/jobs/{jid}/source"))
+        out = run([PY, "-I", "-c", SKETCH_PREP, str(inp)])
+        sketch = json.loads(out.strip().splitlines()[-1])
+        geo = {"sketch": sketch}
+    else:
+        run([PY, "-I", PROTO / "scene_proxy.py", blank, proxy], env=geo); shutil.copy(proxy, inp)
+    size = sketch["size"] if sketch else SIZE_HI
     prompt = p.get("prompt") or scene_prompt(p); (work / "prompt.txt").write_text(prompt)
     # the owner's references (interiors, materials, mood) go to the model after the mock-up: images 2..
     # The owner's references go to the image model as WORDS only (tested 2026-11-26: the picture itself made the model
@@ -289,8 +348,8 @@ def scene_candidates(job):
         prog.set(stage="generating", done=n - 1)
         wf = work / f"wf_{n}.json"
         if AGENT_MODEL == "flux3":
-            run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}",
-                 inp.name], env={"START": "2", "STEPS": "16"})
+            run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", size, f"adelie/{jid}_{n}",
+                 inp.name], env={"START": "0" if sketch else "2", "STEPS": "16"})
         else:   # FLUX.2 klein for comparisons: 8 steps, the first skipped (the same share)
             run([PY, "-I", PROTO / "wf_klein.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}",
                  inp.name], env={"START": "1", "STEPS": "8", "KLEIN": AGENT_MODEL[-2:]})
@@ -298,7 +357,9 @@ def scene_candidates(job):
         prog.set(stage="uploading")
         name = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")][0]
         img = COMFY_DIR / "output" / "adelie" / name
-        meta = {"prompt": prompt, "seed": seed, "model": MODEL, "size": "832x1248", "refAssetIds": p.get("refAssetIds") or [], "referenceStyle": ref_style,
+        img, refined = photo_pass(jid, work, n, seed, img, p.get("photoPrompt"), prog)
+        meta = {"prompt": prompt, "seed": seed, "model": MODEL, "size": size, "photoPass": refined,
+                "sketchId": p.get("sketchId"), "refAssetIds": p.get("refAssetIds") or [], "referenceStyle": ref_style,
                 "proxy": geo, "mock": SIZE_MOCK[p["sizeClass"]], "kind": kind}
         call(f"/gpu/jobs/{jid}/scenes", data=img.read_bytes(), timeout=300,
              headers={"Content-Type": "image/png", "X-Number": str(n),
@@ -321,13 +382,15 @@ def scene_refine(job):
     prog = Progress(jid, len(p.get("seeds") or [1]))
     src = COMFY_DIR / "input" / f"adelie_{jid}_source.png"
     src.write_bytes(fetch(f"/gpu/jobs/{jid}/source"))
+    # refine at the scene's own size (scenes are ~2 MP since 2026-11-27)
+    ref_size = run([PY, "-I", "-c", f"from PIL import Image; w,h=Image.open('{src}').size; k=min(1.0,(2_000_000/(w*h))**0.5); print('%dx%d'%(round(w*k/16)*16, round(h*k/16)*16))"]).strip()
     (work / "prompt.txt").write_text(p["prompt"])
     comfy_free()
     seeds = p.get("seeds") or [1]
     for n, seed in enumerate(seeds, 1):
         prog.set(stage="generating", done=n - 1)
         wf = work / f"wf_{n}.json"
-        run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}", src.name],
+        run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", ref_size, f"adelie/{jid}_{n}", src.name],
             env={"START": "0", "STEPS": "16"})
         out = run([PY, "-I", PROTO / "comfy_run.py", wf], env={"PROGRESS_FILE": str(prog.file)})
         prog.set(stage="uploading")

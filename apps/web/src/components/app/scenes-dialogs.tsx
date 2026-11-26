@@ -36,6 +36,7 @@ import {
   type GpuState,
   type LocationDetail,
   type SceneRule,
+  type SceneSketch,
 } from './scenes-data';
 
 /** References one request may carry. */
@@ -278,6 +279,9 @@ export function AddScenesDialog({
   base,
   locationId,
   sceneTypes,
+  sketches,
+  typeLabel,
+  initialSketchId,
   gpu,
   onClose,
   onQueued,
@@ -285,12 +289,19 @@ export function AddScenesDialog({
   base: string;
   locationId: string;
   sceneTypes: { key: string; label: string }[];
+  sketches: SceneSketch[];
+  typeLabel: (key: string | null) => string;
+  initialSketchId?: string | null;
   gpu: GpuState;
   onClose: () => void;
   onQueued: () => void;
 }) {
   const t = useTranslations('Scenes');
   const [sceneType, setSceneType] = useState(sceneTypes[0]?.key ?? '');
+  // A sketch of the location is the room; without one, the block mock-up of the chosen scene type
+  const [sketchId, setSketchId] = useState<string | null>(
+    initialSketchId ?? sketches[0]?.id ?? null,
+  );
   const [style, setStyle] = useState('');
   const [light, setLight] = useState<string>('sun');
   const [angle, setAngle] = useState<string>('front');
@@ -343,7 +354,10 @@ export function AddScenesDialog({
       await api(`${base}/scene-locations/${locationId}/generate`, {
         method: 'POST',
         json: {
-          sceneType,
+          sceneType: sketchId
+            ? (sketches.find((s) => s.id === sketchId)?.sceneType ?? sceneType)
+            : sceneType,
+          sketchId,
           style,
           light,
           angle,
@@ -380,7 +394,7 @@ export function AddScenesDialog({
           </button>
           <button
             type="submit"
-            disabled={busy || !sceneType || uploading}
+            disabled={busy || (!sceneType && !sketchId) || uploading}
             className="btn-primary w-auto px-5"
           >
             {t('addScenesSubmit')}
@@ -395,7 +409,46 @@ export function AddScenesDialog({
             {gpu === 'busy' ? t('pcBusyWarning') : t('pcOfflineWarning')}
           </p>
         )}
-        {sceneTypes.length === 0 ? (
+        {sketches.length > 0 && (
+          <div>
+            <Label text={t('sketch')} hint={t('sketchHint')} />
+            <div className="flex flex-wrap gap-2 px-1">
+              {sketches.map((sk) => (
+                <button
+                  key={sk.id}
+                  type="button"
+                  aria-pressed={sketchId === sk.id}
+                  onClick={() => setSketchId(sk.id)}
+                  title={sk.name ?? typeLabel(sk.sceneType)}
+                  className={`relative h-20 w-28 overflow-hidden rounded-xl border-2 ${
+                    sketchId === sk.id ? 'border-accent' : 'border-transparent'
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- served by the API with the session cookie */}
+                  <img
+                    src={`${apiUrl}${base}/assets/${sk.assetId}`}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                  <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1.5 py-0.5 text-[11px] text-white">
+                    {sk.name ?? typeLabel(sk.sceneType)}
+                  </span>
+                </button>
+              ))}
+              <button
+                type="button"
+                aria-pressed={sketchId === null}
+                onClick={() => setSketchId(null)}
+                className={`h-20 w-28 rounded-xl border-2 text-xs text-muted ${
+                  sketchId === null ? 'border-accent' : 'border-dashed border-line'
+                }`}
+              >
+                {t('noSketch')}
+              </button>
+            </div>
+          </div>
+        )}
+        {sketchId ? null : sceneTypes.length === 0 ? (
           <p className="px-1 text-sm text-muted">{t('noSceneTypes')}</p>
         ) : (
           <div>
@@ -418,7 +471,7 @@ export function AddScenesDialog({
               options={LIGHTS.map((v) => ({ value: v, label: t(`lights.${v}`) }))}
             />
           </div>
-          <div>
+          <div className={sketchId ? 'hidden' : ''}>
             <Label text={t('angle')} />
             <Select
               ariaLabel={t('angle')}
