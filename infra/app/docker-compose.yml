@@ -23,6 +23,11 @@ services:
   api:
     <<: *app
     command: ['node', 'apps/api/dist/main.js']
+    # Library files (ADR-0040 §11, ADR-0042): on the server's HDD volume, owned by uid 1000 (the image's `node` user).
+    environment:
+      ASSETS_DIR: /data/assets
+    volumes:
+      - ${ASSETS_HOST_DIR:-/srv/adelie-assets}/${APP_ENV}:/data/assets
     depends_on:
       migrate:
         condition: service_completed_successfully

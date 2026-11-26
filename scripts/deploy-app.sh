@@ -35,7 +35,10 @@ ssh -o BatchMode=yes "adelie@$HOST" "
   docker build -q -f infra/app/Dockerfile -t adelie-app:$ENV_NAME \
     --build-arg NEXT_PUBLIC_API_URL=\$(get NEXT_PUBLIC_API_URL) \
     --build-arg NEXT_PUBLIC_APP_ENV=\$(get NEXT_PUBLIC_APP_ENV) . >/dev/null
-  APP_ENV=$ENV_NAME ENV_FILE=\$ENV_FILE docker compose -f infra/app/docker-compose.yml up -d --remove-orphans
+  # Library files (ADR-0042): the API runs as uid 1000, so its folder on the host is created with that owner.
+  ASSETS=\$(get ASSETS_HOST_DIR); ASSETS=\${ASSETS:-/srv/adelie-assets}
+  docker run --rm --user 0 -v \$ASSETS:/a adelie-app:$ENV_NAME sh -c 'mkdir -p /a/$ENV_NAME && chown 1000:1000 /a/$ENV_NAME'
+  APP_ENV=$ENV_NAME ENV_FILE=\$ENV_FILE ASSETS_HOST_DIR=\$ASSETS docker compose -f infra/app/docker-compose.yml up -d --remove-orphans
   docker image prune -f >/dev/null
   APP_ENV=$ENV_NAME ENV_FILE=\$ENV_FILE docker compose -f infra/app/docker-compose.yml ps --format 'table {{.Service}}\t{{.Status}}'
 "

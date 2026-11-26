@@ -2,7 +2,7 @@
 sofa (W x D x H) behind the product and the grey product slab. The model only 'dresses' these blocks (START=1 keeps the
 layout), so the furniture cannot come out at another scale than the product - the size cue the prompt alone could not give.
 Usage: scene_proxy.py cutout_canvas.png out.png
-env (same as rectify_place.py): SIZE ROT ELEV ROOM_CM CANVAS CY; SOFA=220x90x80 (cm), GAP=30 (cm between product and sofa),
+env (same as rectify_place.py): SIZE ROT ELEV ROOM_CM CANVAS CY; YAW (camera around, degrees); SOFA=220x90x80 (cm), GAP=30 (cm between product and sofa),
 WALL=40 (cm between sofa and wall), GREY=150"""
 import os, sys
 import numpy as np
@@ -18,9 +18,13 @@ GAP = float(os.environ.get("GAP", 30)); WALLD = float(os.environ.get("WALL", 40)
 
 C = np.array([0, -D * np.cos(ELEV), D * np.sin(ELEV)]); f = -C / np.linalg.norm(C)
 r = np.cross(f, [0, 0, 1.0]); r /= np.linalg.norm(r); u = np.cross(r, f); fpx = CW * D / ROOM
+# YAW: the camera walks around the product (degrees, + = from the right) - the "side" angle of a scene (ADR-0042)
+YAW = np.radians(float(os.environ.get("YAW", 0))); cy_, sy_ = np.cos(YAW), np.sin(YAW)
 def P(x, y, z):
+    x, y = cy_ * x + sy_ * y, -sy_ * x + cy_ * y                         # the world turned instead of the camera
     d = np.array([x, y, z], float) - C
-    return (CW / 2 + fpx * d @ r / (d @ f), CH * CY - fpx * d @ u / (d @ f))
+    depth = max(d @ f, 20.0)                                           # never behind the camera
+    return (CW / 2 + fpx * d @ r / depth, CH * CY - fpx * d @ u / depth)
 
 # product footprint after rotation: its depth (extent along y) decides where the sofa starts
 c, s_ = np.cos(ROT), np.sin(ROT)
@@ -32,7 +36,13 @@ img = Image.new("RGB", (CW, CH), (214, 184, 146)); dr = ImageDraw.Draw(img)
 y_near = C[1] + 80                                                     # floor lines only in front of the camera
 for x in range(-1000, 1001, 20):
     dr.line([P(x, y_near, 0), P(x, yw, 0)], fill=(200, 170, 132), width=1)
-dr.polygon([P(-2000, yw, 0), P(2000, yw, 0), P(2000, yw, 600), P(-2000, yw, 600)], fill=(236, 226, 210))
+if YAW:   # turned camera: a room corner - the back wall plus the side wall it turns towards (no wall end in mid-air)
+    xs = -float(os.environ.get("SIDE_WALL", 330)) * np.sign(YAW)
+    dr.polygon([P(xs, -400, 0), P(xs, yw, 0), P(xs, yw, 600), P(xs, -400, 600)], fill=(226, 214, 196))
+    xa, xb = sorted((xs, 2000 * np.sign(YAW)))
+    dr.polygon([P(xa, yw, 0), P(xb, yw, 0), P(xb, yw, 600), P(xa, yw, 600)], fill=(236, 226, 210))
+else:
+    dr.polygon([P(-2000, yw, 0), P(2000, yw, 0), P(2000, yw, 600), P(-2000, yw, 600)], fill=(236, 226, 210))
 # sofa: back block, seat block, two arms (flat-shaded faces, painter's order: back -> front)
 def box(x0, x1, ya, yb, z0, z1, shade):
     top = [P(x0, ya, z1), P(x1, ya, z1), P(x1, yb, z1), P(x0, yb, z1)]
