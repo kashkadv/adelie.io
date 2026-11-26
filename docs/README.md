@@ -20,6 +20,7 @@
 | [plans/niche-research.md](plans/niche-research.md) | Дослідження ніш: що просувати й як писати (в роботі) |
 | [plans/pin-workshop.md](plans/pin-workshop.md) | Майстерня публікацій: візуал, шаблони Figma, текст, GPU-воркер (план) |
 | [plans/product-studio.md](plans/product-studio.md) | Студія фото виробів: «новий інтер'єр», розмір і ракурс, набір для порівняння (план) |
+| [plans/scenes.md](plans/scenes.md) | Сцени для виробів у Майстерні: локації, кандидати, GPU-воркер (план) |
 | [plans/stage-2-data-model.md](plans/stage-2-data-model.md) | Етап 2: модель даних соцмереж і метрик (узгоджено) |
 | [plans/mvp-discussion.md](plans/mvp-discussion.md) | Обговорення обсягу MVP і стеку (завершено) |
 | [plans/infra-discussion.md](plans/infra-discussion.md) | Обговорення інфраструктури на домашньому Proxmox (в роботі) |
@@ -73,3 +74,4 @@
 - [ADR-0039](decisions/0039-calendar-direction.md) — Напрям у записах календаря; фокус фільтрує картки (прийнято)
 - [ADR-0040](decisions/0040-publication-workshop.md) — Майстерня публікацій: візуал і текст у записі календаря (прийнято)
 - [ADR-0041](decisions/0041-gpu-worker-on-demand.md) — GPU-воркер на ПК за потреби, pull-модель (прийнято)
+- [ADR-0042](decisions/0042-product-scenes.md) — Сцени для виробів: бібліотека локацій у Майстерні (прийнято)
