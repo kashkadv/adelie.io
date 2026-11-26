@@ -248,6 +248,10 @@ else:
     occ = slab & (sat > float(os.environ.get("OCC_SAT", 0.3))) & (dev > float(os.environ.get("OCC_DEV", 0.08)))
 occ = ndi.binary_opening(occ, iterations=max(1, int(2 * s)))
 occ = ndi.binary_dilation(occ, iterations=max(1, int(2 * s))) & slab
+if FILL == "none" or os.environ.get("OCC") == "0":
+    # bare floor: there is no mat for objects to stand on, and warm floorboards in the sun look like 'objects' - they punched
+    # a ragged edge into the rug (2026-11-26); the model's room has nothing standing in the rug's area by prompt
+    occ[:] = False
 occ_soft = ndi.gaussian_filter(occ.astype(float), 1.0 * s)
 print("occluders on the slab: %.1f%% of it" % (100 * occ[slab].mean()))
 a = a * (1 - occ_soft)
