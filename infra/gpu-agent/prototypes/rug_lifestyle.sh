@@ -8,7 +8,7 @@
 #   6. klein re-renders only the rug (volume, light; real thickness) with the photo as reference
 #   7. sharp floor back, original pattern + fibres with the model's light, neutral grade, no clipping, tighter crop
 # Usage: rug_lifestyle.sh <name> <folder under input/gushka> <main photo> <W>x<H cm> <thickness mm> [seed] [ref photo]
-# env: MODEL=flux3 (FLUX 3 Image Klein, commercial outputs under US$5M revenue) or klein (default) with KLEIN 4b|9b; ROT 90, ELEV 35, ROOM_CM 380, CY 0.72,
+# env: MODEL flux3 (default; FLUX 3 Image Klein, commercial outputs under US$5M revenue) or klein with KLEIN 4b|9b; ROT 90, ELEV 35, ROOM_CM 380, CY 0.72,
 #      FRINGE_CM (fringe on the short ends, not part of the size; drawn by the model). Not given: fringe_check.py looks
 #      for a fringe on every photo of the product and sets it (length from the main photo, else 5 cm).
 #      ROOM_IMG: a room already generated and chosen (skips step 4)
@@ -19,7 +19,7 @@ WK=$CUI/work/$NAME; mkdir -p $WK; OUTD=$CUI/output/$NAME; mkdir -p $OUTD
 export KLEIN=${KLEIN:-9b}; GEO="ROT=${ROT:-90} ELEV=${ELEV:-35} SIZE=$SIZE ROOM_CM=${ROOM_CM:-380} CY=${CY:-0.72}"
 free() { curl -s -X POST localhost:8188/free -H 'Content-Type: application/json' -d '{"unload_models":true,"free_memory":true}' >/dev/null; }
 klein() { # seed prompt prefix main [refs...]   (env MASK, START)
-  if [ "$MODEL" = "flux3" ]; then   # FLUX 3 Image Klein: 16 steps, the same share of steps skipped
+  if [ "${MODEL:-flux3}" = "flux3" ]; then   # FLUX 3 Image Klein (default): 16 steps, the same share of steps skipped
     START=$(( ${START:-0} * 2 )) STEPS=16 $PY -I "$P/wf_flux3.py" $WK/$3.json $1 "$2" 832x1248 $NAME/$3 "${@:4}" >/dev/null
   else STEPS=8 $PY -I "$P/wf_klein.py" $WK/$3.json $1 "$2" 832x1248 $NAME/$3 "${@:4}" >/dev/null; fi
   $PY -I "$P/comfy_run.py" $WK/$3.json | tail -1; }
