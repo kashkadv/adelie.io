@@ -1194,3 +1194,139 @@ model ShopProductDaily {
   @@index([accountId, date])
   @@map("shop_product_daily")
 }
+
+/// A file of the project's library (ADR-0040 §9, minimum for scenes — ADR-0042): an image stored under ASSETS_DIR,
+/// served only through the API. Generated files keep their parent and recipe.
+model Asset {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  workspaceId String   @db.Uuid
+  projectId   String   @db.Uuid
+  /// scene | scene_reference | upload | variant | final
+  role        String
+  /// generated | upload
+  origin      String
+  /// Path under ASSETS_DIR.
+  path        String
+  mime        String
+  width       Int?
+  height      Int?
+  bytes       Int
+  sha256      String
+  parentId    String?  @db.Uuid
+  /// How a generated file was made: model, prompt, seed, parameters.
+  recipe      Json?
+  createdAt   DateTime @default(now())
+
+  @@index([projectId, role])
+  @@index([sha256])
+  @@map("asset")
+}
+
+/// A PC that runs GPU jobs (ADR-0041): it calls Adelie (pull), never the other way round. Authenticated by a key
+/// shown once; only its hash is stored.
+model GpuWorker {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  workspaceId String    @db.Uuid
+  name        String
+  keyHash     String    @unique
+  /// The first characters of the key, to tell keys apart.
+  keyPrefix   String
+  lastSeenAt  DateTime?
+  /// What the agent reported: ready | busy (owner's switch off, little free VRAM).
+  state       String?
+  vramFreeMb  Int?
+  info        Json?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  jobs        GpuJob[]
+
+  @@index([workspaceId])
+  @@map("gpu_worker")
+}
+
+/// A job for the GPU worker (ADR-0041): waits in the queue until a ready PC claims it.
+model GpuJob {
+  id          String     @id @default(uuid(7)) @db.Uuid
+  workspaceId String     @db.Uuid
+  projectId   String     @db.Uuid
+  /// scene_candidates (ADR-0042) | product_in_scene (later)
+  kind        String
+  params      Json
+  /// queued | running | done | failed | cancelled
+  status      String     @default("queued")
+  workerId    String?    @db.Uuid
+  worker      GpuWorker? @relation(fields: [workerId], references: [id], onDelete: SetNull)
+  /// 0..100, reported by the agent.
+  progress    Int        @default(0)
+  error       String?
+  claimedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  scenes      Scene[]
+
+  @@index([status, createdAt])
+  @@index([projectId, createdAt])
+  @@map("gpu_job")
+}
+
+/// A location of the scene library (ADR-0042): a category the owner creates (living room, bedroom…), with a base
+/// description the generator builds on.
+model SceneLocation {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  workspaceId String   @db.Uuid
+  projectId   String   @db.Uuid
+  name        String
+  /// The room type the generator lays out: living | bedroom | hall | reading | kids | chalet | other
+  kind        String   @default("living")
+  /// What the room is like, in the owner's words (goes into the prompt).
+  description String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  scenes      Scene[]
+
+  @@index([projectId, position])
+  @@map("scene_location")
+}
+
+/// A scene (ADR-0042): one room image plus everything needed to put a product into it at its real size.
+model Scene {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  workspaceId  String        @db.Uuid
+  projectId    String        @db.Uuid
+  locationId   String        @db.Uuid
+  location     SceneLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  /// candidate | library | archived | rejected
+  status       String        @default("candidate")
+  name         String?
+  /// Number among the candidates of its job (the owner picks by number).
+  number       Int           @default(1)
+  style        String?
+  /// sun | evening
+  light        String?
+  /// front | side
+  angle        String?
+  /// small | medium | large | runner
+  sizeClass    String?
+  /// floor | wall
+  placement    String        @default("floor")
+  /// lizhnyk | rug | runner | panel | pillow | pouf
+  productTypes String[]
+  tags         String[]
+  /// The product sizes the free zone takes, cm of the long side.
+  minCm        Int?
+  maxCm        Int?
+  /// Camera and mock-up (cm, angles), prompt, model, seed, references - to place a product in it later.
+  params       Json
+  assetId      String?       @db.Uuid
+  jobId        String?       @db.Uuid
+  job          GpuJob?       @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  decidedAt    DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([projectId, status])
+  @@index([locationId, status])
+  @@map("scene")
+}

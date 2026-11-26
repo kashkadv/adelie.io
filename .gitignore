@@ -9,3 +9,6 @@ coverage/
 !.env.example
 .DS_Store
 packages/db/generated/
+
+# Library files in development (ADR-0042); on the server ASSETS_DIR=/srv/adelie-assets
+/.data/

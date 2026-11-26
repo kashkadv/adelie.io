@@ -5,6 +5,8 @@ import { FlipperController } from './flipper/flipper.controller.js';
 import { FlipperIngestController } from './flipper/flipper-ingest.controller.js';
 import { CalendarController } from './calendar/calendar.controller.js';
 import { ContentController } from './content/content.controller.js';
+import { GpuAgentController } from './gpu/gpu-agent.controller.js';
+import { GpuWorkersController } from './gpu/gpu-workers.controller.js';
 import { HealthController } from './health.controller.js';
 import { GoClicksController } from './links/go-clicks.controller.js';
 import { LinksController } from './links/links.controller.js';
@@ -13,6 +15,7 @@ import { PreferencesController } from './preferences/preferences.controller.js';
 import { PrismaService } from './prisma.service.js';
 import { ResearchController } from './research/research.controller.js';
 import { SalesController } from './sales/sales.controller.js';
+import { ScenesController } from './scenes/scenes.controller.js';
 import { ProfileController } from './profile/profile.controller.js';
 import { ConnectService } from './social/connect.service.js';
 import { InvitationsController } from './social/invitations.controller.js';
@@ -31,6 +34,8 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
     FlipperController,
     FlipperIngestController,
     GoClicksController,
+    GpuAgentController,
+    GpuWorkersController,
     HealthController,
     InvitationsController,
     LinksController,
@@ -38,6 +43,7 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
     PreferencesController,
     ResearchController,
     SalesController,
+    ScenesController,
     ProfileController,
     SocialController,
     WorkspacesController,
