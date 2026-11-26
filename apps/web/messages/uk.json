@@ -2226,7 +2226,6 @@
       "podium": "подіум",
       "backdrop": "фон"
     },
-    "jobRunning": "генерується, {progress}%",
     "jobQueued": "у черзі",
     "jobWaitingPc": "чекає на ПК",
     "jobCancel": "Скасувати завдання",
@@ -2266,6 +2265,14 @@
       "sceneType": "Оберіть сцену",
       "location": "У локації є сцени",
       "ruleInUse": "Цей тип уже використовують сцени — видалити не можна"
-    }
+    },
+    "stages": {
+      "mockup": "будую макет",
+      "loading": "завантажую модель",
+      "generating": "генерую сцену {n} з {total}",
+      "uploading": "зберігаю"
+    },
+    "etaMinutes": "≈ {count} хв",
+    "etaUnderMinute": "менше хвилини"
   }
 }

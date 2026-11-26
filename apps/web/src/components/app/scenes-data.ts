@@ -54,6 +54,9 @@ export interface GpuJob {
   kind: string;
   status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
   progress: number;
+  /** What the PC is doing: mockup | loading | generating | uploading | saved. */
+  stage: string | null;
+  claimedAt: string | null;
   error: string | null;
   params: {
     count?: number;

@@ -1258,6 +1258,8 @@ model GpuJob {
   worker      GpuWorker? @relation(fields: [workerId], references: [id], onDelete: SetNull)
   /// 0..100, reported by the agent.
   progress    Int        @default(0)
+  /// What the PC is doing now, for the page: mockup | generating | uploading (with progress).
+  stage       String?
   error       String?
   claimedAt   DateTime?
   finishedAt  DateTime?

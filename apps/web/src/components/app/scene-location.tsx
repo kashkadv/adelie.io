@@ -39,6 +39,8 @@ export function SceneLocation({ locationId }: { locationId: string }) {
   const base = workspace && project ? `/workspaces/${workspace.id}/projects/${project.id}` : null;
 
   const [data, setData] = useState<LocationDetail | null>(null);
+  // when the data came: the estimate of the time left is counted from it (no clock read while rendering)
+  const [loadedAt, setLoadedAt] = useState(0);
   const [missing, setMissing] = useState(false);
   const [version, setVersion] = useState(0);
   const [tab, setTab] = useState<Tab | null>(null);
@@ -54,7 +56,11 @@ export function SceneLocation({ locationId }: { locationId: string }) {
     let cancelled = false;
     const load = () =>
       api<LocationDetail>(`${base}/scene-locations/${locationId}`).then(
-        (r) => !cancelled && setData(r),
+        (r) => {
+          if (cancelled) return;
+          setData(r);
+          setLoadedAt(Date.now());
+        },
         () => !cancelled && setMissing(true),
       );
     void load();
@@ -87,17 +93,27 @@ export function SceneLocation({ locationId }: { locationId: string }) {
   }, [scenes, current]);
 
   // New scenes, grouped by the request (job) that made them.
+  // A request still running also shows the scenes it has not made yet, as placeholders.
   const batches = useMemo(() => {
     const groups = new Map<string, Scene[]>();
+    const running = (data?.jobs ?? []).filter(
+      (j) => j.status === 'queued' || j.status === 'running',
+    );
+    for (const j of running) groups.set(j.id, []);
     for (const s of scenes.filter((x) => x.status === 'candidate')) {
       const k = s.jobId ?? s.id;
       groups.set(k, [...(groups.get(k) ?? []), s]);
     }
-    return [...groups].map(([key, items]) => ({
-      key,
-      items: items.sort((a, b) => a.number - b.number),
-    }));
-  }, [scenes]);
+    return [...groups].map(([key, items]) => {
+      const job = running.find((j) => j.id === key);
+      const made = scenes.filter((x) => x.jobId === key).length;
+      return {
+        key,
+        items: items.sort((a, b) => a.number - b.number),
+        pending: job ? Math.max(0, (job.params.count ?? 0) - made) : 0,
+      };
+    });
+  }, [scenes, data]);
   const flat = current === 'candidate' ? batches.flatMap((b) => b.items) : inTab;
 
   const look = (s: Scene) =>
@@ -236,6 +252,47 @@ export function SceneLocation({ locationId }: { locationId: string }) {
       .filter(Boolean)
       .join(' · ');
 
+  /** "Generating scene 2 of 4 · 45% · ~3 min": the stage the PC reports, the estimate from the time so far. */
+  const jobLine = (j: LocationDetail['jobs'][number]) => {
+    const total = j.params.count ?? 1;
+    const n = Math.min(total, Math.floor((j.progress / 100) * total) + 1);
+    const stage =
+      j.stage === 'mockup'
+        ? t('stages.mockup')
+        : j.stage === 'loading'
+          ? t('stages.loading')
+          : j.stage === 'uploading' || j.stage === 'saved'
+            ? t('stages.uploading')
+            : t('stages.generating', { n, total });
+    const started = j.claimedAt ? new Date(j.claimedAt).getTime() : 0;
+    const left =
+      started && j.progress >= 5
+        ? ((loadedAt - started) * (100 - j.progress)) / j.progress / 60_000
+        : null;
+    return [
+      stage,
+      `${j.progress}%`,
+      left !== null &&
+        (left < 1 ? t('etaUnderMinute') : t('etaMinutes', { count: Math.round(left) })),
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  };
+
+  const placeholder = (key: string) => (
+    <div key={key} className="card overflow-hidden rounded-[20px]" aria-hidden="true">
+      <div className="relative aspect-[2/3] animate-pulse bg-hover">
+        <span className="absolute inset-0 flex items-center justify-center text-muted">
+          <RefreshCw size={22} className="animate-spin" />
+        </span>
+      </div>
+      <div className="px-3 pt-2.5 pb-3">
+        <span className="block h-3.5 w-2/3 rounded bg-hover" />
+        <span className="mt-1.5 block h-3 w-1/2 rounded bg-hover" />
+      </div>
+    </div>
+  );
+
   const card = (s: Scene, i: number, candidate: boolean) => {
     const picked = chosen.has(s.id);
     return (
@@ -373,12 +430,22 @@ export function SceneLocation({ locationId }: { locationId: string }) {
                 className={j.status === 'running' ? 'animate-spin text-accent' : 'text-muted'}
                 aria-hidden="true"
               />
-              <span className="min-w-0 flex-1 truncate">
-                {jobTitle(j)} · {t('scenesN', { count: j.params.count ?? 0 })}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">
+                  {jobTitle(j)} · {t('scenesN', { count: j.params.count ?? 0 })}
+                </span>
+                {j.status === 'running' && (
+                  <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-hover">
+                    <span
+                      className="block h-full rounded-full bg-accent transition-[width] duration-700"
+                      style={{ width: `${Math.max(2, j.progress)}%` }}
+                    />
+                  </span>
+                )}
               </span>
-              <span className="text-muted">
+              <span className="shrink-0 text-right text-muted">
                 {j.status === 'running'
-                  ? t('jobRunning', { progress: j.progress })
+                  ? jobLine(j)
                   : data.gpu.state === 'ready'
                     ? t('jobQueued')
                     : t('jobWaitingPc')}
@@ -462,29 +529,33 @@ export function SceneLocation({ locationId }: { locationId: string }) {
           <div className="animate-rise grid gap-7">
             {batches.map((b) => {
               const job = data.jobs.find((j) => j.id === b.key);
-              const first = b.items[0]!;
-              const offset = flat.indexOf(first);
+              const first = b.items[0];
+              const offset = first ? flat.indexOf(first) : 0;
               const any = b.items.some((s) => chosen.has(s.id));
               return (
                 <section key={b.key}>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-semibold">
-                        {job ? jobTitle(job) : `${typeLabel(first.sceneType)} · ${look(first)}`}
+                        {job
+                          ? jobTitle(job)
+                          : first
+                            ? `${typeLabel(first.sceneType)} · ${look(first)}`
+                            : ''}
                       </p>
                       <p className="text-xs text-muted">
-                        {format.dateTime(new Date(first.createdAt), {
+                        {format.dateTime(new Date(first?.createdAt ?? job?.createdAt ?? 0), {
                           day: 'numeric',
                           month: 'short',
                           hour: '2-digit',
                           minute: '2-digit',
                         })}
                         {' · '}
-                        {t('scenesN', { count: b.items.length })}
-                        {first.style ? ` · ${first.style}` : ''}
+                        {t('scenesN', { count: b.items.length + b.pending })}
+                        {first?.style ? ` · ${first.style}` : ''}
                       </p>
                     </div>
-                    {canManage && (
+                    {canManage && first && (
                       <div className="flex gap-2">
                         <button
                           type="button"
@@ -507,6 +578,7 @@ export function SceneLocation({ locationId }: { locationId: string }) {
                   </div>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                     {b.items.map((s, j) => card(s, offset + j, true))}
+                    {Array.from({ length: b.pending }, (_, i) => placeholder(`${b.key}-p${i}`))}
                   </div>
                 </section>
               );

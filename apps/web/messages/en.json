@@ -2226,7 +2226,6 @@
       "podium": "podium",
       "backdrop": "backdrop"
     },
-    "jobRunning": "generating, {progress}%",
     "jobQueued": "queued",
     "jobWaitingPc": "waiting for the PC",
     "jobCancel": "Cancel the job",
@@ -2266,6 +2265,14 @@
       "sceneType": "Choose a scene",
       "location": "The location has scenes",
       "ruleInUse": "Scenes use this type — it cannot be deleted"
-    }
+    },
+    "stages": {
+      "mockup": "building the mock-up",
+      "loading": "loading the model",
+      "generating": "generating scene {n} of {total}",
+      "uploading": "saving"
+    },
+    "etaMinutes": "~{count} min",
+    "etaUnderMinute": "under a minute"
   }
 }

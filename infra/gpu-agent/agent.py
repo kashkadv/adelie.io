@@ -82,6 +82,52 @@ def heartbeat():
     return st
 
 
+class Progress:
+    """Live progress of a job for Adelie: overall % from finished scenes plus the current scene's sampling step
+    (ComfyUI's websocket, via comfy_run.py's PROGRESS_FILE), sent every few seconds while the PC works."""
+
+    def __init__(self, jid, total):
+        self.jid, self.total, self.done, self.stage = jid, max(1, total), 0, "mockup"
+        self.file = Path(f"/tmp/adelie-progress-{jid}.json"); self.file.unlink(missing_ok=True)
+        self.stop = threading.Event(); self.last = None
+        threading.Thread(target=self.loop, daemon=True).start()
+
+    def percent(self):
+        step = 0.0
+        if self.stage == "generating":
+            try:
+                d = json.loads(self.file.read_text()); step = d["value"] / max(1, d["max"])
+            except Exception:
+                pass
+        elif self.stage == "uploading":
+            step = 1.0
+        return min(99, round(100 * (self.done + step) / self.total))
+
+    def send(self):
+        # before the first sampling step ComfyUI is loading the model (~20-30 s on the first scene)
+        stage = "loading" if self.stage == "generating" and not self.file.exists() else self.stage
+        now = (self.percent(), stage)
+        if now != self.last:
+            try:
+                call(f"/gpu/jobs/{self.jid}/progress", {"progress": now[0], "stage": now[1]}, timeout=10)
+                self.last = now
+            except Exception:
+                pass
+
+    def loop(self):
+        while not self.stop.wait(4):
+            self.send()
+
+    def set(self, stage=None, done=None):
+        if stage is not None: self.stage = stage
+        if done is not None: self.done = done
+        if stage in ("generating",): self.file.unlink(missing_ok=True)
+        self.send()
+
+    def close(self):
+        self.stop.set(); self.file.unlink(missing_ok=True)
+
+
 def comfy_free():
     try:
         urllib.request.urlopen(urllib.request.Request(COMFY + "/free", b'{"unload_models":true,"free_memory":true}',
@@ -181,12 +227,14 @@ def scene_candidates(job):
            "ARMCHAIR": "left" if armchair else "none", "SIDE_TABLE": "right" if side_table else "none",
            "LIGHT": p.get("light", "sun")}
     proxy = work / "proxy.png"
+    prog = Progress(jid, len(p.get("seeds") or [1]))
     run([PY, "-I", PROTO / "scene_proxy.py", blank, proxy], env=geo)
     inp = COMFY_DIR / "input" / f"adelie_{jid}_proxy.png"; shutil.copy(proxy, inp)
     prompt = p.get("prompt") or scene_prompt(p); (work / "prompt.txt").write_text(prompt)
     seeds = p.get("seeds") or [1]
     comfy_free()
     for n, seed in enumerate(seeds, 1):
+        prog.set(stage="generating", done=n - 1)
         wf = work / f"wf_{n}.json"
         if AGENT_MODEL == "flux3":
             run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}",
@@ -194,7 +242,8 @@ def scene_candidates(job):
         else:   # FLUX.2 klein for comparisons: 8 steps, the first skipped (the same share)
             run([PY, "-I", PROTO / "wf_klein.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}",
                  inp.name], env={"START": "1", "STEPS": "8", "KLEIN": AGENT_MODEL[-2:]})
-        out = run([PY, "-I", PROTO / "comfy_run.py", wf])
+        out = run([PY, "-I", PROTO / "comfy_run.py", wf], env={"PROGRESS_FILE": str(prog.file)})
+        prog.set(stage="uploading")
         name = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")][0]
         img = COMFY_DIR / "output" / "adelie" / name
         meta = {"prompt": prompt, "seed": seed, "model": MODEL, "size": "832x1248",
@@ -203,9 +252,10 @@ def scene_candidates(job):
              headers={"Content-Type": "image/png", "X-Number": str(n),
                       "X-Meta": base64.b64encode(json.dumps(meta).encode()).decode()})
         img.unlink(missing_ok=True)
-        call(f"/gpu/jobs/{jid}/progress", {"progress": round(100 * n / len(seeds))})
+        prog.set(stage="saved", done=n)
         report(job={**(_status.get("job") or {}), "done": n})
         print(f"  scene {n}/{len(seeds)} uploaded", flush=True)
+    prog.close()
     comfy_free()
     inp.unlink(missing_ok=True)
 

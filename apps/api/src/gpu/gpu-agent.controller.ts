@@ -97,10 +97,15 @@ export class GpuAgentController {
   ) {
     const job = await this.ownJob(req, id);
     if (!job) return res.status(404).json({ error: 'job' });
-    const p = Number((req.body as { progress?: unknown })?.progress);
+    const body = (req.body ?? {}) as { progress?: unknown; stage?: unknown };
+    const p = Number(body.progress);
+    const stage = typeof body.stage === 'string' ? body.stage.slice(0, 40) : undefined;
     await this.prisma.client.gpuJob.update({
       where: { id },
-      data: { progress: Number.isFinite(p) ? Math.max(0, Math.min(100, Math.round(p))) : 0 },
+      data: {
+        progress: Number.isFinite(p) ? Math.max(0, Math.min(100, Math.round(p))) : 0,
+        ...(stage !== undefined ? { stage } : {}),
+      },
     });
     return res.json({ ok: true });
   }
