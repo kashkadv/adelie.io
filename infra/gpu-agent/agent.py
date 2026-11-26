@@ -28,7 +28,8 @@ MODEL = "flux3-image-klein-int8"
 
 def call(path, body=None, data=None, headers=None, timeout=60):
     """POST to the Adelie API with the worker key: a JSON body or raw bytes; JSON back (None on 204)."""
-    h = {"Authorization": f"Bearer {KEY}", **(headers or {})}
+    # Cloudflare in front of the API refuses the default Python-urllib user agent (403)
+    h = {"Authorization": f"Bearer {KEY}", "User-Agent": "adelie-gpu-agent/1", **(headers or {})}
     if data is None:
         data = json.dumps(body if body is not None else {}).encode(); h["Content-Type"] = "application/json"
     req = urllib.request.Request(API + path, data=data, headers=h, method="POST")
