@@ -122,14 +122,18 @@ def scene_prompt(p):
         f"The floor in front of it stays open and bare: a clear area of plain floor about {size} cm, with nothing "
         "standing on it - no table, no rug, no basket, no object, nothing hanging over it.",
         "Every grey block becomes its real object completely; no plain grey boxes remain. Everything at real-world "
-        "size and well built: straight legs, clean edges, real proportions, a sensible layout like a designer's. "
-        "Curtains only at windows. No animals, no people, no rugs or carpets, no text.",
+        "size and well built, like real products from a good furniture store: straight evenly spaced legs, clean "
+        "edges, square corners, true proportions between objects, a sensible layout like a designer's; rectangular "
+        "picture frames, a straight curtain rod with evenly hanging curtains, plants with natural leaves. "
+        "Throws and blankets lie folded on the seats, nothing hangs down to the floor. Curtains only at windows. "
+        "No animals, no people, no rugs or carpets, no text.",
     ]
     if room: parts.append(room)
     if style: parts.append(f"Style: {style}.")
     parts.append(LIGHT.get(p.get("light", "sun"), LIGHT["sun"]))
     if notes: parts.append(notes)
-    parts.append("An unedited photo from a home interior magazine, natural textures, subtle film grain.")
+    parts.append("A real photograph: an unedited photo from a home interior magazine, true-to-life colours, natural "
+                 "textures of wood, fabric and plaster, subtle film grain; not a 3D render, not an illustration.")
     return " ".join(parts)
 
 
