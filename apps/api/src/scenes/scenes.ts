@@ -2,18 +2,8 @@
  * Scene library (ADR-0042): the choices of a scene and how a request for new candidates is checked.
  * The agent on the PC turns the parameters into a block mock-up in centimetres and a prompt.
  */
-/** Rooms generated inside a location (a hotel, a chalet…). */
-export const ROOMS = [
-  'living',
-  'bedroom',
-  'hotel_room',
-  'lobby',
-  'hall',
-  'reading',
-  'kids',
-  'kitchen',
-  'other',
-] as const;
+/** A scene type is a rule's key (living, bedroom, podium, a custom one); checked against the project's rules. */
+export const SCENE_TYPE = /^[a-z][a-z0-9_]{0,39}$/;
 export const LIGHTS = ['sun', 'evening'] as const;
 export const ANGLES = ['front', 'side'] as const;
 export const PRODUCT_TYPES = ['lizhnyk', 'rug', 'runner', 'panel', 'pillow', 'pouf'] as const;
@@ -40,7 +30,7 @@ const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slic
 
 export interface CandidateRequest {
   locationId: string;
-  room: (typeof ROOMS)[number];
+  sceneType: string;
   style: string;
   light: (typeof LIGHTS)[number];
   angle: (typeof ANGLES)[number];
@@ -57,8 +47,9 @@ export function parseCandidateRequest(
 ): { ok: true; request: CandidateRequest } | { ok: false; error: string } {
   const locationId = typeof body['locationId'] === 'string' ? body['locationId'] : '';
   if (!/^[0-9a-f-]{36}$/i.test(locationId)) return { ok: false, error: 'locationId' };
-  const room = pick(ROOMS, body['room'] ?? 'living');
-  if (!room) return { ok: false, error: 'room' };
+  const rawType = body['sceneType'] ?? body['room'] ?? 'living';
+  const sceneType = typeof rawType === 'string' && SCENE_TYPE.test(rawType) ? rawType : null;
+  if (!sceneType) return { ok: false, error: 'sceneType' };
   const light = pick(LIGHTS, body['light'] ?? 'sun');
   if (!light) return { ok: false, error: 'light' };
   const angle = pick(ANGLES, body['angle'] ?? 'front');
@@ -82,7 +73,7 @@ export function parseCandidateRequest(
     ok: true,
     request: {
       locationId,
-      room,
+      sceneType,
       style: text(body['style'], 300),
       light,
       angle,

@@ -146,7 +146,7 @@ export class GpuAgentController {
         projectId: job.projectId,
         locationId: String(p['locationId']),
         number: Number.isInteger(number) ? number : 1,
-        room: (p['room'] as string) ?? null,
+        sceneType: (p['sceneType'] as string) ?? (p['room'] as string) ?? null,
         style: (p['style'] as string) || null,
         light: (p['light'] as string) ?? null,
         angle: (p['angle'] as string) ?? null,

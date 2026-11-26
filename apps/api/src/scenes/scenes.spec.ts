@@ -9,7 +9,7 @@ describe('parseCandidateRequest', () => {
   it('accepts a full request and drops unknown product types', () => {
     const r = parseCandidateRequest({
       locationId: LOC,
-      room: 'bedroom',
+      sceneType: 'bedroom',
       style: '  warm scandinavian ',
       light: 'evening',
       angle: 'side',
@@ -21,7 +21,7 @@ describe('parseCandidateRequest', () => {
       ok: true,
       request: {
         locationId: LOC,
-        room: 'bedroom',
+        sceneType: 'bedroom',
         style: 'warm scandinavian',
         light: 'evening',
         angle: 'side',
@@ -48,9 +48,9 @@ describe('parseCandidateRequest', () => {
       ok: false,
       error: 'productTypes',
     });
-    expect(parseCandidateRequest({ ...base, room: 'garage' })).toEqual({
+    expect(parseCandidateRequest({ ...base, sceneType: 'Garage!' })).toEqual({
       ok: false,
-      error: 'room',
+      error: 'sceneType',
     });
     expect(parseCandidateRequest({ ...base, count: 9 })).toEqual({ ok: false, error: 'count' });
     expect(parseCandidateRequest({ ...base, light: 'noon' })).toEqual({
@@ -97,5 +97,31 @@ describe('imageSize', () => {
     png.writeUInt32BE(832, 16);
     png.writeUInt32BE(1248, 20);
     expect(imageSize(png)).toEqual({ width: 832, height: 1248 });
+  });
+});
+
+describe('composePrompt', () => {
+  it('puts the location first and fills the free area', async () => {
+    const { composePrompt, DEFAULT_RULES } = await import('./rules.js');
+    const general = DEFAULT_RULES.find((r) => r.key === 'general')!;
+    const living = DEFAULT_RULES.find((r) => r.key === 'living')!;
+    const p = composePrompt({
+      location: { description: 'Carpathian chalet: spruce beams', mustHave: 'a stone fireplace' },
+      typeRule: living,
+      general,
+      sizeClass: 'large',
+      light: 'evening',
+      style: 'darker walnut',
+      notes: '',
+    });
+    expect(p.startsWith('The place: Carpathian chalet: spruce beams')).toBe(true);
+    expect(p.indexOf('Always in this place: a stone fireplace')).toBeLessThan(
+      p.indexOf('A living room'),
+    );
+    expect(p.indexOf('A living room')).toBeLessThan(p.indexOf('Keep the camera'));
+    expect(p).toContain('200 x 300 cm');
+    expect(p).not.toContain('{size}');
+    expect(p).toContain('Style of this series: darker walnut.');
+    expect(p).toContain('evening');
   });
 });
