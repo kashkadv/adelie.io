@@ -1,32 +1,30 @@
-// Scene library of the Workshop (ADR-0042): what the API returns and the choices the forms offer.
-/** Rooms generated inside a location (a hotel, a chalet…). */
-export const ROOMS = [
-  'living',
-  'bedroom',
-  'hotel_room',
-  'lobby',
-  'hall',
-  'reading',
-  'kids',
-  'kitchen',
-  'other',
-] as const;
+// Scenes of the Workshop (ADR-0042): what the API returns and the choices the forms offer.
+export const DIRECTIONS = ['interior', 'studio', 'outdoor'] as const;
 export const LIGHTS = ['sun', 'evening'] as const;
 export const ANGLES = ['front', 'side'] as const;
 export const SIZE_CLASSES = ['small', 'medium', 'large', 'runner'] as const;
 export const PRODUCT_TYPES = ['lizhnyk', 'rug', 'runner', 'panel', 'pillow', 'pouf'] as const;
-export const STATUS_VIEWS = ['library', 'candidate', 'archived'] as const;
+export const TABS = ['library', 'candidate', 'archived'] as const;
 
-export type Room = (typeof ROOMS)[number];
+export type Direction = (typeof DIRECTIONS)[number];
 export type GpuState = 'ready' | 'busy' | 'offline';
+export type Gpu = { state: GpuState; workers: number };
 
-export interface SceneLocation {
+export interface LocationCard {
   id: string;
   name: string;
   description: string | null;
+  mustHave: string | null;
+  direction: Direction;
+  coverSceneId: string | null;
+  archivedAt: string | null;
   position: number;
-  /** Scenes per status. */
-  counts: Partial<Record<'candidate' | 'library' | 'archived' | 'rejected', number>>;
+  coverAssetId: string | null;
+  /** Kept scenes, new ones waiting for a decision, archived ones. */
+  scenes: number;
+  fresh: number;
+  archived: number;
+  sceneTypes: { key: string; label: string; count: number }[];
 }
 
 export interface Scene {
@@ -35,7 +33,7 @@ export interface Scene {
   status: 'candidate' | 'library' | 'archived' | 'rejected';
   name: string | null;
   number: number;
-  room: string | null;
+  sceneType: string | null;
   style: string | null;
   light: string | null;
   angle: string | null;
@@ -57,14 +55,72 @@ export interface GpuJob {
   status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
   progress: number;
   error: string | null;
-  params: { count?: number; room?: string; location?: { name: string } };
+  params: {
+    count?: number;
+    sceneType?: string;
+    sceneTypeLabel?: string;
+    light?: string;
+    angle?: string;
+    sizeClass?: string;
+    style?: string;
+  };
   createdAt: string;
   finishedAt: string | null;
 }
 
-export interface ScenesData {
-  locations: SceneLocation[];
+export interface LocationDetail {
+  location: Omit<LocationCard, 'coverAssetId' | 'scenes' | 'fresh' | 'archived' | 'sceneTypes'>;
   scenes: Scene[];
   jobs: GpuJob[];
-  gpu: { state: GpuState; workers: number };
+  /** Scene types of the location's direction (for "Add scenes"). */
+  sceneTypes: { key: string; label: string }[];
+  /** Every type's label (scenes made under another direction keep their name). */
+  allTypes: { key: string; label: string }[];
+  gpu: Gpu;
 }
+
+export interface SceneRule {
+  key: string;
+  direction: Direction | null;
+  label: string;
+  text: string;
+  mockup: { preset: string; size: string; armchair?: boolean; sideTable?: boolean } | null;
+  builtIn: boolean;
+}
+
+/** Ready-made locations: a concrete description (objects, materials) works far better than abstract words. */
+export const LOCATION_TEMPLATES: {
+  key: string;
+  direction: Direction;
+  description: string;
+  mustHave: string;
+}[] = [
+  {
+    key: 'chalet',
+    direction: 'interior',
+    description:
+      'Carpathian chalet: exposed old spruce beams, wood-panelled walls, a stone fireplace, wool throws and sheepskins, linen curtains, warm honey wood tones',
+    mustHave: 'exposed wooden ceiling beams',
+  },
+  {
+    key: 'scandi',
+    direction: 'interior',
+    description:
+      'Scandinavian flat: light oak floor and furniture, cream bouclé, linen curtains, white walls, ceramics, books and plants, honey and caramel accents',
+    mustHave: '',
+  },
+  {
+    key: 'hotel',
+    direction: 'interior',
+    description:
+      'Boutique hotel: larch wood, terrazzo, brushed brass details, crisp white linen, warm indirect lighting, calm luxury',
+    mustHave: 'a large window with a view',
+  },
+  {
+    key: 'japandi',
+    direction: 'interior',
+    description:
+      'Japandi home: low wooden furniture, light ash and dark walnut, paper lamps, stone and ceramic objects, muted sand and charcoal tones',
+    mustHave: '',
+  },
+];
