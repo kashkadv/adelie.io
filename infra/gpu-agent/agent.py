@@ -206,11 +206,23 @@ def scene_candidates(job):
 JOBS = {"scene_candidates": scene_candidates}
 
 
+def goodbye(*_):
+    """On stop (systemd sends SIGTERM): tell Adelie at once, so the PC shows offline without the 90 s timeout."""
+    try:
+        call("/gpu/heartbeat", {"state": "offline"}, timeout=5)
+    except Exception:
+        pass
+    report(connected=False, state="offline", job=None)
+    os._exit(0)
+
+
 def main():
     if not KEY:
         sys.exit("ADELIE_GPU_KEY is not set (Adelie -> Workshop -> Scenes -> Connect a PC)")
     print(f"Adelie GPU agent -> {API}; model {MODEL}; switch off: touch {SWITCH_OFF}", flush=True)
     report(started=time.time(), api=API, job=None)
+    import signal
+    signal.signal(signal.SIGTERM, goodbye); signal.signal(signal.SIGINT, goodbye)
     def beat():
         while True:
             heartbeat(); time.sleep(30)

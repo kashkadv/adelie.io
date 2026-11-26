@@ -28,7 +28,7 @@ export class GpuAgentController {
     });
   }
 
-  /** The PC is alive: its state (ready / busy) and free VRAM. */
+  /** The PC is alive: its state (ready / busy) and free VRAM; 'offline' when the agent stops. */
   @Post('heartbeat')
   async heartbeat(@Req() req: Request, @Res() res: Response) {
     const w = await this.worker(req);
@@ -37,8 +37,9 @@ export class GpuAgentController {
     await this.prisma.client.gpuWorker.update({
       where: { id: w.id },
       data: {
-        lastSeenAt: new Date(),
-        state: body.state === 'ready' ? 'ready' : 'busy',
+        // 'offline': the agent is shutting down - the PC shows offline at once, not after the 90 s timeout
+        lastSeenAt: body.state === 'offline' ? null : new Date(),
+        state: body.state === 'ready' ? 'ready' : body.state === 'offline' ? 'offline' : 'busy',
         vramFreeMb: typeof body.vramFreeMb === 'number' ? Math.round(body.vramFreeMb) : null,
         ...(body.info && typeof body.info === 'object'
           ? { info: body.info as Prisma.InputJsonValue }
