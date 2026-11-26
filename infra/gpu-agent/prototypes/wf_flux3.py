@@ -2,7 +2,7 @@
 ComfyUI (API format) - a drop-in twin of wf_klein.py: same CLI, same START (begin from the MAIN image's latent, skip the
 first START of STEPS) and MASK (latent noise mask) semantics. Wiring follows BFL's flux3_klein_int8_mi2i workflow:
 Qwen3-VL-4B encoder, ModelSamplingFlux with shift log(16), ReferenceMultiLatent, euler/simple, cfg 1, 16 steps.
-Usage: wf_flux3.py out.json seed prompt.txt WxH prefix main.png [ref2.png ...]   env: STEPS 16, START 0, MASK, REF_MP 1.0"""
+Usage: wf_flux3.py out.json seed prompt.txt WxH prefix main.png [ref2.png ...]   env: STEPS 16, START 0, MASK, REF_MP 1.0, NO_MAIN_REF"""
 import json, math, os, sys
 
 UNET = os.environ.get("FLUX3_UNET", "flux3-image-klein-int8-convrot.safetensors")
@@ -22,7 +22,8 @@ def build(seed, prompt, w, h, prefix, images, steps=16, start=0):
            "resolution": "resize", "resolution.megapixels": float(os.environ.get("REF_MP", 1.0))}
     for i, img in enumerate(images):
         g[f"load{i}"] = {"class_type": "LoadImage", "inputs": {"image": img}}
-        ref[f"images.image{i}"] = [f"load{i}", 0]
+        if not (i == 0 and os.environ.get("NO_MAIN_REF")):     # detail pass: the main image only as the start latent,
+            ref[f"images.image{i}"] = [f"load{i}", 0]          # else the model copies the wrong object back
     g["ref"] = {"class_type": "ReferenceMultiLatent", "inputs": ref}
     # the sampled latent: the main image at the output size (START > 0) or an empty one
     g["scale"] = {"class_type": "ImageScale", "inputs": {"image": ["load0", 0], "upscale_method": "lanczos", "width": w, "height": h, "crop": "center"}}
