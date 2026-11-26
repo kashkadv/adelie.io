@@ -6,7 +6,8 @@ Ready = the owner's switch is on (no file ~/.adelie-gpu-off) and at least MIN_VR
 
 Jobs:
   scene_candidates - a room mock-up in real centimetres (prototypes/scene_proxy.py) dressed by FLUX 3 Image Klein
-                     (prototypes/wf_flux3.py); one scene per seed, uploaded with its recipe.
+                     (prototypes/wf_flux3.py); one scene per seed, uploaded with its recipe. The prompt and the mock-up
+                     come with the job (built in Adelie from the project's rules); scene_prompt() is the fallback.
 
 Usage:  ADELIE_API=https://api.dev.adelie.space ADELIE_GPU_KEY=gpw_... python3 infra/gpu-agent/agent.py
 env:    COMFY (default http://127.0.0.1:8188), COMFY_DIR (~/ComfyUI), COMFY_PY (<COMFY_DIR>/venv/bin/python),
@@ -123,8 +124,8 @@ LIGHT = {
 
 
 def room_of(p):
-    """The room to generate: chosen per job inside a location (a hotel, a chalet); old jobs used the location's kind."""
-    return p.get("room") or (p.get("location") or {}).get("kind") or "living"
+    """The scene type: chosen per job inside a location; older jobs said `room` or used the location's kind."""
+    return p.get("sceneType") or p.get("room") or (p.get("location") or {}).get("kind") or "living"
 
 
 def scene_prompt(p):
@@ -167,16 +168,22 @@ def scene_candidates(job):
     p = job["params"]; jid = job["id"]
     kind = room_of(p)
     _, sofa, armchair = KIND.get(kind, KIND["other"])
+    side_table = armchair
+    mock = p.get("mockup") or {}                 # since scenes v2 the server sends the scene type's mock-up and prompt
+    if mock:
+        sofa = mock.get("size") or sofa
+        armchair, side_table = bool(mock.get("armchair")), bool(mock.get("sideTable"))
     work = COMFY_DIR / "work" / "adelie" / jid; work.mkdir(parents=True, exist_ok=True)
     blank = work / "blank.png"
     run([PY, "-I", "-c", f"from PIL import Image; Image.new('RGBA',(1200,1800),(0,0,0,0)).save('{blank}')"])
     geo = {"ROT": "90", "ELEV": "35", "ROOM_CM": "380", "CY": "0.72", "SIZE": SIZE_MOCK[p["sizeClass"]],
            "YAW": "20" if p.get("angle") == "side" else "0", "SOFA": sofa, "SLAB": "0",
-           "ARMCHAIR": "left" if armchair else "none", "SIDE_TABLE": "right" if armchair else "none"}
+           "ARMCHAIR": "left" if armchair else "none", "SIDE_TABLE": "right" if side_table else "none",
+           "LIGHT": p.get("light", "sun")}
     proxy = work / "proxy.png"
     run([PY, "-I", PROTO / "scene_proxy.py", blank, proxy], env=geo)
     inp = COMFY_DIR / "input" / f"adelie_{jid}_proxy.png"; shutil.copy(proxy, inp)
-    prompt = scene_prompt(p); (work / "prompt.txt").write_text(prompt)
+    prompt = p.get("prompt") or scene_prompt(p); (work / "prompt.txt").write_text(prompt)
     seeds = p.get("seeds") or [1]
     comfy_free()
     for n, seed in enumerate(seeds, 1):
@@ -238,7 +245,7 @@ def main():
             if job:
                 print(f"job {job['id']} ({job['kind']})", flush=True)
                 p = job.get("params") or {}
-                title = " · ".join(x for x in [(p.get("location") or {}).get("name"), room_of(p)] if x)
+                title = " · ".join(x for x in [(p.get("location") or {}).get("name"), p.get("sceneTypeLabel") or room_of(p)] if x)
                 info = {"id": job["id"], "kind": job["kind"], "title": title, "total": len(p.get("seeds") or [1]),
                         "done": 0, "started": time.time()}
                 report(job=info)

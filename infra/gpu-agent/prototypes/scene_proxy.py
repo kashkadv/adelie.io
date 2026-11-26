@@ -2,7 +2,7 @@
 sofa (W x D x H) behind the product and the grey product slab. The model only 'dresses' these blocks (START=1 keeps the
 layout), so the furniture cannot come out at another scale than the product - the size cue the prompt alone could not give.
 Usage: scene_proxy.py cutout_canvas.png out.png
-env (same as rectify_place.py): SIZE ROT ELEV ROOM_CM CANVAS CY; YAW (camera around, degrees); SOFA=220x90x80 (cm), GAP=30 (cm between product and sofa),
+env (same as rectify_place.py): SIZE ROT ELEV ROOM_CM CANVAS CY; LIGHT=evening (darker) / TONE; YAW (camera around, degrees); SOFA=220x90x80 (cm), GAP=30 (cm between product and sofa),
 WALL=40 (cm between sofa and wall), GREY=150"""
 import os, sys
 import numpy as np
@@ -31,18 +31,21 @@ c, s_ = np.cos(ROT), np.sin(ROT)
 corners = np.array([[-sw / 2, -sh / 2], [sw / 2, -sh / 2], [sw / 2, sh / 2], [-sw / 2, sh / 2]]) @ np.array([[c, -s_], [s_, c]]).T
 y_back = corners[:, 1].max()
 y0 = y_back + GAP; y1 = y0 + SD; yw = y1 + WALLD                       # sofa front, sofa back, wall
-img = Image.new("RGB", (CW, CH), (214, 184, 146)); dr = ImageDraw.Draw(img)
+# LIGHT=evening: a darker mock-up - the model takes the overall brightness from image 1, so words alone gave daylight
+_k = float(os.environ.get("TONE", 0.55 if os.environ.get("LIGHT") == "evening" else 1.0))
+tone = lambda c: tuple(int(v * _k) for v in c)
+img = Image.new("RGB", (CW, CH), tone((214, 184, 146))); dr = ImageDraw.Draw(img)
 # wall (a big vertical plane) and floor boards along x
 y_near = C[1] + 80                                                     # floor lines only in front of the camera
 for x in range(-1000, 1001, 20):
-    dr.line([P(x, y_near, 0), P(x, yw, 0)], fill=(200, 170, 132), width=1)
+    dr.line([P(x, y_near, 0), P(x, yw, 0)], fill=tone((200, 170, 132)), width=1)
 if YAW:   # turned camera: a room corner - the back wall plus the side wall it turns towards (no wall end in mid-air)
     xs = -float(os.environ.get("SIDE_WALL", 330)) * np.sign(YAW)
-    dr.polygon([P(xs, -400, 0), P(xs, yw, 0), P(xs, yw, 600), P(xs, -400, 600)], fill=(226, 214, 196))
+    dr.polygon([P(xs, -400, 0), P(xs, yw, 0), P(xs, yw, 600), P(xs, -400, 600)], fill=tone((226, 214, 196)))
     xa, xb = sorted((xs, 2000 * np.sign(YAW)))
-    dr.polygon([P(xa, yw, 0), P(xb, yw, 0), P(xb, yw, 600), P(xa, yw, 600)], fill=(236, 226, 210))
+    dr.polygon([P(xa, yw, 0), P(xb, yw, 0), P(xb, yw, 600), P(xa, yw, 600)], fill=tone((236, 226, 210)))
 else:
-    dr.polygon([P(-2000, yw, 0), P(2000, yw, 0), P(2000, yw, 600), P(-2000, yw, 600)], fill=(236, 226, 210))
+    dr.polygon([P(-2000, yw, 0), P(2000, yw, 0), P(2000, yw, 600), P(-2000, yw, 600)], fill=tone((236, 226, 210)))
 # sofa: back block, seat block, two arms (flat-shaded faces, painter's order: back -> front)
 def box(x0, x1, ya, yb, z0, z1, shade):
     top = [P(x0, ya, z1), P(x1, ya, z1), P(x1, yb, z1), P(x0, yb, z1)]
