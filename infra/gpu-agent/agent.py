@@ -10,7 +10,9 @@ Jobs:
 
 Usage:  ADELIE_API=https://api.dev.adelie.space ADELIE_GPU_KEY=gpw_... python3 infra/gpu-agent/agent.py
 env:    COMFY (default http://127.0.0.1:8188), COMFY_DIR (~/ComfyUI), COMFY_PY (<COMFY_DIR>/venv/bin/python),
-        MIN_VRAM_MB 6000, ONCE=1 (one claim then exit - for testing)
+        MIN_VRAM_MB 6000, AGENT_MODEL flux3 | klein4b | klein9b, ONCE=1 (one claim then exit - for testing)
+The settings usually come from ~/.config/adelie/gpu-agent.env (the "Adelie GPU" app writes it; systemd reads it).
+State for the app: ~/.cache/adelie/gpu-agent.json (connection, state, current job, recent jobs).
 Standard library only."""
 import base64, json, os, shutil, subprocess, sys, threading, time, traceback, urllib.error, urllib.request
 from pathlib import Path
@@ -23,7 +25,20 @@ COMFY_DIR = Path(os.environ.get("COMFY_DIR", Path.home() / "ComfyUI"))
 PY = os.environ.get("COMFY_PY", str(COMFY_DIR / "venv/bin/python"))
 MIN_VRAM = int(os.environ.get("MIN_VRAM_MB", 6000))
 SWITCH_OFF = Path.home() / ".adelie-gpu-off"
-MODEL = "flux3-image-klein-int8"
+AGENT_MODEL = os.environ.get("AGENT_MODEL", "flux3")
+MODEL = {"flux3": "flux3-image-klein-int8", "klein4b": "flux2-klein-4b-fp8", "klein9b": "flux2-klein-9b-fp8"}.get(
+    AGENT_MODEL, "flux3-image-klein-int8")
+STATE_FILE = Path.home() / ".cache/adelie/gpu-agent.json"
+_status = {"pid": os.getpid(), "model": MODEL, "history": []}
+_lock = threading.Lock()
+
+
+def report(**kw):
+    """What the app shows: merged into the state file (written atomically)."""
+    with _lock:
+        _status.update(kw, updated=time.time())
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = STATE_FILE.with_suffix(".tmp"); tmp.write_text(json.dumps(_status)); tmp.replace(STATE_FILE)
 
 
 def call(path, body=None, data=None, headers=None, timeout=60):
@@ -59,8 +74,10 @@ def heartbeat():
     st, free = state()
     try:
         call("/gpu/heartbeat", {"state": st, "vramFreeMb": free, "info": {"agent": 1, "model": MODEL}})
+        report(connected=True, connError=None, lastBeat=time.time(), state=st, vramFreeMb=free)
     except Exception as e:
         print("heartbeat failed:", e, flush=True)
+        report(connected=False, connError=str(e)[:200], state=st, vramFreeMb=free)
     return st
 
 
@@ -164,18 +181,23 @@ def scene_candidates(job):
     comfy_free()
     for n, seed in enumerate(seeds, 1):
         wf = work / f"wf_{n}.json"
-        run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}", inp.name],
-            env={"START": "2", "STEPS": "16"})
+        if AGENT_MODEL == "flux3":
+            run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}",
+                 inp.name], env={"START": "2", "STEPS": "16"})
+        else:   # FLUX.2 klein for comparisons: 8 steps, the first skipped (the same share)
+            run([PY, "-I", PROTO / "wf_klein.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}",
+                 inp.name], env={"START": "1", "STEPS": "8", "KLEIN": AGENT_MODEL[-2:]})
         out = run([PY, "-I", PROTO / "comfy_run.py", wf])
         name = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")][0]
         img = COMFY_DIR / "output" / "adelie" / name
-        meta = {"prompt": prompt, "seed": seed, "model": MODEL, "steps": 16, "start": 2, "size": "832x1248",
+        meta = {"prompt": prompt, "seed": seed, "model": MODEL, "size": "832x1248",
                 "proxy": geo, "mock": SIZE_MOCK[p["sizeClass"]], "kind": kind}
         call(f"/gpu/jobs/{jid}/scenes", data=img.read_bytes(), timeout=300,
              headers={"Content-Type": "image/png", "X-Number": str(n),
                       "X-Meta": base64.b64encode(json.dumps(meta).encode()).decode()})
         img.unlink(missing_ok=True)
         call(f"/gpu/jobs/{jid}/progress", {"progress": round(100 * n / len(seeds))})
+        report(job={**(_status.get("job") or {}), "done": n})
         print(f"  scene {n}/{len(seeds)} uploaded", flush=True)
     comfy_free()
     inp.unlink(missing_ok=True)
@@ -187,7 +209,8 @@ JOBS = {"scene_candidates": scene_candidates}
 def main():
     if not KEY:
         sys.exit("ADELIE_GPU_KEY is not set (Adelie -> Workshop -> Scenes -> Connect a PC)")
-    print(f"Adelie GPU agent -> {API}; switch off: touch {SWITCH_OFF}", flush=True)
+    print(f"Adelie GPU agent -> {API}; model {MODEL}; switch off: touch {SWITCH_OFF}", flush=True)
+    report(started=time.time(), api=API, job=None)
     def beat():
         while True:
             heartbeat(); time.sleep(30)
@@ -202,16 +225,24 @@ def main():
                 print("claim failed:", e, flush=True); job = None
             if job:
                 print(f"job {job['id']} ({job['kind']})", flush=True)
+                p = job.get("params") or {}
+                title = " · ".join(x for x in [(p.get("location") or {}).get("name"), room_of(p)] if x)
+                info = {"id": job["id"], "kind": job["kind"], "title": title, "total": len(p.get("seeds") or [1]),
+                        "done": 0, "started": time.time()}
+                report(job=info)
+                result, err = "done", None
                 try:
                     JOBS[job["kind"]](job)
                     call(f"/gpu/jobs/{job['id']}/done")
                     print("  done", flush=True)
                 except Exception as e:
-                    traceback.print_exc()
+                    traceback.print_exc(); result, err = "failed", str(e)[:300]
                     try:
                         call(f"/gpu/jobs/{job['id']}/fail", {"error": str(e)[:1500]})
                     except Exception:
                         pass
+                done = {**(_status.get("job") or info), "result": result, "error": err, "finished": time.time()}
+                report(job=None, history=([done] + _status["history"])[:10])
                 if os.environ.get("ONCE"):
                     return
                 continue

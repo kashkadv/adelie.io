@@ -4,45 +4,30 @@
 [ADR-0042](../../docs/decisions/0042-product-scenes.md)). Він сам звертається до API Adelie: кожні 30 с надсилає стан ПК,
 забирає завдання з черги, генерує локально й вантажить результат. Adelie до ПК не підключається.
 
-## Запуск
+## Застосунок «Adelie GPU» (рекомендовано)
 
-1. ComfyUI запущений на `127.0.0.1:8188`, у ньому є FLUX 3 Image Klein (int8) і енкодер Qwen3-VL-4B
-   (див. [docs/plans/product-studio.md](../../docs/plans/product-studio.md)).
-2. Ключ: Adelie → Майстерня → Сцени → кнопка з процесором («Підключити ПК»). Ключ показується один раз.
-3. Запуск:
+Невеликий застосунок для Ubuntu (GTK 4 + libadwaita, без додаткових пакетів): стан ПК і зв'язку з Adelie, ComfyUI,
+відеопам'ять, поточне завдання з прогресом, останні завдання, журнал; «Запустити / Зупинити», «Дозволити Adelie брати
+завдання» (пауза), «Запускати при вході в систему»; налаштування — адреса Adelie, ключ ПК, модель, мінімум відеопам'яті,
+тека ComfyUI.
 
-   ```bash
-   ADELIE_API=https://<адреса API> ADELIE_GPU_KEY=gpw_... python3 infra/gpu-agent/agent.py
-   ```
-
-   Лише стандартна бібліотека Python; рецепти (`prototypes/`) запускаються через Python ComfyUI (`~/ComfyUI/venv`).
-
-## Перемикач
-
-`touch ~/.adelie-gpu-off` — ПК «зайнятий», нових завдань не бере (гра, рендер). `rm ~/.adelie-gpu-off` — знову готовий.
-ПК також вважається зайнятим, коли вільно менше `MIN_VRAM_MB` (6000) відеопам'яті.
-
-## Як постійна служба (systemd, користувацька)
-
-`~/.config/systemd/user/adelie-gpu.service`:
-
-```ini
-[Unit]
-Description=Adelie GPU agent
-After=network-online.target
-
-[Service]
-Environment=ADELIE_API=https://<адреса API>
-Environment=ADELIE_GPU_KEY=gpw_...
-ExecStart=/usr/bin/python3 %h/My own projects/Adelie/adelie.io/infra/gpu-agent/agent.py
-Restart=always
-RestartSec=20
-
-[Install]
-WantedBy=default.target
+```bash
+infra/gpu-agent/app/install.sh      # ярлик, значки, служби systemd (нічого не запускає)
 ```
 
-`systemctl --user enable --now adelie-gpu` · журнал: `journalctl --user -u adelie-gpu -f`.
+Далі: «Adelie GPU» у списку програм → закріпити в доці → Налаштування: ключ (Adelie → Майстерня → Сцени → кнопка з
+процесором) → Зберегти → Стан: «Запустити». Значок у верхній панелі — після
+`sudo apt install gir1.2-ayatanaappindicator3-0.1` (кольорова крапка стану, пауза, запуск).
+
+Що під капотом: служби `comfyui` і `adelie-gpu` (`~/.config/systemd/user/`), налаштування —
+`~/.config/adelie/gpu-agent.env` (лише для користувача), стан агента для застосунку — `~/.cache/adelie/gpu-agent.json`,
+пауза — файл `~/.adelie-gpu-off`.
+
+## Запуск вручну (без застосунку)
+
+1. ComfyUI запущений на `127.0.0.1:8188` з FLUX 3 Image Klein (int8) і енкодером Qwen3-VL-4B.
+2. `ADELIE_API=https://<адреса API> ADELIE_GPU_KEY=gpw_... python3 infra/gpu-agent/agent.py`
+   (`AGENT_MODEL` — `flux3` | `klein4b` | `klein9b`, `MIN_VRAM_MB` — 6000).
 
 ## Завдання
 
