@@ -1,8 +1,9 @@
-import { Controller, Param, ParseUUIDPipe, Post, Req, Res } from '@nestjs/common';
+import { createReadStream } from 'node:fs';
+import { Controller, Get, Param, ParseUUIDPipe, Post, Req, Res } from '@nestjs/common';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import type { Request, Response } from 'express';
 import { Prisma } from '@adelie/db';
-import { MIME_EXT, readBinary, saveAsset } from '../assets/storage.js';
+import { assetFile, MIME_EXT, readBinary, saveAsset } from '../assets/storage.js';
 import { PrismaService } from '../prisma.service.js';
 import { SIZE_CLASSES, type SizeClass } from '../scenes/scenes.js';
 import { hashWorkerKey, isWorkerKey, STALE_RUNNING_MS } from './gpu.js';
@@ -117,7 +118,8 @@ export class GpuAgentController {
   @Post('jobs/:id/scenes')
   async scene(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request, @Res() res: Response) {
     const job = await this.ownJob(req, id);
-    if (!job || job.kind !== 'scene_candidates') return res.status(404).json({ error: 'job' });
+    if (!job || !['scene_candidates', 'scene_refine'].includes(job.kind))
+      return res.status(404).json({ error: 'job' });
     const mime = String(req.headers['content-type'] ?? '')
       .split(';')[0]!
       .trim();
@@ -167,6 +169,25 @@ export class GpuAgentController {
       select: { id: true },
     });
     return res.json({ sceneId: scene.id, assetId: asset.id });
+  }
+
+  /** The image a refine job edits (the scene the owner asked to refine). */
+  @Get('jobs/:id/source')
+  async source(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request, @Res() res: Response) {
+    const job = await this.ownJob(req, id);
+    const assetId = (job?.params as { sourceAssetId?: unknown } | undefined)?.sourceAssetId;
+    if (!job || typeof assetId !== 'string') return res.status(404).json({ error: 'job' });
+    const asset = await this.prisma.client.asset.findFirst({
+      where: { id: assetId, projectId: job.projectId },
+      select: { path: true, mime: true, bytes: true },
+    });
+    const file = asset && assetFile(asset.path);
+    if (!asset || !file) return res.status(404).json({ error: 'asset' });
+    res.setHeader('Content-Type', asset.mime);
+    res.setHeader('Content-Length', String(asset.bytes));
+    createReadStream(file)
+      .on('error', () => res.status(404).end())
+      .pipe(res);
   }
 
   @Post('jobs/:id/done')

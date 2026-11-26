@@ -66,6 +66,9 @@ export interface GpuJob {
     angle?: string;
     sizeClass?: string;
     style?: string;
+    /** A refine job: what the owner asked to change, in which scene. */
+    instruction?: string;
+    parentNumber?: number;
   };
   createdAt: string;
   finishedAt: string | null;

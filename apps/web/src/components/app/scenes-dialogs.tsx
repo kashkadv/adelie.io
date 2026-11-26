@@ -7,6 +7,7 @@ import {
   Copy,
   Cpu,
   MapPin,
+  PencilLine,
   Plus,
   RotateCcw,
   ScrollText,
@@ -660,6 +661,92 @@ export function RulesDialog({ base, onClose }: { base: string; onClose: () => vo
           </div>
         </div>
       )}
+    </Dialog>
+  );
+}
+
+/** "Refine": what to change in this very scene; the PC edits it and keeps everything else. */
+export function RefineDialog({
+  base,
+  sceneId,
+  title,
+  onClose,
+  onQueued,
+}: {
+  base: string;
+  sceneId: string;
+  title: string;
+  onClose: () => void;
+  onQueued: () => void;
+}) {
+  const t = useTranslations('Scenes');
+  const [instruction, setInstruction] = useState('');
+  const [count, setCount] = useState('2');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy || !instruction.trim()) return;
+    setBusy(true);
+    try {
+      await api(`${base}/scenes/${sceneId}/refine`, {
+        method: 'POST',
+        json: { instruction, count: Number(count) },
+      });
+      onQueued();
+    } catch {
+      setError(t('errors.failed'));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      icon={PencilLine}
+      title={t('refineTitle', { scene: title })}
+      lead={t('refineLead')}
+      busy={busy}
+      onClose={onClose}
+      onSubmit={submit}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={busy} className={subtle}>
+            {t('cancel')}
+          </button>
+          <button
+            type="submit"
+            disabled={busy || !instruction.trim()}
+            className="btn-primary w-auto px-5"
+          >
+            {t('refineSubmit')}
+          </button>
+        </>
+      }
+    >
+      <div className="grid gap-4">
+        <label className="block">
+          <Label text={t('refineWhat')} hint={t('refineWhatHint')} />
+          <textarea
+            autoFocus
+            className="field min-h-24 py-2.5"
+            maxLength={500}
+            placeholder={t('refinePlaceholder')}
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+          />
+        </label>
+        <div className="max-w-40">
+          <Label text={t('refineCount')} />
+          <Select
+            ariaLabel={t('refineCount')}
+            value={count}
+            onChange={setCount}
+            options={['1', '2', '4'].map((v) => ({ value: v, label: v }))}
+          />
+        </div>
+        {error && <ErrorText text={error} />}
+      </div>
     </Dialog>
   );
 }

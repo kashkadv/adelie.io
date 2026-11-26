@@ -480,6 +480,64 @@ export class ScenesController {
     return this.queue(ctx, projectId, { ...parsed.request });
   }
 
+  /**
+   * "Refine": the PC edits this very scene by the owner's instruction (remove the floor lamp, darker walls), keeping the
+   * camera, layout and the free floor; the results come back as new scenes of the same location.
+   */
+  @Post('scenes/:id/refine')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async refine(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { instruction?: unknown; count?: unknown } | undefined,
+    @Req() request: Ctx,
+  ) {
+    const ctx = request.workspace;
+    await this.project(ctx, projectId);
+    const instruction = str(body?.instruction, 500);
+    if (!instruction) throw new BadRequestException({ errors: { instruction: 'required' } });
+    const count = Number(body?.count ?? 2);
+    const scene = await this.prisma.client.scene.findFirst({
+      where: { id, projectId, workspaceId: ctx.workspaceId },
+      select: SCENE_SELECT,
+    });
+    if (!scene?.assetId) throw new NotFoundException();
+    const n = Number.isInteger(count) && count >= 1 && count <= 4 ? count : 2;
+    const prompt =
+      `Edit the photograph in image 1: ${instruction}. ` +
+      'Change only that. Keep everything else exactly as it is: the same camera and framing, the same room, ' +
+      'furniture, materials, colours and light, and the open bare floor area in front stays empty. ' +
+      'The result is a real, unedited-looking photograph.';
+    const params = {
+      locationId: scene.locationId,
+      sceneType: scene.sceneType,
+      light: scene.light,
+      angle: scene.angle,
+      sizeClass: scene.sizeClass,
+      placement: scene.placement,
+      productTypes: scene.productTypes,
+      style: scene.style ?? '',
+      count: n,
+      seeds: seedsFor(n),
+      instruction,
+      parentSceneId: scene.id,
+      parentNumber: scene.number,
+      sourceAssetId: scene.assetId,
+      // the mock-up of the original, for placing a product later
+      proxy: (scene.params as { proxy?: unknown }).proxy ?? null,
+      prompt,
+    };
+    return this.prisma.client.gpuJob.create({
+      data: {
+        workspaceId: ctx.workspaceId,
+        projectId,
+        kind: 'scene_refine',
+        params: params as unknown as Prisma.InputJsonValue,
+      },
+      select: { id: true, status: true, createdAt: true },
+    });
+  }
+
   /** Several decisions at once ("keep the chosen ones, reject the rest"). */
   @Post('scenes/decide')
   @WorkspaceRoles(...CONNECT_ROLES)

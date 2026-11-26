@@ -5,6 +5,7 @@ uploads the result.
 Ready = the owner's switch is on (no file ~/.adelie-gpu-off) and at least MIN_VRAM_MB of video memory is free.
 
 Jobs:
+  scene_refine     - one scene edited by the owner's instruction (FLUX 3 Klein, the scene as image 1).
   scene_candidates - a room mock-up in real centimetres (prototypes/scene_proxy.py) dressed by FLUX 3 Image Klein
                      (prototypes/wf_flux3.py); one scene per seed, uploaded with its recipe. The prompt and the mock-up
                      come with the job (built in Adelie from the project's rules); scene_prompt() is the fallback.
@@ -52,6 +53,13 @@ def call(path, body=None, data=None, headers=None, timeout=60):
     with urllib.request.urlopen(req, timeout=timeout) as r:
         raw = r.read()
         return json.loads(raw) if raw else None
+
+
+def fetch(path, timeout=120):
+    """GET bytes from the Adelie API with the worker key (the image a refine job edits)."""
+    req = urllib.request.Request(API + path, headers={"Authorization": f"Bearer {KEY}", "User-Agent": "adelie-gpu-agent/1"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read()
 
 
 def vram_free_mb():
@@ -260,7 +268,40 @@ def scene_candidates(job):
     inp.unlink(missing_ok=True)
 
 
-JOBS = {"scene_candidates": scene_candidates}
+def scene_refine(job):
+    """The owner's instruction applied to one scene: FLUX 3 Klein edits the scene itself (as the reference image), keeping
+    camera, layout and the free floor; each seed gives one refined version, uploaded as a new scene."""
+    p = job["params"]; jid = job["id"]
+    work = COMFY_DIR / "work" / "adelie" / jid; work.mkdir(parents=True, exist_ok=True)
+    prog = Progress(jid, len(p.get("seeds") or [1]))
+    src = COMFY_DIR / "input" / f"adelie_{jid}_source.png"
+    src.write_bytes(fetch(f"/gpu/jobs/{jid}/source"))
+    (work / "prompt.txt").write_text(p["prompt"])
+    comfy_free()
+    seeds = p.get("seeds") or [1]
+    for n, seed in enumerate(seeds, 1):
+        prog.set(stage="generating", done=n - 1)
+        wf = work / f"wf_{n}.json"
+        run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}", src.name],
+            env={"START": "0", "STEPS": "16"})
+        out = run([PY, "-I", PROTO / "comfy_run.py", wf], env={"PROGRESS_FILE": str(prog.file)})
+        prog.set(stage="uploading")
+        name = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")][0]
+        img = COMFY_DIR / "output" / "adelie" / name
+        meta = {"prompt": p["prompt"], "seed": seed, "model": MODEL, "size": "832x1248", "instruction": p.get("instruction"),
+                "parentSceneId": p.get("parentSceneId"), "proxy": p.get("proxy")}
+        call(f"/gpu/jobs/{jid}/scenes", data=img.read_bytes(), timeout=300,
+             headers={"Content-Type": "image/png", "X-Number": str(n),
+                      "X-Meta": base64.b64encode(json.dumps(meta).encode()).decode()})
+        img.unlink(missing_ok=True)
+        prog.set(stage="saved", done=n)
+        print(f"  refined {n}/{len(seeds)} uploaded", flush=True)
+    prog.close()
+    comfy_free()
+    src.unlink(missing_ok=True)
+
+
+JOBS = {"scene_candidates": scene_candidates, "scene_refine": scene_refine}
 
 
 def goodbye(*_):

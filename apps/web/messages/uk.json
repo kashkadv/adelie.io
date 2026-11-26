@@ -2273,6 +2273,15 @@
       "uploading": "зберігаю"
     },
     "etaMinutes": "≈ {count} хв",
-    "etaUnderMinute": "менше хвилини"
+    "etaUnderMinute": "менше хвилини",
+    "refine": "Уточнити",
+    "refineTitle": "Уточнити: {scene}",
+    "refineLead": "ПК змінить лише те, що ви напишете; камера, меблі, світло й вільна підлога лишаться.",
+    "refineWhat": "Що змінити",
+    "refineWhatHint": "Конкретно, 1–2 зміни. Англійською працює точніше.",
+    "refinePlaceholder": "remove the floor lamp on the left; darker walls",
+    "refineCount": "Скільки варіантів",
+    "refineSubmit": "Уточнити",
+    "refineJob": "Уточнення №{n}: {what}"
   }
 }

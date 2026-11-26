@@ -5,6 +5,7 @@ import {
   ArchiveRestore,
   Check,
   ChevronLeft,
+  PencilLine,
   Plus,
   RefreshCw,
   Sparkles,
@@ -20,7 +21,7 @@ import { api } from '@/lib/api';
 import { apiUrl } from '@/lib/auth-client';
 import { CONNECT_ROLES } from './accounts-data';
 import { GpuPill } from './scenes';
-import { AddScenesDialog, LocationDialog, SceneViewer } from './scenes-dialogs';
+import { AddScenesDialog, LocationDialog, RefineDialog, SceneViewer } from './scenes-dialogs';
 import { TABS, type LocationDetail, type Scene } from './scenes-data';
 import { useWorkspace } from './workspace-context';
 
@@ -49,6 +50,7 @@ export function SceneLocation({ locationId }: { locationId: string }) {
   const [focus, setFocus] = useState(0);
   const [viewer, setViewer] = useState<number | null>(null);
   const [dialog, setDialog] = useState<'edit' | 'add' | null>(null);
+  const [refining, setRefining] = useState<Scene | null>(null);
   const reload = () => setVersion((v) => v + 1);
 
   useEffect(() => {
@@ -243,14 +245,16 @@ export function SceneLocation({ locationId }: { locationId: string }) {
   const failed = data.jobs.filter((j) => j.status === 'failed');
   const viewed = viewer !== null ? flat[viewer] : undefined;
   const jobTitle = (j: LocationDetail['jobs'][number]) =>
-    [
-      j.params.sceneTypeLabel ?? typeLabel(j.params.sceneType ?? null),
-      j.params.light && t(`lights.${j.params.light}` as 'lights.sun'),
-      j.params.angle && t(`angles.${j.params.angle}` as 'angles.front'),
-      j.params.sizeClass && t(`sizes.${j.params.sizeClass}` as 'sizes.small'),
-    ]
-      .filter(Boolean)
-      .join(' · ');
+    j.kind === 'scene_refine'
+      ? t('refineJob', { n: j.params.parentNumber ?? '', what: j.params.instruction ?? '' })
+      : [
+          j.params.sceneTypeLabel ?? typeLabel(j.params.sceneType ?? null),
+          j.params.light && t(`lights.${j.params.light}` as 'lights.sun'),
+          j.params.angle && t(`angles.${j.params.angle}` as 'angles.front'),
+          j.params.sizeClass && t(`sizes.${j.params.sizeClass}` as 'sizes.small'),
+        ]
+          .filter(Boolean)
+          .join(' · ');
 
   /** "Generating scene 2 of 4 · 45% · ~3 min": the stage the PC reports, the estimate from the time so far. */
   const jobLine = (j: LocationDetail['jobs'][number]) => {
@@ -359,6 +363,15 @@ export function SceneLocation({ locationId }: { locationId: string }) {
                 className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/95 text-black"
               >
                 <X size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setRefining(s)}
+                aria-label={t('refine')}
+                title={t('refine')}
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/95 text-black"
+              >
+                <PencilLine size={14} aria-hidden="true" />
               </button>
             </div>
           )}
@@ -672,6 +685,14 @@ export function SceneLocation({ locationId }: { locationId: string }) {
                 )}
                 <button
                   type="button"
+                  onClick={() => setRefining(viewed)}
+                  className="flex h-10 items-center gap-1.5 rounded-xl bg-white/15 px-4 text-sm text-white"
+                >
+                  <PencilLine size={15} aria-hidden="true" />
+                  {t('refine')}
+                </button>
+                <button
+                  type="button"
                   onClick={() => void more(viewed)}
                   className="flex h-10 items-center gap-1.5 rounded-xl bg-white/15 px-4 text-sm text-white"
                 >
@@ -699,6 +720,20 @@ export function SceneLocation({ locationId }: { locationId: string }) {
           onClose={() => setDialog(null)}
           onSaved={() => {
             setDialog(null);
+            reload();
+          }}
+        />
+      )}
+      {refining && base && (
+        <RefineDialog
+          base={base}
+          sceneId={refining.id}
+          title={`${typeLabel(refining.sceneType)}${refining.status === 'candidate' ? ` №${refining.number}` : ''}`}
+          onClose={() => setRefining(null)}
+          onQueued={() => {
+            setRefining(null);
+            setViewer(null);
+            setTab('candidate');
             reload();
           }}
         />
