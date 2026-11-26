@@ -194,6 +194,37 @@ export class GpuAgentController {
     return this.sendAsset(job.projectId, assetId, res);
   }
 
+  /** The words the PC wrote for reference n: kept on the file, so the next request with it skips describing. */
+  @Post('jobs/:id/refs/:n/description')
+  async describe(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('n') n: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const job = await this.ownJob(req, id);
+    const refs = (job?.params as { refAssetIds?: unknown } | undefined)?.refAssetIds;
+    const assetId = Array.isArray(refs) ? refs[Number(n) - 1] : undefined;
+    const raw = (req.body as { text?: unknown })?.text;
+    const text = typeof raw === 'string' ? raw.trim().slice(0, 2000) : '';
+    if (!job || typeof assetId !== 'string' || !text) return res.status(404).json({ error: 'job' });
+    const asset = await this.prisma.client.asset.findFirst({
+      where: { id: assetId, projectId: job.projectId },
+      select: { recipe: true },
+    });
+    if (!asset) return res.status(404).json({ error: 'asset' });
+    await this.prisma.client.asset.update({
+      where: { id: assetId },
+      data: {
+        recipe: {
+          ...(asset.recipe as Record<string, unknown> | null),
+          description: text,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    return res.json({ ok: true });
+  }
+
   private async sendAsset(projectId: string, assetId: string, res: Response) {
     const asset = await this.prisma.client.asset.findFirst({
       where: { id: assetId, projectId },

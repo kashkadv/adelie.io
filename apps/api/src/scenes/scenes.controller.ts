@@ -484,17 +484,26 @@ export class ScenesController {
       notes: r.notes,
     });
     const refs = (r['refAssetIds'] as string[] | undefined) ?? [];
+    // References described before (by the PC, kept on the file) go as words at once; the PC describes the rest.
+    const described = refs.length
+      ? await this.prisma.client.asset.findMany({
+          where: { id: { in: refs } },
+          select: { id: true, recipe: true },
+        })
+      : [];
+    const refDescriptions = refs.map(
+      (id) =>
+        ((described.find((d) => d.id === id)?.recipe as { description?: string } | null)
+          ?.description as string | undefined) ?? null,
+    );
     const params = {
       ...r,
       refAssetIds: refs,
+      refDescriptions,
       location: { id: loc.id, name: loc.name, direction: loc.direction },
       sceneTypeLabel: typeRule.label,
       mockup: (typeRule.mockup as Mockup | null) ?? null,
-      prompt: refs.length
-        ? `${prompt} ${refs.length > 1 ? `Images 2 to ${refs.length + 1} are` : 'Image 2 is'} style ` +
-          'references: take their materials, colours, furniture style and atmosphere; do not copy their layout, ' +
-          'objects placement or camera - the layout and camera come only from image 1.'
-        : prompt,
+      prompt,
       seeds: seedsFor(r.count),
     };
     return this.prisma.client.gpuJob.create({

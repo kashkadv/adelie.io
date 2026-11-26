@@ -218,6 +218,26 @@ def scene_prompt(p):
     return " ".join(parts)
 
 
+def describe_refs(jid, work, refs, prog):
+    """The references in words (FLUX 3 Klein prompt upsampler, a vision-language model); None if it is not installed
+    or fails - then the pictures alone go to the image model."""
+    if not (COMFY_DIR / "models/text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors").exists():
+        return None
+    prog.set(stage="describing")
+    try:
+        comfy_free()
+        wf = work / "describe.json"
+        run([PY, "-I", PROTO / "wf_describe.py", wf, *[r.name for r in refs]])
+        out = run([PY, "-I", PROTO / "comfy_run.py", wf])
+        texts = [json.loads(l[len("text: "):]) for l in out.splitlines() if l.startswith("text: ")]
+        comfy_free()                                   # the 9B describer out of VRAM before the image model
+        text = " ".join(str(t) for t in texts).strip()
+        return text[:900] or None
+    except Exception as e:
+        print("  describing the references failed:", e, flush=True)
+        return None
+
+
 def scene_candidates(job):
     p = job["params"]; jid = job["id"]
     kind = room_of(p)
@@ -240,10 +260,29 @@ def scene_candidates(job):
     inp = COMFY_DIR / "input" / f"adelie_{jid}_proxy.png"; shutil.copy(proxy, inp)
     prompt = p.get("prompt") or scene_prompt(p); (work / "prompt.txt").write_text(prompt)
     # the owner's references (interiors, materials, mood) go to the model after the mock-up: images 2..
-    refs = []
+    # The owner's references go to the image model as WORDS only (tested 2026-11-26: the picture itself made the model
+    # copy the reference's layout instead of the mock-up's; the words carried the style and kept the layout).
+    # A description written before is kept on the file by Adelie; the others are described here once and sent back.
+    refs, words = [], []
+    known = p.get("refDescriptions") or []
     for i, _ in enumerate(p.get("refAssetIds") or [], 1):
+        if i <= len(known) and known[i - 1]:
+            words.append(known[i - 1]); continue
         ref = COMFY_DIR / "input" / f"adelie_{jid}_ref{i}.png"; ref.write_bytes(fetch(f"/gpu/jobs/{jid}/refs/{i}"))
-        refs.append(ref)
+        # a smaller picture: the describer reads it faster (≈ 4.5 instead of 6.5 min) and sees the same style
+        run([PY, "-I", "-c", f"from PIL import Image; im=Image.open('{ref}').convert('RGB'); im.thumbnail((640, 640)); im.save('{ref}')"])
+        text = describe_refs(jid, work, [ref], prog)
+        ref.unlink(missing_ok=True)
+        if text:
+            words.append(text)
+            try:
+                call(f"/gpu/jobs/{jid}/refs/{i}/description", {"text": text})
+            except Exception:
+                pass
+    ref_style = " ".join(words) or None
+    if ref_style:
+        prompt += f" Style details: {ref_style}"
+        (work / "prompt.txt").write_text(prompt)
     seeds = p.get("seeds") or [1]
     comfy_free()
     for n, seed in enumerate(seeds, 1):
@@ -251,15 +290,15 @@ def scene_candidates(job):
         wf = work / f"wf_{n}.json"
         if AGENT_MODEL == "flux3":
             run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}",
-                 inp.name, *[r.name for r in refs]], env={"START": "2", "STEPS": "16", "REF_MP": "0.6"})
+                 inp.name], env={"START": "2", "STEPS": "16"})
         else:   # FLUX.2 klein for comparisons: 8 steps, the first skipped (the same share)
             run([PY, "-I", PROTO / "wf_klein.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}",
-                 inp.name, *[r.name for r in refs]], env={"START": "1", "STEPS": "8", "KLEIN": AGENT_MODEL[-2:]})
+                 inp.name], env={"START": "1", "STEPS": "8", "KLEIN": AGENT_MODEL[-2:]})
         out = run([PY, "-I", PROTO / "comfy_run.py", wf], env={"PROGRESS_FILE": str(prog.file)})
         prog.set(stage="uploading")
         name = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")][0]
         img = COMFY_DIR / "output" / "adelie" / name
-        meta = {"prompt": prompt, "seed": seed, "model": MODEL, "size": "832x1248", "refAssetIds": p.get("refAssetIds") or [],
+        meta = {"prompt": prompt, "seed": seed, "model": MODEL, "size": "832x1248", "refAssetIds": p.get("refAssetIds") or [], "referenceStyle": ref_style,
                 "proxy": geo, "mock": SIZE_MOCK[p["sizeClass"]], "kind": kind}
         call(f"/gpu/jobs/{jid}/scenes", data=img.read_bytes(), timeout=300,
              headers={"Content-Type": "image/png", "X-Number": str(n),
@@ -271,8 +310,7 @@ def scene_candidates(job):
     prog.close()
     comfy_free()
     inp.unlink(missing_ok=True)
-    for r in refs:
-        r.unlink(missing_ok=True)
+
 
 
 def scene_refine(job):

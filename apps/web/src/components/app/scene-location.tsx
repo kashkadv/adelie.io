@@ -263,11 +263,13 @@ export function SceneLocation({ locationId }: { locationId: string }) {
     const stage =
       j.stage === 'mockup'
         ? t('stages.mockup')
-        : j.stage === 'loading'
-          ? t('stages.loading')
-          : j.stage === 'uploading' || j.stage === 'saved'
-            ? t('stages.uploading')
-            : t('stages.generating', { n, total });
+        : j.stage === 'describing'
+          ? t('stages.describing')
+          : j.stage === 'loading'
+            ? t('stages.loading')
+            : j.stage === 'uploading' || j.stage === 'saved'
+              ? t('stages.uploading')
+              : t('stages.generating', { n, total });
     const started = j.claimedAt ? new Date(j.claimedAt).getTime() : 0;
     const left =
       started && j.progress >= 5

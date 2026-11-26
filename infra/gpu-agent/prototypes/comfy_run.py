@@ -70,3 +70,5 @@ for m in r["status"]["messages"]:
 for nid, o in r.get("outputs", {}).items():
     for im in o.get("images", []):
         print("output:", im["subfolder"], im["filename"])
+    for txt in o.get("text", []):                 # PreviewAny / text nodes (wf_describe.py)
+        print("text:", json.dumps(txt))

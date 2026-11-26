@@ -2272,7 +2272,8 @@
       "mockup": "building the mock-up",
       "loading": "loading the model",
       "generating": "generating scene {n} of {total}",
-      "uploading": "saving"
+      "uploading": "saving",
+      "describing": "describing the references"
     },
     "etaMinutes": "~{count} min",
     "etaUnderMinute": "under a minute",
@@ -2286,7 +2287,7 @@
     "refineSubmit": "Refine",
     "refineJob": "Refining №{n}: {what}",
     "references": "References",
-    "referencesHint": "Up to 3 photos: interiors, materials, mood. The model takes their style, colours and materials; the layout comes only from the mock-up.",
+    "referencesHint": "Up to 3 photos: interiors, materials, mood. The PC describes each photo in words (the first time ~5 min per photo, then the description is kept), and the model takes the style, materials and colours from it. The layout comes only from the mock-up; the picture itself is not copied.",
     "referenceAdd": "Drop photos here or choose files",
     "referenceMore": "More photos",
     "referenceRemove": "Remove the reference"
