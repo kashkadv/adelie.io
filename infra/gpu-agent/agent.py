@@ -422,6 +422,14 @@ def goodbye(*_):
     os._exit(0)
 
 
+_CODE = [Path(__file__), *sorted(PROTO.glob("*.py"))]
+_STAMP = {p: p.stat().st_mtime for p in _CODE if p.exists()}
+
+
+def code_changed():
+    return any(p.exists() and p.stat().st_mtime != t for p, t in _STAMP.items())
+
+
 def main():
     if not KEY:
         sys.exit("ADELIE_GPU_KEY is not set (Adelie -> Workshop -> Scenes -> Connect a PC)")
@@ -466,6 +474,11 @@ def main():
                 continue
             if os.environ.get("ONCE"):
                 return
+        if code_changed():
+            # the agent's code was updated (git pull, deploy): restart between jobs so the next job runs the new code
+            # (2026-11-27: a job with a sketch ran on the old code, which ignored the sketch)
+            print("agent code changed - restarting", flush=True)
+            os.execv(sys.executable, [sys.executable, "-u", *sys.argv])
         time.sleep(15)
 
 
