@@ -39,6 +39,9 @@
   --accent: #0b0e12;
   --accent-foreground: #ffffff;
 
+  /* The area painted over a photo ("Refine an area"); over a photo, so the same in both themes */
+  --mask: #f43f5e;
+
   /* Background glow (behind the glass) */
   --glow-1: rgb(63 132 212 / 0.16);
   --glow-2: rgb(232 150 46 / 0.12);

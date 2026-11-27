@@ -69,6 +69,8 @@ export interface GpuJob {
     /** A refine job: what the owner asked to change, in which scene. */
     instruction?: string;
     parentNumber?: number;
+    /** "Refine an area": the owner's mask. */
+    maskAssetId?: string | null;
   };
   createdAt: string;
   finishedAt: string | null;

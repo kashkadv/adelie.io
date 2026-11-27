@@ -5,7 +5,8 @@ uploads the result.
 Ready = the owner's switch is on (no file ~/.adelie-gpu-off) and at least MIN_VRAM_MB of video memory is free.
 
 Jobs:
-  scene_refine     - one scene edited by the owner's instruction (FLUX 3 Klein, the scene as image 1).
+  scene_refine     - one scene edited by the owner's instruction (FLUX 3 Klein, the scene as image 1); with the owner's
+                     mask ("Refine an area") only that area is drawn anew and the original pixels stay around it.
   scene_candidates - a room mock-up in real centimetres (prototypes/scene_proxy.py) dressed by FLUX 3 Image Klein
                      (prototypes/wf_flux3.py); one scene per seed, uploaded with its recipe. The prompt and the mock-up
                      come with the job (built in Adelie from the project's rules); scene_prompt() is the fallback.
@@ -374,9 +375,41 @@ def scene_candidates(job):
 
 
 
+# "Refine an area": the scene brought to the generation size exactly (no crop inside ComfyUI, so the result lines up
+# pixel for pixel), the owner's mask at that size widened a little (the model needs a margin to blend the change in)
+# for the noise mask, a softened copy of it for pasting the result over the original, and the scene with the area
+# filled grey - what the model is shown (tested 2026-11-27: shown the original, FLUX 3 copied the armchair it was
+# asked to replace straight back). argv: source mask size feather holed
+AREA_PREP = r"""
+import sys
+from PIL import Image, ImageFilter
+src, mask, size, feather, holed = sys.argv[1:6]
+w, h = map(int, size.split("x"))
+im = Image.open(src).convert("RGB").resize((w, h), Image.LANCZOS); im.save(src)
+m = Image.open(mask).convert("L").resize((w, h), Image.BILINEAR).point(lambda v: 255 if v > 127 else 0)
+r = max(8, round(min(w, h) * 0.02))                          # ~2% of the short side: ~23 px at 1152 wide
+grown = m.filter(ImageFilter.GaussianBlur(r)).point(lambda v: 255 if v > 10 else 0)
+# soft edges both for sampling and for pasting: a hard edge left a visible tone step on the floor (test, 2026-11-27);
+# outside the noise mask the model returns the original, so a seam reaching a little outward is safe
+grown.filter(ImageFilter.GaussianBlur(r / 2)).convert("RGB").save(mask)
+grown.filter(ImageFilter.GaussianBlur(r)).save(feather)
+Image.composite(Image.new("RGB", (w, h), (128, 128, 128)), im, grown).save(holed)
+"""
+
+# The generated frame inside the softened mask, the original pixels outside it. argv: generated original feather out
+AREA_PASTE = r"""
+import sys
+from PIL import Image
+gen, orig, feather, out = sys.argv[1:5]
+o = Image.open(orig).convert("RGB"); g = Image.open(gen).convert("RGB").resize(o.size, Image.LANCZOS)
+Image.composite(g, o, Image.open(feather).convert("L").resize(o.size)).save(out)
+"""
+
+
 def scene_refine(job):
     """The owner's instruction applied to one scene: FLUX 3 Klein edits the scene itself (as the reference image), keeping
-    camera, layout and the free floor; each seed gives one refined version, uploaded as a new scene."""
+    camera, layout and the free floor; each seed gives one refined version, uploaded as a new scene. With a mask
+    ("Refine an area") only the masked part is sampled and the original pixels are pasted back around it."""
     p = job["params"]; jid = job["id"]
     work = COMFY_DIR / "work" / "adelie" / jid; work.mkdir(parents=True, exist_ok=True)
     prog = Progress(jid, len(p.get("seeds") or [1]))
@@ -384,20 +417,36 @@ def scene_refine(job):
     src.write_bytes(fetch(f"/gpu/jobs/{jid}/source"))
     # refine at the scene's own size (scenes are ~2 MP since 2026-11-27)
     ref_size = run([PY, "-I", "-c", f"from PIL import Image; w,h=Image.open('{src}').size; k=min(1.0,(2_000_000/(w*h))**0.5); print('%dx%d'%(round(w*k/16)*16, round(h*k/16)*16))"]).strip()
+    env = {"START": "0", "STEPS": "16"}
+    mask = feather = holed = None
+    images = [src.name]
+    if p.get("maskAssetId"):
+        mask = COMFY_DIR / "input" / f"adelie_{jid}_mask.png"; feather = work / "feather.png"
+        holed = COMFY_DIR / "input" / f"adelie_{jid}_holed.png"
+        mask.write_bytes(fetch(f"/gpu/jobs/{jid}/mask"))
+        run([PY, "-I", "-c", AREA_PREP, src, mask, ref_size, feather, holed])
+        # the latent starts from the original (a soft mask edge then blends into the real room, not into grey - tested
+        # 2026-11-27: the grey start left a see-through grey ghost); the model is shown only the holed scene
+        images = [src.name, holed.name]
+        env.update(MASK=mask.name, NO_MAIN_REF="1")
     (work / "prompt.txt").write_text(p["prompt"])
     comfy_free()
     seeds = p.get("seeds") or [1]
     for n, seed in enumerate(seeds, 1):
         prog.set(stage="generating", done=n - 1)
         wf = work / f"wf_{n}.json"
-        run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", ref_size, f"adelie/{jid}_{n}", src.name],
-            env={"START": "0", "STEPS": "16"})
+        run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", ref_size, f"adelie/{jid}_{n}", *images],
+            env=env)
         out = run([PY, "-I", PROTO / "comfy_run.py", wf], env={"PROGRESS_FILE": str(prog.file)})
         prog.set(stage="uploading")
         name = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")][0]
         img = COMFY_DIR / "output" / "adelie" / name
-        meta = {"prompt": p["prompt"], "seed": seed, "model": MODEL, "size": "832x1248", "instruction": p.get("instruction"),
-                "parentSceneId": p.get("parentSceneId"), "proxy": p.get("proxy")}
+        if mask:
+            pasted = work / f"area_{n}.png"
+            run([PY, "-I", "-c", AREA_PASTE, img, src, feather, pasted])
+            img.unlink(missing_ok=True); img = pasted
+        meta = {"prompt": p["prompt"], "seed": seed, "model": MODEL, "size": ref_size, "instruction": p.get("instruction"),
+                "parentSceneId": p.get("parentSceneId"), "proxy": p.get("proxy"), "area": bool(mask)}
         call(f"/gpu/jobs/{jid}/scenes", data=img.read_bytes(), timeout=300,
              headers={"Content-Type": "image/png", "X-Number": str(n),
                       "X-Meta": base64.b64encode(json.dumps(meta).encode()).decode()})
@@ -407,6 +456,8 @@ def scene_refine(job):
     prog.close()
     comfy_free()
     src.unlink(missing_ok=True)
+    for f in (mask, holed):
+        if f: f.unlink(missing_ok=True)
 
 
 JOBS = {"scene_candidates": scene_candidates, "scene_refine": scene_refine}

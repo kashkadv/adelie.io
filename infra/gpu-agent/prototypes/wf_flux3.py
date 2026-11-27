@@ -32,7 +32,9 @@ def build(seed, prompt, w, h, prefix, images, steps=16, start=0):
     g["enc"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["scale", 0], "vae": ["vae", 0]}}
     g["empty"] = {"class_type": "EmptyFlux2LatentImage", "inputs": {"width": w, "height": h, "batch_size": 1}}
     lat = ["enc", 0] if start else ["empty", 0]
-    if start and os.environ.get("MASK"):
+    # MASK: only the masked area is sampled, the rest keeps the main image's latent - also from step 0 (the area is
+    # drawn anew while the model sees the whole room around it: "Refine an area")
+    if os.environ.get("MASK"):
         g["mload"] = {"class_type": "LoadImage", "inputs": {"image": os.environ["MASK"]}}
         g["mconv"] = {"class_type": "ImageToMask", "inputs": {"image": ["mload", 0], "channel": "red"}}
         g["nmask"] = {"class_type": "SetLatentNoiseMask", "inputs": {"samples": ["enc", 0], "mask": ["mconv", 0]}}

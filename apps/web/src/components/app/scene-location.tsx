@@ -3,6 +3,7 @@
 import {
   Archive,
   ArchiveRestore,
+  Brush,
   Check,
   ChevronLeft,
   PencilLine,
@@ -21,6 +22,7 @@ import { api } from '@/lib/api';
 import { apiUrl } from '@/lib/auth-client';
 import { CONNECT_ROLES } from './accounts-data';
 import { GpuPill } from './scenes';
+import { AreaRefine } from './scene-area-refine';
 import { SceneSketches } from './scene-sketches';
 import { AddScenesDialog, LocationDialog, RefineDialog, SceneViewer } from './scenes-dialogs';
 import { TABS, type LocationDetail, type Scene } from './scenes-data';
@@ -53,6 +55,7 @@ export function SceneLocation({ locationId }: { locationId: string }) {
   const [dialog, setDialog] = useState<'edit' | 'add' | null>(null);
   const [useSketch, setUseSketch] = useState<string | null>(null);
   const [refining, setRefining] = useState<Scene | null>(null);
+  const [area, setArea] = useState<Scene | null>(null);
   const reload = () => setVersion((v) => v + 1);
 
   useEffect(() => {
@@ -248,7 +251,10 @@ export function SceneLocation({ locationId }: { locationId: string }) {
   const viewed = viewer !== null ? flat[viewer] : undefined;
   const jobTitle = (j: LocationDetail['jobs'][number]) =>
     j.kind === 'scene_refine'
-      ? t('refineJob', { n: j.params.parentNumber ?? '', what: j.params.instruction ?? '' })
+      ? t(j.params.maskAssetId ? 'areaJob' : 'refineJob', {
+          n: j.params.parentNumber ?? '',
+          what: j.params.instruction ?? '',
+        })
       : [
           j.params.sceneTypeLabel ?? typeLabel(j.params.sceneType ?? null),
           j.params.light && t(`lights.${j.params.light}` as 'lights.sun'),
@@ -643,7 +649,7 @@ export function SceneLocation({ locationId }: { locationId: string }) {
         </div>
       )}
 
-      {viewed && (
+      {viewed && !area && (
         <SceneViewer
           src={src(viewed)}
           title={`${typeLabel(viewed.sceneType)}${viewed.status === 'candidate' ? ` · №${viewed.number}` : ''}`}
@@ -715,6 +721,14 @@ export function SceneLocation({ locationId }: { locationId: string }) {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setArea(viewed)}
+                  className="flex h-10 items-center gap-1.5 rounded-xl bg-white/15 px-4 text-sm text-white"
+                >
+                  <Brush size={15} aria-hidden="true" />
+                  {t('area')}
+                </button>
+                <button
+                  type="button"
                   onClick={() => void more(viewed)}
                   className="flex h-10 items-center gap-1.5 rounded-xl bg-white/15 px-4 text-sm text-white"
                 >
@@ -754,6 +768,21 @@ export function SceneLocation({ locationId }: { locationId: string }) {
           onClose={() => setRefining(null)}
           onQueued={() => {
             setRefining(null);
+            setViewer(null);
+            setTab('candidate');
+            reload();
+          }}
+        />
+      )}
+      {area && base && (
+        <AreaRefine
+          base={base}
+          sceneId={area.id}
+          src={src(area)}
+          title={`${typeLabel(area.sceneType)}${area.status === 'candidate' ? ` №${area.number}` : ''}`}
+          onClose={() => setArea(null)}
+          onQueued={() => {
+            setArea(null);
             setViewer(null);
             setTab('candidate');
             reload();

@@ -180,6 +180,15 @@ export class GpuAgentController {
     return this.sendAsset(job.projectId, assetId, res);
   }
 
+  /** The owner's mask of a "Refine an area" job (white = change). */
+  @Get('jobs/:id/mask')
+  async mask(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request, @Res() res: Response) {
+    const job = await this.ownJob(req, id);
+    const assetId = (job?.params as { maskAssetId?: unknown } | undefined)?.maskAssetId;
+    if (!job || typeof assetId !== 'string') return res.status(404).json({ error: 'job' });
+    return this.sendAsset(job.projectId, assetId, res);
+  }
+
   @Get('jobs/:id/refs/:n')
   async reference(
     @Param('id', ParseUUIDPipe) id: string,

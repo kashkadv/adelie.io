@@ -720,18 +720,79 @@ export class ScenesController {
     await this.project(ctx, projectId);
     const instruction = str(body?.instruction, 500);
     if (!instruction) throw new BadRequestException({ errors: { instruction: 'required' } });
-    const count = Number(body?.count ?? 2);
+    return this.queueRefine(ctx, projectId, id, instruction, body?.count, null);
+  }
+
+  /**
+   * "Refine an area" (owner, 2026-11-27): the owner paints over a part of the scene and says what to do there. The
+   * mask comes as the body (PNG, white = change), the instruction and count in the query. The PC samples the whole
+   * frame with the mask as a noise mask (the model sees the room and keeps the scale), widens it a little and pastes
+   * the original pixels back outside it with a soft seam.
+   */
+  @Post('scenes/:id/refine-area')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async refineArea(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('instruction') rawInstruction: string | undefined,
+    @Query('count') count: string | undefined,
+    @Req() request: Ctx & Request,
+  ) {
+    const ctx = request.workspace;
+    await this.project(ctx, projectId);
+    const instruction = str(rawInstruction, 500);
+    if (!instruction) throw new BadRequestException({ errors: { instruction: 'required' } });
+    const mime = String(request.headers['content-type'] ?? '')
+      .split(';')[0]!
+      .trim();
+    if (mime !== 'image/png') throw new BadRequestException({ errors: { mask: 'type' } });
+    const data = await readBinary(request, 10 * 1024 * 1024);
+    if (!data?.length) throw new BadRequestException({ errors: { mask: 'size' } });
+    const scene = await this.prisma.client.scene.findFirst({
+      where: { id, projectId, workspaceId: ctx.workspaceId },
+      select: { id: true },
+    });
+    if (!scene) throw new NotFoundException();
+    const mask = await saveAsset(this.prisma.client, {
+      workspaceId: ctx.workspaceId,
+      projectId,
+      role: 'scene_mask',
+      origin: 'upload',
+      mime,
+      data,
+      recipe: { sceneId: id },
+    });
+    return this.queueRefine(ctx, projectId, id, instruction, count, mask.id);
+  }
+
+  private async queueRefine(
+    ctx: Ctx['workspace'],
+    projectId: string,
+    id: string,
+    instruction: string,
+    rawCount: unknown,
+    maskAssetId: string | null,
+  ) {
+    const count = Number(rawCount ?? 2);
     const scene = await this.prisma.client.scene.findFirst({
       where: { id, projectId, workspaceId: ctx.workspaceId },
       select: SCENE_SELECT,
     });
     if (!scene?.assetId) throw new NotFoundException();
     const n = Number.isInteger(count) && count >= 1 && count <= 4 ? count : 2;
-    const prompt =
-      `Edit the photograph in image 1: ${instruction}. ` +
-      'Change only that. Keep everything else exactly as it is: the same camera and framing, the same room, ' +
-      'furniture, materials, colours and light, and the open bare floor area in front stays empty. ' +
-      'The result is a real, unedited-looking photograph.';
+    const prompt = maskAssetId
+      ? // the PC shows the model the scene with the area filled grey (else it copies back what was there) and samples
+        // only that area; the rest of the frame stays as it is
+        // and the request is quoted as is: "replace the armchair with…" names what the model no longer sees
+        'Image 1 is a photograph with one area filled flat grey; whatever stood there before is gone. ' +
+        `The request for that area: "${instruction}". Put into the grey area what the request asks for, so the ` +
+        'photograph is complete. The same camera, room and light; the walls, floor and furniture continue ' +
+        'seamlessly into it; everything at its true real-world size, in scale with the furniture around it, with ' +
+        'natural contact shadows. No grey patch remains. The result is a real, unedited-looking photograph.'
+      : `Edit the photograph in image 1: ${instruction}. ` +
+        'Change only that. Keep everything else exactly as it is: the same camera and framing, the same room, ' +
+        'furniture, materials, colours and light, and the open bare floor area in front stays empty. ' +
+        'The result is a real, unedited-looking photograph.';
     const params = {
       locationId: scene.locationId,
       sceneType: scene.sceneType,
@@ -747,6 +808,8 @@ export class ScenesController {
       parentSceneId: scene.id,
       parentNumber: scene.number,
       sourceAssetId: scene.assetId,
+      // "Refine an area": the owner's mask (white = change); the agent downloads it from /gpu/jobs/:id/mask
+      maskAssetId,
       // the mock-up of the original, for placing a product later
       proxy: (scene.params as { proxy?: unknown }).proxy ?? null,
       prompt,
