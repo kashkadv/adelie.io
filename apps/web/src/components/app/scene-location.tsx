@@ -14,7 +14,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { useFormatter, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -36,7 +36,6 @@ type Tab = (typeof TABS)[number];
  */
 export function SceneLocation({ locationId }: { locationId: string }) {
   const t = useTranslations('Scenes');
-  const format = useFormatter();
   const router = useRouter();
   const { workspace, project } = useWorkspace();
   const canManage = !!workspace && CONNECT_ROLES.includes(workspace.role);
@@ -79,7 +78,8 @@ export function SceneLocation({ locationId }: { locationId: string }) {
   }, [base, locationId, version]);
 
   const scenes = useMemo(() => data?.scenes ?? [], [data]);
-  const count = (s: Tab) => scenes.filter((x) => x.status === s).length;
+  const count = (s: Tab) =>
+    s === 'sketches' ? (data?.sketches?.length ?? 0) : scenes.filter((x) => x.status === s).length;
   // Opens on "New" while something waits for a decision, else on the kept scenes.
   const current: Tab = tab ?? (data && count('candidate') > 0 ? 'candidate' : 'library');
   const typeLabel = useCallback(
@@ -99,29 +99,33 @@ export function SceneLocation({ locationId }: { locationId: string }) {
     return [...m];
   }, [scenes, current]);
 
-  // New scenes, grouped by the request (job) that made them.
-  // A request still running also shows the scenes it has not made yet, as placeholders.
-  const batches = useMemo(() => {
-    const groups = new Map<string, Scene[]>();
-    const running = (data?.jobs ?? []).filter(
-      (j) => j.status === 'queued' || j.status === 'running',
-    );
-    for (const j of running) groups.set(j.id, []);
-    for (const s of scenes.filter((x) => x.status === 'candidate')) {
+  // New scenes as one grid (owner, 2026-11-27): the newest request first, its scenes in their order, so the versions of
+  // one request stay side by side. Scenes still being made come first, as placeholders.
+  const fresh = useMemo(() => {
+    const items = scenes.filter((x) => x.status === 'candidate');
+    const started = new Map<string, number>();
+    for (const s of items) {
       const k = s.jobId ?? s.id;
-      groups.set(k, [...(groups.get(k) ?? []), s]);
+      const at = new Date(s.createdAt).getTime();
+      started.set(k, Math.min(started.get(k) ?? at, at));
     }
-    return [...groups].map(([key, items]) => {
-      const job = running.find((j) => j.id === key);
-      const made = scenes.filter((x) => x.jobId === key).length;
-      return {
-        key,
-        items: items.sort((a, b) => a.number - b.number),
-        pending: job ? Math.max(0, (job.params.count ?? 0) - made) : 0,
-      };
-    });
-  }, [scenes, data]);
-  const flat = current === 'candidate' ? batches.flatMap((b) => b.items) : inTab;
+    const key = (s: Scene) => started.get(s.jobId ?? s.id) ?? 0;
+    return items.sort((a, b) => key(b) - key(a) || a.number - b.number);
+  }, [scenes]);
+  const pending = useMemo(
+    () =>
+      (data?.jobs ?? [])
+        .filter((j) => j.status === 'queued' || j.status === 'running')
+        .flatMap((j) => {
+          const made = scenes.filter((x) => x.jobId === j.id).length;
+          return Array.from(
+            { length: Math.max(0, (j.params.count ?? 0) - made) },
+            (_, i) => `${j.id}-${i}`,
+          );
+        }),
+    [scenes, data],
+  );
+  const flat = current === 'candidate' ? fresh : inTab;
 
   const look = (s: Scene) =>
     [
@@ -165,10 +169,12 @@ export function SceneLocation({ locationId }: { locationId: string }) {
     }).catch(() => undefined);
     reload();
   };
-  const keepChosen = async (items: Scene[]) => {
+  /** The chosen new scenes, kept or rejected at once. */
+  const decideChosen = async (status: 'library' | 'rejected') => {
     if (!base) return;
-    const keepIds = items.filter((s) => chosen.has(s.id)).map((s) => s.id);
-    const rejectIds = items.filter((s) => !chosen.has(s.id)).map((s) => s.id);
+    const ids = fresh.filter((s) => chosen.has(s.id)).map((s) => s.id);
+    const keepIds = status === 'library' ? ids : [];
+    const rejectIds = status === 'rejected' ? ids : [];
     setData(
       (d) =>
         d && {
@@ -295,6 +301,14 @@ export function SceneLocation({ locationId }: { locationId: string }) {
       .join(' · ');
   };
 
+  /** Under a new scene: the request that made it - the refine instruction, or how it was asked for. */
+  const caption = (s: Scene) => {
+    const p = s.params as { instruction?: string; area?: boolean };
+    return p.instruction
+      ? `${t(p.area ? 'area' : 'refine')}: ${p.instruction}`
+      : [look(s), s.style].filter(Boolean).join(' · ');
+  };
+
   const placeholder = (key: string) => (
     <div key={key} className="card overflow-hidden rounded-[20px]" aria-hidden="true">
       <div className="relative aspect-[2/3] animate-pulse bg-hover">
@@ -385,12 +399,23 @@ export function SceneLocation({ locationId }: { locationId: string }) {
               >
                 <PencilLine size={14} aria-hidden="true" />
               </button>
+              <button
+                type="button"
+                onClick={() => void more(s)}
+                aria-label={t('more')}
+                title={t('more')}
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/95 text-black"
+              >
+                <Sparkles size={14} aria-hidden="true" />
+              </button>
             </div>
           )}
         </div>
         <div className="px-3 pt-2.5 pb-3">
           <p className="truncate text-sm font-semibold">{typeLabel(s.sceneType)}</p>
-          <p className="truncate text-xs text-muted">{look(s)}</p>
+          <p className="truncate text-xs text-muted" title={candidate ? caption(s) : undefined}>
+            {candidate ? caption(s) : look(s)}
+          </p>
         </div>
       </article>
     );
@@ -497,22 +522,6 @@ export function SceneLocation({ locationId }: { locationId: string }) {
         </section>
       )}
 
-      {base && (
-        <SceneSketches
-          base={base}
-          locationId={locationId}
-          sketches={data.sketches ?? []}
-          sceneTypes={data.sceneTypes}
-          typeLabel={typeLabel}
-          canManage={canManage}
-          onChanged={reload}
-          onUse={(id) => {
-            setUseSketch(id);
-            setDialog('add');
-          }}
-        />
-      )}
-
       <div className="animate-rise mb-4 flex flex-wrap items-center justify-between gap-3">
         <div
           role="tablist"
@@ -541,7 +550,7 @@ export function SceneLocation({ locationId }: { locationId: string }) {
             </button>
           ))}
         </div>
-        {current !== 'candidate' && typesHere.length > 1 && (
+        {current !== 'candidate' && current !== 'sketches' && typesHere.length > 1 && (
           <div className="flex flex-wrap gap-1.5 text-sm">
             {[[null, inTab.length] as const, ...typesHere].map(([k, n]) => (
               <button
@@ -563,68 +572,64 @@ export function SceneLocation({ locationId }: { locationId: string }) {
         )}
       </div>
 
-      {current === 'candidate' ? (
-        batches.length === 0 ? (
+      {current === 'sketches' ? (
+        base && (
+          <SceneSketches
+            base={base}
+            locationId={locationId}
+            sketches={data.sketches ?? []}
+            sceneTypes={data.sceneTypes}
+            typeLabel={typeLabel}
+            canManage={canManage}
+            onChanged={reload}
+            onUse={(id) => {
+              setUseSketch(id);
+              setDialog('add');
+            }}
+          />
+        )
+      ) : current === 'candidate' ? (
+        fresh.length === 0 && pending.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted">{t('noNew')}</p>
         ) : (
-          <div className="animate-rise grid gap-7">
-            {batches.map((b) => {
-              const job = data.jobs.find((j) => j.id === b.key);
-              const first = b.items[0];
-              const offset = first ? flat.indexOf(first) : 0;
-              const any = b.items.some((s) => chosen.has(s.id));
-              return (
-                <section key={b.key}>
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-semibold">
-                        {job
-                          ? jobTitle(job)
-                          : first
-                            ? `${typeLabel(first.sceneType)} · ${look(first)}`
-                            : ''}
-                      </p>
-                      <p className="text-xs text-muted">
-                        {format.dateTime(new Date(first?.createdAt ?? job?.createdAt ?? 0), {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                        {' · '}
-                        {t('scenesN', { count: b.items.length + b.pending })}
-                        {first?.style ? ` · ${first.style}` : ''}
-                      </p>
-                    </div>
-                    {canManage && first && (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void more(first)}
-                          className="flex h-9 items-center gap-1.5 rounded-xl border border-line px-3 text-sm text-muted hover:text-foreground"
-                        >
-                          <Sparkles size={14} aria-hidden="true" />
-                          {t('more')}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!any}
-                          onClick={() => void keepChosen(b.items)}
-                          className="btn-primary h-9 w-auto px-3 text-sm"
-                        >
-                          {t('keepChosen')}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-                    {b.items.map((s, j) => card(s, offset + j, true))}
-                    {Array.from({ length: b.pending }, (_, i) => placeholder(`${b.key}-p${i}`))}
-                  </div>
-                </section>
-              );
-            })}
+          <div className="animate-rise grid gap-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+              {pending.map((k) => placeholder(k))}
+              {fresh.map((s, i) => card(s, i, true))}
+            </div>
             {canManage && <p className="text-xs text-muted">{t('keysHint')}</p>}
+            {canManage && chosen.size > 0 && (
+              <div className="sticky bottom-4 z-10 flex justify-center">
+                <div className="glass glass-strong flex flex-wrap items-center gap-2 rounded-2xl p-2 pl-4 shadow-lg">
+                  <span className="text-sm font-medium">
+                    {t('chosenN', { count: chosen.size })}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void decideChosen('library')}
+                    className="btn-primary flex h-9 w-auto items-center gap-1.5 px-3.5 text-sm"
+                  >
+                    <Check size={15} aria-hidden="true" />
+                    {t('keepSelected')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void decideChosen('rejected')}
+                    className="flex h-9 items-center gap-1.5 rounded-xl border border-line px-3.5 text-sm text-muted hover:text-foreground"
+                  >
+                    <X size={15} aria-hidden="true" />
+                    {t('rejectSelected')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChosen(new Set())}
+                    className="h-9 rounded-xl px-3 text-sm text-muted hover:bg-hover hover:text-foreground"
+                  >
+                    {t('clearChosen')}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )
       ) : inTab.length === 0 ? (

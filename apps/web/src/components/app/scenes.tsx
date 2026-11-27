@@ -1,6 +1,6 @@
 'use client';
 
-import { Cpu, Images, Plus, ScrollText } from 'lucide-react';
+import { Cpu, Images, Plus, ScrollText, Search, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -44,6 +44,7 @@ export function Scenes() {
   const base = workspace && project ? `/workspaces/${workspace.id}/projects/${project.id}` : null;
   const [data, setData] = useState<{ locations: LocationCard[]; gpu: Gpu } | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<'location' | 'pc' | 'rules' | null>(null);
 
   useEffect(() => {
@@ -67,7 +68,10 @@ export function Scenes() {
   const all = data?.locations ?? [];
   const locations = all.filter((l) => !l.archivedAt);
   const archived = all.filter((l) => l.archivedAt);
-  const shown = showArchived ? archived : locations;
+  const needle = search.trim().toLowerCase();
+  const shown = (showArchived ? archived : locations).filter(
+    (l) => !needle || l.name.toLowerCase().includes(needle),
+  );
 
   return (
     <>
@@ -124,7 +128,30 @@ export function Scenes() {
         />
       ) : (
         <>
-          <div className="animate-rise grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-5">
+          <label className="animate-rise mb-5 flex h-10 w-full items-center gap-2 rounded-full border border-line px-4 text-sm focus-within:border-[var(--field-focus)] sm:w-80">
+            <Search size={15} className="shrink-0 text-muted" aria-hidden="true" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('searchLocations')}
+              aria-label={t('searchLocations')}
+              className="w-full min-w-0 bg-transparent outline-none placeholder:text-muted"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label={t('clearSearch')}
+                className="text-muted hover:text-foreground"
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            )}
+          </label>
+          {needle && shown.length === 0 && (
+            <p className="py-6 text-sm text-muted">{t('noLocationsFound')}</p>
+          )}
+          <div className="animate-rise grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {shown.map((l) => (
               <Link
                 key={l.id}
@@ -169,7 +196,7 @@ export function Scenes() {
                 </div>
               </Link>
             ))}
-            {canManage && !showArchived && (
+            {canManage && !showArchived && !needle && (
               <button
                 type="button"
                 onClick={() => setDialog('location')}

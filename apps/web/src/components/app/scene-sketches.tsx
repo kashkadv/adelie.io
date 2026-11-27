@@ -75,13 +75,9 @@ export function SceneSketches({
     onChanged();
   };
 
-  if (!sketches.length && !canManage) return null;
   return (
-    <section className="animate-rise mb-5">
-      <div className="mb-2 flex items-center gap-2 px-1">
-        <h2 className="text-sm font-semibold">{t('sketches')}</h2>
-        <span className="text-xs text-muted">{t('sketchesLead')}</span>
-      </div>
+    <section className="animate-rise">
+      <p className="mb-3 px-1 text-sm text-muted">{t('sketchesLead')}</p>
       <div
         onDragOver={(e) => {
           if (!canManage) return;
@@ -94,10 +90,10 @@ export function SceneSketches({
           setDragging(false);
           if (canManage) void add(e.dataTransfer.files);
         }}
-        className={`scroll-thin flex gap-3 overflow-x-auto rounded-2xl p-1 ${dragging ? 'bg-hover' : ''}`}
+        className={`grid grid-cols-2 gap-4 rounded-2xl md:grid-cols-3 xl:grid-cols-4 ${dragging ? 'bg-hover' : ''}`}
       >
         {sketches.map((sk) => (
-          <div key={sk.id} className="card w-56 shrink-0 overflow-hidden rounded-2xl">
+          <div key={sk.id} className="card overflow-hidden rounded-[20px]">
             <div className="group relative">
               {/* eslint-disable-next-line @next/next/no-img-element -- served by the API with the session cookie */}
               <img
@@ -142,7 +138,7 @@ export function SceneSketches({
           </div>
         ))}
         {canManage && (
-          <label className="flex w-56 shrink-0 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-[1.5px] border-dashed border-line p-4 text-center text-sm text-muted hover:text-foreground">
+          <label className="flex aspect-[3/2] cursor-pointer flex-col items-center justify-center gap-2 rounded-[20px] border-[1.5px] border-dashed border-line p-4 text-center text-sm text-muted hover:text-foreground">
             <ImagePlus size={22} strokeWidth={1.75} aria-hidden="true" />
             {busy ? '…' : t('sketchAdd')}
             <span className="text-xs">{t('sketchAddHint')}</span>

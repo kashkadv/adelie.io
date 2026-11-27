@@ -4,7 +4,7 @@ export const LIGHTS = ['sun', 'evening'] as const;
 export const ANGLES = ['front', 'side'] as const;
 export const SIZE_CLASSES = ['small', 'medium', 'large', 'runner'] as const;
 export const PRODUCT_TYPES = ['lizhnyk', 'rug', 'runner', 'panel', 'pillow', 'pouf'] as const;
-export const TABS = ['library', 'candidate', 'archived'] as const;
+export const TABS = ['library', 'candidate', 'sketches', 'archived'] as const;
 
 export type Direction = (typeof DIRECTIONS)[number];
 export type GpuState = 'ready' | 'busy' | 'offline';

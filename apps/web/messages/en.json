@@ -2089,6 +2089,9 @@
   "Scenes": {
     "title": "Scenes",
     "subtitle": "Photoshoot locations: each holds scenes to place blankets, rugs, runners and wall hangings in",
+    "searchLocations": "Search by name",
+    "clearSearch": "Clear",
+    "noLocationsFound": "No locations with this name",
     "close": "Close",
     "cancel": "Cancel",
     "save": "Save",
@@ -2235,6 +2238,7 @@
     "tabs": {
       "library": "Scenes",
       "candidate": "New",
+      "sketches": "Sketches",
       "archived": "Archive"
     },
     "allTypes": "All",
@@ -2244,7 +2248,10 @@
     "keep": "Keep",
     "reject": "Reject",
     "choose": "Choose",
-    "keepChosen": "Keep chosen, reject the rest",
+    "chosenN": "Chosen: {count}",
+    "keepSelected": "Keep",
+    "rejectSelected": "Reject",
+    "clearChosen": "Clear the choice",
     "more": "More like this",
     "archive": "Archive",
     "restore": "Restore",
@@ -2312,7 +2319,6 @@
     "referenceAdd": "Drop photos here or choose files",
     "referenceMore": "More photos",
     "referenceRemove": "Remove the reference",
-    "sketches": "Sketches",
     "sketchesLead": "rooms of this location: the PC turns a sketch into a photo keeping its composition",
     "sketchAdd": "Add a sketch",
     "sketchAddHint": "Drop or choose. Pencil, line or coloured; best leave the floor for the product empty.",
