@@ -93,8 +93,9 @@ export function SceneSketches({
         className={`grid grid-cols-2 gap-4 rounded-2xl md:grid-cols-3 xl:grid-cols-4 ${dragging ? 'bg-hover' : ''}`}
       >
         {sketches.map((sk) => (
-          <div key={sk.id} className="card overflow-hidden rounded-[20px]">
-            <div className="group relative">
+          <div key={sk.id} className="card rounded-[20px]">
+            {/* only the picture is clipped: the scene type list below opens past the card's edge */}
+            <div className="group relative overflow-hidden rounded-t-[20px]">
               {/* eslint-disable-next-line @next/next/no-img-element -- served by the API with the session cookie */}
               <img
                 src={`${apiUrl}${base}/assets/${sk.assetId}`}
