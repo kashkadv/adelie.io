@@ -77,6 +77,11 @@ def state():
     if SWITCH_OFF.exists():
         return "busy", vram_free_mb()
     free = vram_free_mb()
+    if free is not None and free < MIN_VRAM:
+        # ComfyUI may still hold a model after a job (2026-11-28: 4.3 GB left after its own failure, so the PC stayed
+        # "busy" with nothing to do) - unload it and measure again; other programs' memory is not touched
+        comfy_free()
+        free = vram_free_mb()
     return ("ready" if free is None or free >= MIN_VRAM else "busy"), free
 
 
