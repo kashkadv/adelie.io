@@ -522,7 +522,7 @@ export function SceneLocation({ locationId }: { locationId: string }) {
         </section>
       )}
 
-      <div className="animate-rise mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="animate-rise mb-7 flex flex-wrap items-center justify-between gap-3">
         <div
           role="tablist"
           aria-label={t('view')}
