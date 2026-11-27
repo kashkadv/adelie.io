@@ -16,9 +16,11 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { Session, type UserSession } from '@thallesp/nestjs-better-auth';
 import type { Request, Response } from 'express';
 import { Prisma } from '@adelie/db';
 import { assetFile, MIME_EXT, readBinary, saveAsset } from '../assets/storage.js';
+import { improveRefineRequest } from './refine-request.js';
 import { bestState, workerState } from '../gpu/gpu.js';
 import { CONNECT_ROLES } from '../social/connect.service.js';
 import { PrismaService } from '../prisma.service.js';
@@ -714,20 +716,21 @@ export class ScenesController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { instruction?: unknown; count?: unknown } | undefined,
+    @Session() session: UserSession,
     @Req() request: Ctx,
   ) {
     const ctx = request.workspace;
     await this.project(ctx, projectId);
     const instruction = str(body?.instruction, 500);
     if (!instruction) throw new BadRequestException({ errors: { instruction: 'required' } });
-    return this.queueRefine(ctx, projectId, id, instruction, body?.count, null);
+    return this.queueRefine(ctx, session.user.id, projectId, id, instruction, body?.count, null);
   }
 
   /**
    * "Refine an area" (owner, 2026-11-27): the owner paints over a part of the scene and says what to do there. The
-   * mask comes as the body (PNG, white = change), the instruction and count in the query. The PC samples the whole
-   * frame with the mask as a noise mask (the model sees the room and keeps the scale), widens it a little and pastes
-   * the original pixels back outside it with a soft seam.
+   * mask comes as the body (PNG, white = change), the instruction and count in the query. The PC shows the model the
+   * scene with the area tinted red, the model edits the whole frame, and only the area (with what grew from it) is
+   * pasted back over the original with a soft seam.
    */
   @Post('scenes/:id/refine-area')
   @WorkspaceRoles(...CONNECT_ROLES)
@@ -736,6 +739,7 @@ export class ScenesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query('instruction') rawInstruction: string | undefined,
     @Query('count') count: string | undefined,
+    @Session() session: UserSession,
     @Req() request: Ctx & Request,
   ) {
     const ctx = request.workspace;
@@ -762,11 +766,12 @@ export class ScenesController {
       data,
       recipe: { sceneId: id },
     });
-    return this.queueRefine(ctx, projectId, id, instruction, count, mask.id);
+    return this.queueRefine(ctx, session.user.id, projectId, id, instruction, count, mask.id);
   }
 
   private async queueRefine(
     ctx: Ctx['workspace'],
+    userId: string,
     projectId: string,
     id: string,
     instruction: string,
@@ -780,16 +785,29 @@ export class ScenesController {
     });
     if (!scene?.assetId) throw new NotFoundException();
     const n = Number.isInteger(count) && count >= 1 && count <= 4 ? count : 2;
+    // The owner's words, in any language, become one concrete English instruction (the model ignored Ukrainian
+    // requests in tests, 2026-11-27); without AI the owner's words go as they are.
+    const [rules, loc] = await Promise.all([
+      this.rules(ctx, projectId),
+      this.location(ctx, projectId, scene.locationId),
+    ]);
+    const english = await improveRefineRequest(this.prisma.client, {
+      workspaceId: ctx.workspaceId,
+      projectId,
+      userId,
+      request: instruction,
+      area: !!maskAssetId,
+      sceneType: rules.find((r) => r.key === scene.sceneType)?.label ?? scene.sceneType,
+      location: loc.description,
+    });
+    const what = english ?? `"${instruction}"`;
     const prompt = maskAssetId
-      ? // the PC shows the model the scene with the area filled grey (else it copies back what was there) and samples
-        // only that area; the rest of the frame stays as it is
-        // and the request is quoted as is: "replace the armchair with…" names what the model no longer sees
-        'Image 1 is a photograph with one area filled flat grey; whatever stood there before is gone. ' +
-        `The request for that area: "${instruction}". Put into the grey area what the request asks for, so the ` +
-        'photograph is complete. The same camera, room and light; the walls, floor and furniture continue ' +
-        'seamlessly into it; everything at its true real-world size, in scale with the furniture around it, with ' +
-        'natural contact shadows. No grey patch remains. The result is a real, unedited-looking photograph.'
-      : `Edit the photograph in image 1: ${instruction}. ` +
+      ? // the PC tints the area red on the scene it shows the model, then pastes only the area back
+        'Image 1 is a photograph with one area tinted semi-transparent red. Edit only that red-tinted area: ' +
+        `${what}. Remove the red tint completely. Everything else stays as it is: the same camera, room, ` +
+        'furniture and light; everything at its true real-world size with natural contact shadows. The result is ' +
+        'a real, unedited-looking photograph.'
+      : `Edit the photograph in image 1: ${what}. ` +
         'Change only that. Keep everything else exactly as it is: the same camera and framing, the same room, ' +
         'furniture, materials, colours and light, and the open bare floor area in front stays empty. ' +
         'The result is a real, unedited-looking photograph.';
@@ -805,6 +823,7 @@ export class ScenesController {
       count: n,
       seeds: seedsFor(n),
       instruction,
+      instructionEn: english,
       parentSceneId: scene.id,
       parentNumber: scene.number,
       sourceAssetId: scene.assetId,

@@ -2291,7 +2291,7 @@
     "refineTitle": "Refine: {scene}",
     "refineLead": "The PC changes only what you write; camera, furniture, light and the free floor stay.",
     "refineWhat": "What to change",
-    "refineWhatHint": "Concrete, 1–2 changes. English works more precisely.",
+    "refineWhatHint": "Concrete, 1–2 changes, in any language: Adelie turns it into a precise instruction for the model.",
     "refinePlaceholder": "remove the floor lamp on the left; darker walls",
     "refineCount": "How many versions",
     "refineSubmit": "Refine",

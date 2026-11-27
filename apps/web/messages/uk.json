@@ -2291,7 +2291,7 @@
     "refineTitle": "Уточнити: {scene}",
     "refineLead": "ПК змінить лише те, що ви напишете; камера, меблі, світло й вільна підлога лишаться.",
     "refineWhat": "Що змінити",
-    "refineWhatHint": "Конкретно, 1–2 зміни. Англійською працює точніше.",
+    "refineWhatHint": "Конкретно, 1–2 зміни, будь-якою мовою: Adelie перетворить запит на точну інструкцію для моделі.",
     "refinePlaceholder": "remove the floor lamp on the left; darker walls",
     "refineCount": "Скільки варіантів",
     "refineSubmit": "Уточнити",
