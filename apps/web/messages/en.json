@@ -2310,7 +2310,7 @@
     "areaUndo": "Undo",
     "areaClear": "Clear",
     "areaWhat": "What to do there",
-    "areaWhatHint": "Say what should be in the area: the PC fills it anew, in scale with the room around it.",
+    "areaWhatHint": "Name what to change, e.g. “remove the floor lamp and the pictures”, and where to add, e.g. “a lamp by the sofa”. Any language.",
     "areaPlaceholder": "a tall fiddle-leaf fig in a terracotta pot",
     "areaEmpty": "Paint over the area first",
     "areaJob": "Refining an area of №{n}: {what}",
