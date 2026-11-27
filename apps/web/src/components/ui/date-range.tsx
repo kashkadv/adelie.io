@@ -20,6 +20,11 @@ const fromDay = (day: Day) => {
   const [y, m, d] = day.split('-').map(Number);
   return new Date(y!, m! - 1, d!);
 };
+/**
+ * Calendar dates here are built at local midnight, so they must be formatted in the browser's own
+ * zone; the formatter's default zone (from next-intl) can differ and shift the day or month.
+ */
+const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 /** The concrete inclusive from/to of a range, or null for "all time". */
 export function resolveRange(range: DateRange, today = new Date()): { from: Day; to: Day } | null {
@@ -40,6 +45,7 @@ function useRangeLabel() {
   const format = useFormatter();
   const short = (day: Day, withYear: boolean) =>
     format.dateTime(fromDay(day), {
+      timeZone: tz,
       day: 'numeric',
       month: 'short',
       ...(withYear ? { year: 'numeric' } : {}),
@@ -94,7 +100,7 @@ export function RangeCalendar({
     ),
   ];
   const weekdays = Array.from({ length: 7 }, (_, i) =>
-    format.dateTime(new Date(2024, 0, 1 + i), { weekday: 'narrow' }),
+    format.dateTime(new Date(2024, 0, 1 + i), { timeZone: tz, weekday: 'narrow' }),
   );
   const span: [Day, Day] | null = start
     ? ([start, hover ?? start].sort() as [Day, Day])
@@ -116,7 +122,7 @@ export function RangeCalendar({
           <ChevronLeft size={16} aria-hidden="true" />
         </button>
         <span className="text-sm font-medium first-letter:uppercase">
-          {format.dateTime(month, { month: 'long', year: 'numeric' })}
+          {format.dateTime(month, { timeZone: tz, month: 'long', year: 'numeric' })}
         </span>
         <button
           type="button"
