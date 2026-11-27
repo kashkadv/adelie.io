@@ -152,6 +152,22 @@ def run(cmd, env=None, cwd=None):
         raise RuntimeError(f"{Path(str(cmd[2])).name}: {(r.stderr or r.stdout)[-800:]}")
     return r.stdout
 
+def comfy_image(wf, env=None):
+    """Runs a workflow in ComfyUI and returns its output image's file name. ComfyUI sometimes fails inside its own
+    memory paging (2026-11-28, the second version of a refine: "RuntimeError: Fault failed: 2" in comfy_aimdo) - then
+    the models are unloaded and the run is tried once more; a second failure reports ComfyUI's own error."""
+    out = ""
+    for attempt in (1, 2):
+        out = run([PY, "-I", PROTO / "comfy_run.py", wf], env=env)
+        names = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")]
+        if names:
+            return names[0]
+        print(f"  ComfyUI returned no image (attempt {attempt}):", out.strip()[-300:], flush=True)
+        comfy_free()
+    err = [l for l in out.splitlines() if l.startswith(("ERROR:", "status:"))]
+    raise RuntimeError("ComfyUI: " + (" ".join(err) or "no image")[:400])
+
+
 
 # --- scene_candidates -------------------------------------------------------------------------------------------------
 
@@ -276,9 +292,8 @@ def photo_pass(jid, work, n, seed, img, prompt, prog):
         comfy_free()
         run([PY, "-I", PROTO / "wf_sdxl_refine.py", wf, seed, work / "photo.txt", src.name, f"adelie/{jid}_{n}_photo"],
             env={"DENOISE": "0.3", "CKPT": REALVIS})
-        out = run([PY, "-I", PROTO / "comfy_run.py", wf])
+        name = comfy_image(wf)
         comfy_free()
-        name = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")][0]
         img.unlink(missing_ok=True)
         return COMFY_DIR / "output" / "adelie" / name, True
     except Exception as e:
@@ -354,9 +369,8 @@ def scene_candidates(job):
         else:   # FLUX.2 klein for comparisons: 8 steps, the first skipped (the same share)
             run([PY, "-I", PROTO / "wf_klein.py", wf, seed, work / "prompt.txt", "832x1248", f"adelie/{jid}_{n}",
                  inp.name], env={"START": "1", "STEPS": "8", "KLEIN": AGENT_MODEL[-2:]})
-        out = run([PY, "-I", PROTO / "comfy_run.py", wf], env={"PROGRESS_FILE": str(prog.file)})
+        name = comfy_image(wf, env={"PROGRESS_FILE": str(prog.file)})
         prog.set(stage="uploading")
-        name = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")][0]
         img = COMFY_DIR / "output" / "adelie" / name
         img, refined = photo_pass(jid, work, n, seed, img, p.get("photoPrompt"), prog)
         meta = {"prompt": prompt, "seed": seed, "model": MODEL, "size": size, "photoPass": refined,
@@ -441,9 +455,8 @@ def scene_refine(job):
         wf = work / f"wf_{n}.json"
         run([PY, "-I", PROTO / "wf_flux3.py", wf, seed, work / "prompt.txt", ref_size, f"adelie/{jid}_{n}", main.name],
             env={"START": "0", "STEPS": "16"})
-        out = run([PY, "-I", PROTO / "comfy_run.py", wf], env={"PROGRESS_FILE": str(prog.file)})
+        name = comfy_image(wf, env={"PROGRESS_FILE": str(prog.file)})
         prog.set(stage="uploading")
-        name = [l.split()[-1] for l in out.splitlines() if l.startswith("output:")][0]
         img = COMFY_DIR / "output" / "adelie" / name
         if mask:
             pasted = work / f"area_{n}.png"
