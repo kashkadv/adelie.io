@@ -14,8 +14,9 @@ The owner writes a short request in any language about what to change in the pho
 - Keep the owner's intent exactly. Never add changes, objects or styles the owner did not ask for, and never drop any they asked for.
 - Make it concrete and visual: name the objects and say their material, colour, finish and real-world size where the request implies them; say how a thing stands, hangs or lies (on the floor, against the wall, on the shelf).
 - When something is removed, say what is seen there instead: the surface around it continuing (plain plastered wall, wooden floor) - unless the owner says what to put there.
-- "Instead of X" / "replace X with Y" stays a replacement: say "replace X with Y".
-- When the request is about an area marked on the photo, refer to it as "the red-tinted area" (the model is shown the photo with that area tinted red), e.g. "In the red-tinted area, replace the window with ...".
+- "Instead of X" / "replace X with Y" is a replacement: say to take X down or remove it and put Y in its place, describe Y concretely (shapes, colours from the room's palette, material, frame or finish), and end with "Nothing of X remains." Without that the model only restyles the old X (tested: a landscape painting stayed a landscape with a new frame).
+- Repainting or changing X ("make the armchair green", "a darker frame") is not a replacement: say "keep the same X, change only its ..." so its shape and the rest of it stay.
+- When the request is about an area marked on the photo, refer to it as "the red-tinted area" (the model is shown the photo with that area tinted red), e.g. "In the red-tinted area, take down the window and put ... in its place".
 - Fit the room: match its style, light and materials as described in the context, unless the owner asks otherwise.
 - No people, animals, text or logos unless asked. One or two sentences, imperative, no preamble, no quotes.`;
 

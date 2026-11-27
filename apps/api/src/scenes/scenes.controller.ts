@@ -801,7 +801,7 @@ export class ScenesController {
       sceneType: rules.find((r) => r.key === scene.sceneType)?.label ?? scene.sceneType,
       location: loc.description,
     });
-    const what = english ?? `"${instruction}"`;
+    const what = (english ?? `"${instruction}"`).replace(/\.+$/, '');
     const prompt = maskAssetId
       ? // the PC tints the area red on the scene it shows the model, then pastes only the area back
         'Image 1 is a photograph with one area tinted semi-transparent red. Edit only that red-tinted area: ' +
