@@ -2232,7 +2232,8 @@
     "jobQueued": "queued",
     "jobWaitingPc": "waiting for the PC",
     "jobCancel": "Cancel the job",
-    "jobFailed": "Failed: {what}",
+    "jobDismiss": "Close",
+    "jobFailedShort": "Failed",
     "scenesN": "{count, plural, one {# scene} other {# scenes}}",
     "view": "Show",
     "tabs": {

@@ -6,11 +6,13 @@ import {
   Brush,
   Check,
   ChevronLeft,
+  Clock,
   PencilLine,
   Plus,
   RefreshCw,
   Sparkles,
   Star,
+  TriangleAlert,
   Trash2,
   X,
 } from 'lucide-react';
@@ -202,6 +204,13 @@ export function SceneLocation({ locationId }: { locationId: string }) {
       else n.add(s.id);
       return n;
     });
+  /** Closes a failed job's message (it stays closed). */
+  const dismissJob = async (id: string) => {
+    if (!base) return;
+    setData((d) => d && { ...d, jobs: d.jobs.filter((j) => j.id !== id) });
+    await api(`${base}/gpu-jobs/${id}/dismiss`, { method: 'POST' }).catch(() => undefined);
+    reload();
+  };
   const cancelJob = async (id: string) => {
     if (!base) return;
     await api(`${base}/gpu-jobs/${id}/cancel`, { method: 'POST' }).catch(() => undefined);
@@ -472,52 +481,86 @@ export function SceneLocation({ locationId }: { locationId: string }) {
       </header>
 
       {(active.length > 0 || failed.length > 0) && (
-        <section className="card animate-rise mb-4 grid gap-2 rounded-[22px] p-4">
-          {active.map((j) => (
-            <div key={j.id} className="flex items-center gap-3 text-sm">
-              <RefreshCw
-                size={15}
-                className={j.status === 'running' ? 'animate-spin text-accent' : 'text-muted'}
-                aria-hidden="true"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate">
-                  {jobTitle(j)} · {t('scenesN', { count: j.params.count ?? 0 })}
+        <section className="card animate-rise mb-8 divide-y divide-line rounded-[22px] px-2">
+          {active.map((j) => {
+            const running = j.status === 'running';
+            const title = `${jobTitle(j)} · ${t('scenesN', { count: j.params.count ?? 0 })}`;
+            return (
+              <div key={j.id} className="flex items-center gap-3 px-2 py-3">
+                <span
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                    running ? 'bg-accent text-accent-foreground' : 'bg-hover text-muted'
+                  }`}
+                >
+                  {running ? (
+                    <RefreshCw size={15} className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Clock size={15} aria-hidden="true" />
+                  )}
                 </span>
-                {j.status === 'running' && (
-                  <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-hover">
-                    <span
-                      className="block h-full rounded-full bg-accent transition-[width] duration-700"
-                      style={{ width: `${Math.max(2, j.progress)}%` }}
-                    />
-                  </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium" title={title}>
+                    {title}
+                  </p>
+                  <p className="truncate text-xs text-muted">
+                    {running
+                      ? jobLine(j)
+                      : data.gpu.state === 'ready'
+                        ? t('jobQueued')
+                        : t('jobWaitingPc')}
+                  </p>
+                  {running && (
+                    <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-hover">
+                      <span
+                        className="block h-full rounded-full bg-accent transition-[width] duration-700"
+                        style={{ width: `${Math.max(2, j.progress)}%` }}
+                      />
+                    </span>
+                  )}
+                </div>
+                {j.status === 'queued' && canManage && (
+                  <button
+                    type="button"
+                    onClick={() => void cancelJob(j.id)}
+                    className="icon-btn h-8 w-8 shrink-0"
+                    title={t('jobCancel')}
+                    aria-label={t('jobCancel')}
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
                 )}
+              </div>
+            );
+          })}
+          {failed.map((j) => (
+            <div key={j.id} className="flex items-center gap-3 px-2 py-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-hover text-rose-600 dark:text-rose-400">
+                <TriangleAlert size={15} aria-hidden="true" />
               </span>
-              <span className="shrink-0 text-right text-muted">
-                {j.status === 'running'
-                  ? jobLine(j)
-                  : data.gpu.state === 'ready'
-                    ? t('jobQueued')
-                    : t('jobWaitingPc')}
-              </span>
-              {j.status === 'queued' && canManage && (
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium" title={jobTitle(j)}>
+                  {jobTitle(j)}
+                </p>
+                <p
+                  className="truncate text-xs text-rose-600 dark:text-rose-400"
+                  title={j.error ?? undefined}
+                >
+                  {t('jobFailedShort')}
+                  {j.error ? ` — ${j.error.slice(0, 200)}` : ''}
+                </p>
+              </div>
+              {canManage && (
                 <button
                   type="button"
-                  onClick={() => void cancelJob(j.id)}
-                  className="icon-btn h-8 w-8"
-                  title={t('jobCancel')}
-                  aria-label={t('jobCancel')}
+                  onClick={() => void dismissJob(j.id)}
+                  className="icon-btn h-8 w-8 shrink-0"
+                  title={t('jobDismiss')}
+                  aria-label={t('jobDismiss')}
                 >
                   <X size={14} aria-hidden="true" />
                 </button>
               )}
             </div>
-          ))}
-          {failed.map((j) => (
-            <p key={j.id} className="text-sm text-rose-600 dark:text-rose-400">
-              {t('jobFailed', { what: jobTitle(j) })}
-              {j.error ? ` — ${j.error.slice(0, 160)}` : ''}
-            </p>
           ))}
         </section>
       )}

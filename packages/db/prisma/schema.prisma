@@ -1263,6 +1263,8 @@ model GpuJob {
   error       String?
   claimedAt   DateTime?
   finishedAt  DateTime?
+  /// The owner closed the failure message on the location page (it is no longer shown).
+  dismissedAt DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   scenes      Scene[]

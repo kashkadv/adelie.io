@@ -267,6 +267,7 @@ export class ScenesController {
           projectId,
           workspaceId: ctx.workspaceId,
           params: { path: ['locationId'], equals: id },
+          dismissedAt: null,
           OR: [
             { status: { in: ['queued', 'running'] } },
             { finishedAt: { gte: new Date(Date.now() - 86_400_000) } },
@@ -885,6 +886,24 @@ export class ScenesController {
       data: { status: 'cancelled', finishedAt: new Date() },
     });
     if (!res.count) throw new BadRequestException({ errors: { job: 'not_queued' } });
+    return { ok: true };
+  }
+
+  /** The owner closes a failed job's message on the location page. */
+  @Post('gpu-jobs/:id/dismiss')
+  @WorkspaceRoles(...CONNECT_ROLES)
+  async dismiss(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: Ctx,
+  ) {
+    const ctx = request.workspace;
+    await this.project(ctx, projectId);
+    const res = await this.prisma.client.gpuJob.updateMany({
+      where: { id, projectId, workspaceId: ctx.workspaceId, status: 'failed' },
+      data: { dismissedAt: new Date() },
+    });
+    if (!res.count) throw new NotFoundException();
     return { ok: true };
   }
 

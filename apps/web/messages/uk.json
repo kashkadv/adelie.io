@@ -2232,7 +2232,8 @@
     "jobQueued": "у черзі",
     "jobWaitingPc": "чекає на ПК",
     "jobCancel": "Скасувати завдання",
-    "jobFailed": "Не вдалося: {what}",
+    "jobDismiss": "Закрити",
+    "jobFailedShort": "Не вдалося",
     "scenesN": "{count, plural, one {# сцена} few {# сцени} other {# сцен}}",
     "view": "Показати",
     "tabs": {
