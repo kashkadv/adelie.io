@@ -95,6 +95,13 @@ Cloudflare Email Routing (лише прийом, переадресація): `h
   Пам'ять закріплено: `qm set 104 --balloon 4096` (мінімум = максимум = 4 ГБ); у VM — swap 4 ГБ
   (`/swapfile` у `/etc/fstab`, `vm.swappiness=10`). Згодом — збирати образи поза сервером (CI).
 
+- 2026-11-27/28: після вимкнення світла Postgres і Redis не піднімались: їхні порти опубліковано лише на Tailscale-адресі
+  (`100.102.237.81:5432`, `:6379`), а Docker стартував раніше, ніж `tailscaled` отримав адресу («cannot assign requested
+  address») — 27.11 контейнери лишились без мережі, 28.11 — зупинені. Виправлено drop-in
+  `/etc/systemd/system/docker.service.d/after-tailscale.conf`: Docker стартує після `tailscaled` і до 60 с чекає адресу
+  на `tailscale0` (потім стартує все одно). Перевірено перезавантаженням VM: усе піднялось саме. Скасувати — видалити
+  файл і `sudo systemctl daemon-reload`. Новий ключ SSH VM (після перезапуску): `SHA256:fgz05qK1…` — звірено власником.
+
 ## Відтворення VM з нуля (на хості Proxmox)
 
 ```bash
