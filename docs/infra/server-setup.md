@@ -6,7 +6,7 @@
 
 | Параметр | Значення |
 |---|---|
-| Хост Proxmox | `pve`, `192.168.3.69` (UI: `:8006`), Proxmox VE 9.2, у tailnet |
+| Хост Proxmox | `pve`, `192.168.3.69` (UI: `:8006`), Proxmox VE 9.2, у tailnet акаунта `dmytrokashka@` (не того, що VM `adelie` і ПК власника — `kashkadmitry1991@`); з ПК — по LAN, `ssh root@192.168.3.69` |
 | VM | ID `104`, ім'я `adelie`, автозапуск з хостом |
 | ОС | Ubuntu Server 24.04 LTS (cloud image + cloud-init) |
 | Ресурси | 4 vCPU, 4 GB RAM (balloon min 2 GB), 60 GB диск на `local-lvm` |
@@ -101,6 +101,9 @@ Cloudflare Email Routing (лише прийом, переадресація): `h
   `/etc/systemd/system/docker.service.d/after-tailscale.conf`: Docker стартує після `tailscaled` і до 60 с чекає адресу
   на `tailscale0` (потім стартує все одно). Перевірено перезавантаженням VM: усе піднялось саме. Скасувати — видалити
   файл і `sudo systemctl daemon-reload`. Новий ключ SSH VM (після перезапуску): `SHA256:fgz05qK1…` — звірено власником.
+- 2026-11-28, перевірка Proxmox після вимкнення світла: хост, VM 104 `adelie` і CT 101–103 піднялись самі (автозапуск
+  є, інтернет є); VM 100 HomeAssistant вимкнено вручну 6.11, без автозапуску. На хості згенеровано локаль
+  `uk_UA.UTF-8` (ПК передає українські `LC_*` по SSH — perl сипав попередження).
 
 ## Відтворення VM з нуля (на хості Proxmox)
 
